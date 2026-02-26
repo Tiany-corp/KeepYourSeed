@@ -29,6 +29,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "experiments": {
+      "baseUrl": "/kys-web-app"
+    },
     "plugins": [
       [
         "expo-av",
