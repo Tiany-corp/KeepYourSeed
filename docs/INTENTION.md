@@ -2,7 +2,7 @@
 
 > **Rôle de ce document** : Centre de vérité vivant pour toute décision de design, d'identité visuelle et d'expérience utilisateur de **KeepYourSeed**. Ce document est lu et mis à jour à chaque itération pour garantir la cohérence du projet.
 >
-> 📅 Dernière mise à jour : 27 février 2026 — v2 (décisions visuelles actées)
+> 📅 Dernière mise à jour : 27 février 2026 — v3 (reveal implémenté, dates contextuelles)
 
 ---
 
@@ -105,25 +105,44 @@ L'esthétique est inspirée des apps de notes minimalistes (Bloc-notes iOS/Andro
 
 ---
 
-## 5. ✨ Interaction de Révélation — "Pensée du Passé"
+## 5. ✨ Interaction de Révélation — "Pensée du Passé" ✅ Implémenté
 
 ### Concept
 La Pensée du Passé est un souvenir aléatoire proposé chaque jour. Elle n'est **pas visible immédiatement** : l'utilisateur doit effectuer une interaction pour la "débloquer". Cela crée un effet de surprise et une micro-dose de dopamine.
 
-### Mécanique retenue ✅ Long Press
+### État verrouillé (carte compacte)
+- **Layout** : Horizontal — 🔒 Lock icon à gauche + texte teaser à droite
+- **Teaser** : Date contextuelle + accroche → *"Mardi soir, tu pensais à..."*
+- **Sous-texte** : *"Maintiens pour écouter"* (mobile) / *"Clique et maintiens pour écouter"* (web)
+- **Barre de progression** : En bas de la carte, ambre doré (`#D97706`) sur fond beige (`#F5F0E8`)
 
-- **État initial** : Carte opaque avec bordure fine, texte mystère : *"💭 Un souvenir t'attend..."*
-- **Interaction** : Appui long (~1.5s)
-- **Pendant l'appui** : Barre de progression linéaire qui se remplit (pas de cercle — cohérent avec l'esthétique carrée) + vibration légère à 50%
-- **À la fin** : Vibration nette + le contenu apparaît avec une transition simple (fade-in / slide-down)
-- **Pas de bounce ni confetti** → rester dans le ton sobre du bloc-notes
-- **Cohérence visuelle** : la barre de progression peut être en `ambre doré (#D97706)` sur fond `beige pâle (#F5F0E8)`
+### Mécanique Long Press (~1.5s)
+- `onPressIn` → la barre se remplit via `Animated.timing` (1500ms)
+- À 50% → vibration légère (mobile uniquement, ignorée sur web)
+- À 100% → vibration nette + fade-in du contenu révélé
+- Si relâché avant → la barre se vide (200ms), annulé
+- **Web compatible** via `Pressable` (mousedown/mouseup)
 
-### Après la révélation
-- Le titre de la note apparaît
-- La date s'affiche : *"Il y a 3 mois, le 27 novembre 2025"*
-- Bouton "▶ Écouter" pour lancer la lecture
-- La carte reste débloquée pour le reste de la journée (pas besoin de re-débloquer)
+### État révélé
+- **Teaser émotionnel** en ambre : *"Mardi soir, tu pensais à..."*
+- **Titre** de la note en gras + **date courte** (5 mars 2026)
+- **Bouton ▶ carré** (44×44px) inline à droite — play/stop toggle
+- **Indicateur de lecture** : Fine barre ambre en bas quand l'audio joue
+- La carte reste débloquée pour la session
+
+### Dates contextuelles ✅ Implémenté
+Le texte de date s'adapte selon la distance temporelle + le moment de la journée :
+
+| Distance | Format | Exemple |
+|----------|--------|----------|
+| Aujourd'hui | Moment | *"Ce matin, tu pensais à..."* |
+| Hier | Hier + moment | *"Hier soir, tu pensais à..."* |
+| < 7 jours | Jour nommé + moment | *"Mardi après-midi, tu pensais à..."* |
+| 7-14 jours | Relatif | *"La semaine dernière, tu pensais à..."* |
+| 14j - 3 mois | Relatif | *"Il y a 2 semaines / 2 mois, tu pensais à..."* |
+| > 3 mois | Date nommée | *"Le 5 mars, tu pensais à..."* |
+
+Moments de la journée : matin (5h-12h), après-midi (12h-18h), soir (18h-22h), nuit (22h-5h)
 
 ---
 
@@ -135,7 +154,7 @@ La Pensée du Passé est un souvenir aléatoire proposé chaque jour. Elle n'est
 |--------|---------------|----------|
 | **Streak bienveillante** | Compteur de jours consécutifs, mais message doux si cassée : *"Pas de souci 🌱"* | MVP |
 | **Rareté** | Un seul souvenir par jour → la rareté crée la valeur | MVP |
-| **Nostalgie contextuelle** | *"Il y a 3 mois, tu pensais à..."* quand applicable | V1.1 |
+| **Nostalgie contextuelle** | Dates contextuelles avec moment de la journée (matin/soir) | ✅ MVP |
 | **Distances temporelles variées** | Parfois la veille, parfois 6 mois — plus l'écart est grand, plus l'émotion est forte | MVP |
 | **Notifications curieuses** | *"Un souvenir du 14 juillet t'attend..."* (opt-in, heure choisie) | V1.1 |
 | **Milestones** | Badges visuels à 7, 30, 100 jours | V2 |
@@ -171,18 +190,16 @@ La Pensée du Passé est un souvenir aléatoire proposé chaque jour. Elle n'est
 
 ---
 
-## 8. 📐 Tokens de Design (futurs)
+## 8. 📐 Tokens de Design
 
-> Cette section sera peuplée quand on passera à l'implémentation concrète du design system.
+### Implémentés (dans `tailwind.config.js`)
+- **Couleurs** : namespace `seed-*` (seed-primary, seed-bg, seed-card, seed-text, seed-muted, seed-accent, seed-border, etc.)
+- **Border radius** : `rounded-seed` = 6px
+- **Animations** : `REVEAL_DURATION` = 1500ms, fade-in = 300ms, cancel = 200ms
 
-```
-À DÉFINIR :
-- Spacing scale (4, 8, 12, 16, 24, 32, 48...)
-- Border radius scale
-- Shadow definitions
-- Animation durations et easings
-- Breakpoints (si web responsive)
-```
+### À définir
+- Spacing scale
+- Breakpoints web responsive
 
 ---
 
@@ -193,13 +210,17 @@ La Pensée du Passé est un souvenir aléatoire proposé chaque jour. Elle n'est
 - [x] **Durée typique** : 2-3 minutes max
 - [x] **Couleur primaire** : Marron chaud (`#78350F`)
 - [x] **Esthétique** : Carrée, bloc-notes, minimaliste (inspiré Bloc-notes / Notes apps)
-- [x] **Interaction de révélation** : Long Press (~1.5s) avec barre de progression
+- [x] **Interaction de révélation** : Long Press (~1.5s) avec barre de progression ambre
 - [x] **Typographie** : Outfit (unique police pour tout)
-- [x] **Animations** : Simples et sobres (pas de bounce/confetti, cohérent avec le ton bloc-notes)
+- [x] **Animations** : Simples et sobres (fade-in, pas de bounce/confetti)
 - [x] **Distances temporelles** : Varier (veille → 6 mois) pour amplifier l'émotion
-- [x] **Mode sombre** : Non prévu — l'app reste en mode clair uniquement
-- [x] **Jeu d'icônes** : Lucide Icons (déjà implémenté dans le projet)
-- [x] **Bordures des cartes** : Marron léger — cohérent avec la palette terrestre
+- [x] **Dates contextuelles** : Jour nommé + moment (matin/soir) pour les récents, date nommée pour les anciens
+- [x] **Mode sombre** : Non prévu
+- [x] **Jeu d'icônes** : Lucide Icons (`lucide-react-native`)
+- [x] **Bordures des cartes** : Marron léger (`seed-border`)
+- [x] **CTA principal** : "Garder une pensée" (wording validé)
+- [x] **Carte verrouillée** : Layout compact horizontal (Lock + teaser + barre)
+- [x] **État révélé** : Teaser émotionnel + titre + bouton play carré inline
 
 ### 🟡 Décisions en attente
 - [ ] **Métaphore graine** : Subtile en texte seulement, ou élément visuel (plante, arbre) ?
