@@ -1,9 +1,10 @@
-import { View, Text, SafeAreaView, Alert, ActivityIndicator, TouchableOpacity, Button } from 'react-native';
+import { View, Text, SafeAreaView, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import useAudioRecorder from '../hooks/useAudioRecorder';
 import { saveRecording, getDailyMemory, getAudioSource } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 import { useState, useEffect, useRef } from 'react';
 import { Audio } from 'expo-av';
+import { Menu, Clock, Mic, Square, Play, CircleStop } from 'lucide-react-native';
 
 export default function RecordScreen({ session, onGoToHistory, onOpenSettings }) {
     const {
@@ -97,9 +98,9 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 // 2. Sauvegarder localement d'abord (l'utilisateur voit sa note immédiatement)
                 const newRecording = {
                     id: recordingId,
-                    localUri: uri,         // indexeddb:// sur Web, file:// sur Mobile
-                    remoteUrl: null,       // Sera rempli après upload cloud
-                    status: 'pending',     // 'pending' → 'uploading' → 'synced' / 'error'
+                    localUri: uri,
+                    remoteUrl: null,
+                    status: 'pending',
                     date: new Date().toISOString(),
                     duration: duration,
                     title: recordingTitle,
@@ -119,7 +120,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                                 publicUrl,
                                 duration
                             );
-                            Alert.alert("Succès", "Note enregistrée et synchronisée ! ☁️");
+                            Alert.alert("Succès", "Note enregistrée et synchronisée !");
                         } else {
                             Alert.alert("Attention", "Note sauvegardée localement, mais l'upload a échoué.");
                         }
@@ -139,82 +140,102 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-gray-100 w-full">
-            <View className="flex-row justify-between items-center px-5 py-2.5 bg-gray-100">
-                <TouchableOpacity onPress={onOpenSettings} style={{ padding: 10 }}>
-                    <Text style={{ fontSize: 22 }}>☰</Text>
+        <SafeAreaView className="flex-1 bg-seed-bg w-full">
+            {/* ═══ HEADER ═══ */}
+            <View className="flex-row justify-between items-center px-5 py-3 border-b border-seed-border bg-seed-bg">
+                <TouchableOpacity onPress={onOpenSettings} className="p-2">
+                    <Menu size={22} color="#78350F" strokeWidth={1.5} />
                 </TouchableOpacity>
-                <Text className="text-lg font-bold text-gray-800">Journal Audio</Text>
-                <Button title="Historique" onPress={onGoToHistory} />
+                <Text className="text-lg font-bold text-seed-text">
+                    KeepYourSeed
+                </Text>
+                <TouchableOpacity onPress={onGoToHistory} className="p-2">
+                    <Clock size={22} color="#78350F" strokeWidth={1.5} />
+                </TouchableOpacity>
             </View>
 
             <View className="flex-1 justify-center items-center p-5">
 
-                {/* === SOUVENIR DU JOUR === */}
+                {/* ═══ SOUVENIR DU JOUR ═══ */}
                 {session?.user && !isRecording && (
-                    <View className="w-full max-w-[350px] mb-8 bg-white rounded-2xl p-4"
-                        style={{
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 8,
-                            elevation: 3,
-                        }}
-                    >
-                        <Text className="text-xs text-gray-400 mb-1">💭 Souvenir du jour</Text>
+                    <View className="w-full max-w-[350px] mb-8 bg-seed-card rounded-seed p-4 border border-seed-border">
+                        <Text className="text-xs text-seed-muted mb-1">Souvenir du jour</Text>
                         {isMemoryLoading ? (
-                            <ActivityIndicator size="small" color="#6366f1" />
+                            <ActivityIndicator size="small" color="#78350F" />
                         ) : dailyMemory ? (
                             <View>
-                                <Text className="text-base font-semibold text-gray-800" numberOfLines={1}>
+                                <Text className="text-base font-semibold text-seed-text" numberOfLines={1}>
                                     {dailyMemory.title}
                                 </Text>
-                                <Text className="text-xs text-gray-400 mt-0.5">
+                                <Text className="text-xs text-seed-muted mt-0.5">
                                     {formatMemoryDate(dailyMemory.date)}
                                 </Text>
                                 <TouchableOpacity
                                     onPress={toggleMemoryPlayback}
-                                    className={`mt-3 py-2.5 rounded-xl items-center ${isMemoryPlaying ? 'bg-red-400' : 'bg-indigo-500'}`}
+                                    className="mt-3 py-2.5 rounded-seed items-center flex-row justify-center gap-2"
+                                    style={{ backgroundColor: isMemoryPlaying ? '#B91C1C' : '#78350F' }}
                                 >
+                                    {isMemoryPlaying ? (
+                                        <CircleStop size={16} color="#FFFFFF" strokeWidth={1.5} />
+                                    ) : (
+                                        <Play size={16} color="#FFFFFF" strokeWidth={1.5} />
+                                    )}
                                     <Text className="text-white font-semibold text-sm">
-                                        {isMemoryPlaying ? '⏹ Arrêter' : '▶ Écouter ce souvenir'}
+                                        {isMemoryPlaying ? 'Arrêter' : 'Écouter ce souvenir'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
                         ) : (
-                            <Text className="text-sm text-gray-400 italic">Aucun souvenir disponible</Text>
+                            <Text className="text-sm text-seed-muted italic">Aucun souvenir disponible</Text>
                         )}
                     </View>
                 )}
 
-                <View className="mb-12 items-center ">
+                {/* ═══ TIMER ═══ */}
+                <View className="mb-12 items-center">
                     <Text
-                        className="text-6xl font-extralight text-gray-800"
+                        className="text-6xl font-extralight text-seed-text"
                         style={{ fontVariant: ['tabular-nums'] }}
                     >
                         {formatDuration(duration)}
                     </Text>
-                    {isRecording && <Text className="mt-2.5 text-red-500 text-base">🔴 Enregistrement...</Text>}
+                    {isRecording && (
+                        <View className="flex-row items-center mt-3 gap-2">
+                            <View className="w-2.5 h-2.5 rounded-full bg-seed-danger" />
+                            <Text className="text-seed-danger text-sm font-medium">Enregistrement...</Text>
+                        </View>
+                    )}
                 </View>
 
+                {/* ═══ BOUTON PRINCIPAL ═══ */}
                 <View className="w-full max-w-[300px] justify-center">
                     {isUploading ? (
-                        <ActivityIndicator size="large" color="#0000ff" />
+                        <ActivityIndicator size="large" color="#78350F" />
                     ) : (
                         <TouchableOpacity
                             onPress={handlePress}
-                            className={`py-4 px-6 rounded-xl items-center ${isRecording ? 'bg-red-500' : 'bg-blue-500'}`}
+                            className="py-4 px-6 rounded-seed items-center flex-row justify-center gap-2"
+                            style={{ backgroundColor: isRecording ? '#B91C1C' : '#78350F' }}
                         >
+                            {isRecording ? (
+                                <Square size={18} color="#FFFFFF" strokeWidth={1.5} />
+                            ) : (
+                                <Mic size={18} color="#FFFFFF" strokeWidth={1.5} />
+                            )}
                             <Text className="text-white font-semibold text-base">
-                                {isRecording ? "Arrêter l'enregistrement" : "Commencer une note"}
+                                {isRecording ? "Arrêter" : "Commencer une note"}
                             </Text>
                         </TouchableOpacity>
                     )}
                 </View>
-                {session?.user && <Text className="mt-5 text-sm text-gray-500">Connecté en tant que {session.user.email}</Text>}
 
+                {/* ═══ INFO UTILISATEUR ═══ */}
+                {session?.user && (
+                    <Text className="mt-5 text-xs text-seed-muted">
+                        {session.user.email}
+                    </Text>
+                )}
             </View>
         </SafeAreaView>
     );
 }
-

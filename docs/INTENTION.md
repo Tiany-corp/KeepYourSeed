@@ -197,12 +197,12 @@ La Pensée du Passé est un souvenir aléatoire proposé chaque jour. Elle n'est
 - [x] **Typographie** : Outfit (unique police pour tout)
 - [x] **Animations** : Simples et sobres (pas de bounce/confetti, cohérent avec le ton bloc-notes)
 - [x] **Distances temporelles** : Varier (veille → 6 mois) pour amplifier l'émotion
+- [x] **Mode sombre** : Non prévu — l'app reste en mode clair uniquement
+- [x] **Jeu d'icônes** : Lucide Icons (déjà implémenté dans le projet)
+- [x] **Bordures des cartes** : Marron léger — cohérent avec la palette terrestre
 
 ### 🟡 Décisions en attente
-- [ ] **Mode sombre** : Prévu pour le MVP ou plus tard ?
 - [ ] **Métaphore graine** : Subtile en texte seulement, ou élément visuel (plante, arbre) ?
-- [ ] **Jeu d'icônes** : Lucide Icons ? Feather Icons ? Autre ?
-- [ ] **Bordures des cartes** : Couleur de bordure — marron léger ou gris ?
 
 ---
 
