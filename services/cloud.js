@@ -196,3 +196,42 @@ export const emptyAudiosBucket = async (userId) => {
         return false;
     }
 };
+
+/**
+ * Récupère UN enregistrement aléatoire via la fonction RPC PostgreSQL.
+ * Utilisé pour la fonctionnalité "Souvenir du jour".
+ * Plus performant : 1 seule requête au lieu de 2 (count + select).
+ * @param {string} userId - UUID de l'utilisateur
+ * @returns {Promise<Object|null>} - Un recording au format app, ou null si rien trouvé
+ */
+export const fetchRandomRecording = async (userId) => {
+    try {
+        const { data, error } = await supabase
+            .rpc('get_random_recording', { p_user_id: userId });
+
+        if (error) {
+            console.error('RPC get_random_recording error:', error);
+            return null;
+        }
+
+        if (!data || data.length === 0) {
+            console.log('Aucun enregistrement trouvé pour le souvenir du jour');
+            return null;
+        }
+
+        const row = data[0];
+        return {
+            id: `cloud_${row.id}`,
+            localUri: null,
+            remoteUrl: row.audio_url,
+            status: 'synced',
+            date: row.created_at,
+            duration: row.duration_seconds || 0,
+            title: row.title || 'Sans titre',
+        };
+
+    } catch (e) {
+        console.error('Failed to fetch random recording:', e);
+        return null;
+    }
+};

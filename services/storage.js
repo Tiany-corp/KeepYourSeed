@@ -72,7 +72,7 @@ export const getAudioSource = async (recording) => {
         // Sur Web, les indexeddb:// doivent être résolues en blob:// temporaire jouable
         if (Platform.OS === 'web' && recording.localUri.startsWith('indexeddb://')) {
             const audioId = recording.localUri.replace('indexeddb://', '');
-            const blobUrl = await universalStorage.getAudioBlobUrl(audioId);
+            const blobUrl = await universalStorage.getAudioBlobUrl(audioId); // Ca ca attrape l'url du cloud
             if (blobUrl) return { uri: blobUrl };
             // Si le blob local a disparu, on tombe sur le cloud ci-dessous
         } else {
@@ -80,8 +80,14 @@ export const getAudioSource = async (recording) => {
         }
     }
 
-    // 2. Fallback : générer une URL signée temporaire depuis Supabase
+    // 2. Fallback : cloud URL
     if (recording.remoteUrl) {
+        // CORRECTION DEMO : Si c'est déjà une URL web absolue (http://...), on la retourne directement
+        if (recording.remoteUrl.startsWith('http')) {
+            return { uri: recording.remoteUrl };
+        }
+
+        // Sinon, c'est un fichier dans notre bucket Supabase, il faut générer l'URL signée temporaire
         // Import dynamique pour éviter les imports circulaires (cloud.js importe storage.js)
         const { getSignedAudioUrl } = require('./cloud');
         const signedUrl = await getSignedAudioUrl(recording.remoteUrl);
@@ -168,3 +174,49 @@ export const clearRecordings = async () => {
 export const saveAudioBlobWeb = universalStorage.saveAudioBlob;
 export const getAudioBlobUrlWeb = universalStorage.getAudioBlobUrl;
 export const removeAudioBlobWeb = universalStorage.removeAudioBlob;
+
+// --- SOUVENIR DU JOUR ---
+// Cache un enregistrement aléatoire pour la journée entière.
+// Clé de stockage : @daily_memory_YYYY-MM-DD
+const DAILY_MEMORY_PREFIX = '@daily_memory_';
+
+const getTodayKey = () => {
+    const today = new Date().toISOString().split('T')[0]; // "2026-02-27"
+    return `${DAILY_MEMORY_PREFIX}${today}`;
+};
+
+/**
+ * Récupère le souvenir du jour.
+ * - Si un souvenir est déjà en cache pour aujourd'hui → le retourne instantanément.
+ * - Sinon → demande un aléatoire à Supabase, le met en cache, et le retourne.
+ * @param {string} userId - UUID de l'utilisateur connecté
+ * @returns {Promise<Object|null>} - Un recording au format app, ou null
+ */
+export const getDailyMemory = async (userId) => {
+    try {
+        const todayKey = getTodayKey();
+
+        // 1. Vérifier le cache local
+        const cached = await universalStorage.getData(todayKey);
+        if (cached) {
+            console.log('Souvenir du jour trouvé en cache');
+            return cached;
+        }
+
+        // 2. Pas de cache → demander à Supabase
+        const { fetchRandomRecording } = require('./cloud');
+        const randomRecording = await fetchRandomRecording(userId);
+
+        if (randomRecording) {
+            // 3. Sauvegarder en cache pour le reste de la journée
+            await universalStorage.saveData(todayKey, randomRecording);
+            console.log('Nouveau souvenir du jour mis en cache:', randomRecording.title);
+        }
+
+        return randomRecording;
+
+    } catch (e) {
+        console.error('Erreur getDailyMemory:', e);
+        return null;
+    }
+};
