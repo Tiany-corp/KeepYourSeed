@@ -1,10 +1,13 @@
-import { View, Text, SafeAreaView, Alert, ActivityIndicator, TouchableOpacity, Animated, Platform, Vibration, Pressable } from 'react-native';
+import { View, Text, SafeAreaView, Alert, ActivityIndicator, TouchableOpacity, Animated, Platform, Vibration, Pressable, Modal } from 'react-native';
 import useAudioRecorder from '../hooks/useAudioRecorder';
 import { saveRecording, getDailyMemory, getAudioSource } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { Menu, Clock, Mic, Square, Lock, Flame, Play, CircleStop } from 'lucide-react-native';
+import AudioPlayer from '../components/AudioPlayer';
+import Logo from '../components/Logo';
+import { getRelativeDate, formatMemoryDate, formatTime } from '../utils/date';
 
 // Durée du long press en ms
 const REVEAL_DURATION = 1500;
@@ -33,6 +36,11 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     const revealOpacity = useRef(new Animated.Value(0)).current;
     const pressTimerRef = useRef(null);
     const halfwayTriggered = useRef(false);
+
+    // --- PLAYER MODAL ---
+    const [showPlayer, setShowPlayer] = useState(false);
+    const [playbackPosition, setPlaybackPosition] = useState(0);
+    const [playbackDuration, setPlaybackDuration] = useState(0);
 
     // Charger le souvenir du jour au montage du composant
     useEffect(() => {
@@ -93,6 +101,34 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                     duration: 300,
                     useNativeDriver: true,
                 }).start();
+
+                // Auto-ouvrir le player modal
+                setShowPlayer(true);
+                // Note: toggleMemoryPlayback sera appelé par openPlayerModal
+                // mais ici on le fait direct pour éviter le double appel
+                (async () => {
+                    try {
+                        const source = await getAudioSource(dailyMemory);
+                        if (!source) return;
+                        const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
+                        memorySoundRef.current = sound;
+                        setIsMemoryPlaying(true);
+                        sound.setOnPlaybackStatusUpdate((status) => {
+                            if (status.isLoaded) {
+                                setPlaybackPosition(status.positionMillis || 0);
+                                setPlaybackDuration(status.durationMillis || 0);
+                            }
+                            if (status.didJustFinish) {
+                                setIsMemoryPlaying(false);
+                                setPlaybackPosition(0);
+                                memorySoundRef.current?.unloadAsync();
+                                memorySoundRef.current = null;
+                            }
+                        });
+                    } catch (e) {
+                        console.error('Auto-play error:', e);
+                    }
+                })();
             }
         });
 
@@ -127,14 +163,24 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     // --- AUDIO PLAYBACK ---
     const toggleMemoryPlayback = async () => {
         try {
-            if (memorySoundRef.current && isMemoryPlaying) {
-                await memorySoundRef.current.stopAsync();
-                await memorySoundRef.current.unloadAsync();
-                memorySoundRef.current = null;
-                setIsMemoryPlaying(false);
-                return;
+            // Si un son existe déjà, vérifier son état réel
+            if (memorySoundRef.current) {
+                const status = await memorySoundRef.current.getStatusAsync();
+                if (status.isLoaded && status.isPlaying) {
+                    // En lecture → mettre en pause
+                    await memorySoundRef.current.pauseAsync();
+                    setIsMemoryPlaying(false);
+                    return;
+                }
+                if (status.isLoaded && !status.isPlaying) {
+                    // En pause → reprendre
+                    await memorySoundRef.current.playAsync();
+                    setIsMemoryPlaying(true);
+                    return;
+                }
             }
 
+            // Pas de son → en créer un nouveau
             const source = await getAudioSource(dailyMemory);
             if (!source) {
                 Alert.alert('Erreur', 'Impossible de charger ce souvenir.');
@@ -146,8 +192,14 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             setIsMemoryPlaying(true);
 
             sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded) {
+                    setPlaybackPosition(status.positionMillis || 0);
+                    setPlaybackDuration(status.durationMillis || 0);
+                }
                 if (status.didJustFinish) {
                     setIsMemoryPlaying(false);
+                    setPlaybackPosition(0);
+                    memorySoundRef.current?.unloadAsync();
                     memorySoundRef.current = null;
                 }
             });
@@ -157,66 +209,29 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
         }
     };
 
-    // Retourne un texte contextuel selon la distance temporelle
-    const getRelativeDate = (dateString) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-
-        // Moment de la journée
-        const hour = date.getHours();
-        let moment = '';
-        if (hour >= 5 && hour < 12) moment = ' matin';
-        else if (hour >= 12 && hour < 18) moment = ' après-midi';
-        else if (hour >= 18 && hour < 22) moment = ' soir';
-        else moment = ' dans la nuit';
-
-        // Jour de la semaine
-        const joursSemaine = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-        const jour = joursSemaine[date.getDay()];
-
-        // < 7 jours : jour nommé + moment ("Mardi soir")
-        if (diffDays === 0) return `Ce${moment}`;
-        if (diffDays === 1) return `Hier${moment}`;
-        if (diffDays < 7) return `${jour}${moment}`;
-
-        // 7 jours - 3 mois : relatif ("Il y a 2 semaines")
-        if (diffDays < 14) return 'La semaine dernière';
-        if (diffDays < 90) {
-            if (diffDays < 30) {
-                const weeks = Math.floor(diffDays / 7);
-                return `Il y a ${weeks} semaine${weeks > 1 ? 's' : ''}`;
-            }
-            const months = Math.floor(diffDays / 30);
-            return `Il y a ${months} mois`;
-        }
-
-        // > 3 mois : date nommée ("Le 5 mars")
-        const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-        return `Le ${dateStr}`;
+    const openPlayerModal = () => {
+        setShowPlayer(true);
+        toggleMemoryPlayback();
     };
 
-    const formatMemoryDate = (dateString) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-        let relativeText = '';
-        if (diffDays === 0) relativeText = "Aujourd'hui";
-        else if (diffDays === 1) relativeText = 'Hier';
-        else if (diffDays < 30) relativeText = `Il y a ${diffDays} jours`;
-        else if (diffDays < 365) {
-            const months = Math.floor(diffDays / 30);
-            relativeText = `Il y a ${months} mois`;
-        } else {
-            const years = Math.floor(diffDays / 365);
-            relativeText = `Il y a ${years} an${years > 1 ? 's' : ''}`;
+    const closePlayerModal = async () => {
+        if (memorySoundRef.current) {
+            await memorySoundRef.current.stopAsync();
+            await memorySoundRef.current.unloadAsync();
+            memorySoundRef.current = null;
         }
-
-        const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-        return `${relativeText}, le ${dateStr}`;
+        setIsMemoryPlaying(false);
+        setPlaybackPosition(0);
+        setPlaybackDuration(0);
+        setShowPlayer(false);
     };
+
+    // Fermer la modal mais garder l'audio (backdrop tap → mini player)
+    const dismissToMiniPlayer = () => {
+        setShowPlayer(false);
+    };
+
+
 
     const handlePress = async () => {
         if (isRecording) {
@@ -282,51 +297,29 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
         }
 
         if (isRevealed) {
-            // ═══ ÉTAT RÉVÉLÉ ═══
+            // ═══ ÉTAT RÉVÉLÉ — tap pour ouvrir le player ═══
             const relDate = getRelativeDate(dailyMemory.date);
 
             return (
                 <Animated.View style={{ opacity: revealOpacity }}>
-                    {/* Contexte émotionnel */}
-                    <Text className="text-xs text-seed-accent font-medium mb-1">
-                        {relDate}, tu pensais à...
-                    </Text>
-
-                    {/* Contenu principal : titre + play inline */}
-                    <View className="flex-row items-center justify-between gap-3">
-                        <View className="flex-1">
-                            <Text className="text-base font-semibold text-seed-text" numberOfLines={1}>
-                                {dailyMemory.title}
-                            </Text>
-                            <Text className="text-xs text-seed-muted mt-0.5">
-                                {new Date(dailyMemory.date).toLocaleDateString('fr-FR', {
-                                    day: 'numeric', month: 'short', year: 'numeric'
-                                })}
-                            </Text>
-                        </View>
-
-                        {/* Bouton play/stop compact */}
-                        <TouchableOpacity
-                            onPress={toggleMemoryPlayback}
-                            className="rounded-seed items-center justify-center"
-                            style={{
-                                backgroundColor: isMemoryPlaying ? '#B91C1C' : '#78350F',
-                                width: 44,
-                                height: 44,
-                            }}
-                        >
-                            {isMemoryPlaying ? (
-                                <CircleStop size={20} color="#FFFFFF" strokeWidth={1.5} />
-                            ) : (
+                    <TouchableOpacity onPress={openPlayerModal} activeOpacity={0.7}>
+                        <View className="flex-row items-center justify-between gap-3">
+                            <View className="flex-1">
+                                <Text className="text-xs text-seed-accent font-medium mb-0.5">
+                                    {relDate}
+                                </Text>
+                                <Text className="text-base font-semibold text-seed-text" numberOfLines={1}>
+                                    {dailyMemory.title}
+                                </Text>
+                            </View>
+                            <View
+                                className="rounded-seed items-center justify-center"
+                                style={{ backgroundColor: '#78350F', width: 44, height: 44 }}
+                            >
                                 <Play size={20} color="#FFFFFF" strokeWidth={1.5} />
-                            )}
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Indicateur lecture active */}
-                    {isMemoryPlaying && (
-                        <View className="w-full h-0.5 mt-2 rounded-full" style={{ backgroundColor: '#D97706' }} />
-                    )}
+                            </View>
+                        </View>
+                    </TouchableOpacity>
                 </Animated.View>
             );
         }
@@ -338,6 +331,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             <Pressable
                 onPressIn={onRevealPressIn}
                 onPressOut={onRevealPressOut}
+                pressRetentionOffset={{ top: 200, left: 200, right: 200, bottom: 200 }}
                 style={{ cursor: 'pointer' }}
             >
                 <View className="flex-row items-center py-3 gap-3">
@@ -383,9 +377,12 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 <TouchableOpacity onPress={onOpenSettings} className="p-2">
                     <Menu size={22} color="#78350F" strokeWidth={1.5} />
                 </TouchableOpacity>
-                <Text className="text-lg font-bold text-seed-text">
-                    KeepYourSeed
-                </Text>
+                <View className="flex-row items-center justify-center gap-2">
+                    <Logo size={24} />
+                    <Text className="text-lg font-bold text-seed-text">
+                        KeepYourSeed
+                    </Text>
+                </View>
                 <TouchableOpacity onPress={onGoToHistory} className="p-2">
                     <Clock size={22} color="#78350F" strokeWidth={1.5} />
                 </TouchableOpacity>
@@ -440,7 +437,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                                     <Mic size={18} color="#FFFFFF" strokeWidth={1.5} />
                                 )}
                                 <Text className="text-white font-semibold text-base">
-                                    {isRecording ? "Arrêter" : "Garder une pensée"}
+                                    {isRecording ? "Arrêter" : "Capturer une pensée"}
                                 </Text>
                             </TouchableOpacity>
                         )}
@@ -466,6 +463,21 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                     <View />
                 )}
             </View>
+
+            {/* ═══ COMPOSANT AUDIO PLAYER (Modal + Mini Player) ═══ */}
+            <AudioPlayer
+                showPlayer={showPlayer}
+                isMemoryPlaying={isMemoryPlaying}
+                dailyMemory={dailyMemory}
+                playbackPosition={playbackPosition}
+                playbackDuration={playbackDuration}
+                memorySoundRef={memorySoundRef}
+                toggleMemoryPlayback={toggleMemoryPlayback}
+                closePlayerModal={closePlayerModal}
+                setShowPlayer={setShowPlayer}
+                dismissToMiniPlayer={dismissToMiniPlayer}
+            />
         </SafeAreaView>
     );
 }
+

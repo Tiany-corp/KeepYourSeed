@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { supabase } from '../services/supabase';
+import Logo from '../components/Logo';
 
 export default function SignUpScreen({ onSwitchToLogin }) {
     const [email, setEmail] = useState('');
@@ -31,8 +32,9 @@ export default function SignUpScreen({ onSwitchToLogin }) {
     }
 
     return (
-        <View className="flex-1 justify-center p-5 bg-white">
+        <View className="flex-1 justify-center p-5 bg-[#FAF7F2]">
             <View className="w-full max-w-sm self-center">
+                <Logo size={80} style={{ alignSelf: 'center', marginBottom: 20 }} />
                 <Text className="text-3xl font-bold text-center mb-10 text-gray-800">Créer un compte</Text>
 
                 <View className="py-1">

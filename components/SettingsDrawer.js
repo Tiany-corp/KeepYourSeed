@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Animated, Platform, Alert } from 'react-native';
 import { supabase } from '../services/supabase';
 import { clearRecordings } from '../services/storage';
+import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
 
@@ -146,6 +147,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
 
                 {/* Footer */}
                 <View className="p-5 border-t border-gray-100 items-center">
+                    <Logo size={24} style={{ marginBottom: 6 }} />
                     <Text className="text-xs text-gray-400">KeepYourSeed v1.0</Text>
                 </View>
             </Animated.View>

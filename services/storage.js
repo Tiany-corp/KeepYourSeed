@@ -137,12 +137,12 @@ export const getRecordings = async () => {
             return [
                 {
                     id: 'demo-1',
-                    localUri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+                    localUri: 'https://drive.google.com/file/d/1u3kI1nzmTSilkexNndY2hJ-OIxkl09NQ/view?usp=drive_link',
                     remoteUrl: null,
                     status: 'pending',
                     date: new Date(Date.now() - 86400000).toISOString(),
                     duration: 125,
-                    title: 'Idée de projet (Demo)',
+                    title: 'Présentation de KeepYourSeed',
                 },
                 {
                     id: 'demo-2',
