@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Animated, Platform, Alert } from 'react-native';
 import { supabase } from '../services/supabase';
 import { clearRecordings } from '../services/storage';
+import { emptyAudiosBucket } from '../services/cloud';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -52,7 +53,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     };
 
     const doEmptyBucket = async () => {
-        const { emptyAudiosBucket } = require('../services/cloud');
         const success = await emptyAudiosBucket(session?.user?.id);
         if (success) {
             await clearRecordings();
