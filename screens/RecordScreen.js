@@ -1,4 +1,4 @@
-import { View, Text, SafeAreaView, Alert, ActivityIndicator, TouchableOpacity, Animated, Platform, Vibration, Pressable, Modal } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, Alert, ActivityIndicator, TouchableOpacity, Animated, Platform, Vibration, Pressable, Modal } from 'react-native';
 import useAudioRecorder from '../hooks/useAudioRecorder';
 import { saveRecording, getDailyMemory, getAudioSource } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
@@ -99,7 +99,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 Animated.timing(revealOpacity, {
                     toValue: 1,
                     duration: 300,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }).start();
 
                 // Auto-ouvrir le player modal
@@ -290,7 +290,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
 
         if (!dailyMemory) {
             return (
-                <Text className="text-sm text-seed-muted italic py-4 text-center">
+                <Text style={styles.emptyMemoryText}>
                     Enregistre des notes pour débloquer des souvenirs
                 </Text>
             );
@@ -303,18 +303,17 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             return (
                 <Animated.View style={{ opacity: revealOpacity }}>
                     <TouchableOpacity onPress={openPlayerModal} activeOpacity={0.7}>
-                        <View className="flex-row items-center justify-between gap-3">
-                            <View className="flex-1">
-                                <Text className="text-xs text-seed-accent font-medium mb-0.5">
+                        <View style={styles.memoryRow}>
+                            <View style={styles.memoryTextContainer}>
+                                <Text style={styles.memoryDateText}>
                                     {relDate}
                                 </Text>
-                                <Text className="text-base font-semibold text-seed-text" numberOfLines={1}>
+                                <Text style={styles.memoryTitleText} numberOfLines={1}>
                                     {dailyMemory.title}
                                 </Text>
                             </View>
                             <View
-                                className="rounded-seed items-center justify-center"
-                                style={{ backgroundColor: '#78350F', width: 44, height: 44 }}
+                                style={[styles.playButtonIcon, { backgroundColor: '#78350F' }]}
                             >
                                 <Play size={20} color="#FFFFFF" strokeWidth={1.5} />
                             </View>
@@ -334,17 +333,17 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 pressRetentionOffset={{ top: 200, left: 200, right: 200, bottom: 200 }}
                 style={{ cursor: 'pointer' }}
             >
-                <View className="flex-row items-center py-3 gap-3">
+                <View style={styles.lockedMemoryRow}>
                     <Lock
                         size={24}
                         color={isPressing ? '#78350F' : '#D97706'}
                         strokeWidth={1.5}
                     />
-                    <View className="flex-1">
-                        <Text className="text-sm text-seed-text font-medium" numberOfLines={1}>
+                    <View style={styles.memoryTextContainer}>
+                        <Text style={styles.lockedMemoryTitle} numberOfLines={1}>
                             {relativeDate}, tu pensais à...
                         </Text>
-                        <Text className="text-xs text-seed-muted mt-0.5">
+                        <Text style={styles.lockedMemoryHelper}>
                             {Platform.OS === 'web'
                                 ? 'Clique et maintiens pour écouter'
                                 : 'Maintiens pour écouter'}
@@ -353,17 +352,14 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 </View>
 
                 {/* Barre de progression */}
-                <View className="w-full h-1 rounded-full" style={{ backgroundColor: '#F5F0E8' }}>
+                <View style={styles.progressBarTrack}>
                     <Animated.View
-                        style={{
-                            height: '100%',
-                            borderRadius: 9999,
-                            backgroundColor: '#D97706',
+                        style={[styles.progressBarFill, {
                             width: progressAnim.interpolate({
                                 inputRange: [0, 1],
                                 outputRange: ['0%', '100%'],
                             }),
-                        }}
+                        }]}
                     />
                 </View>
             </Pressable>
@@ -371,30 +367,30 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-seed-bg w-full">
+        <SafeAreaView style={styles.safeArea}>
             {/* ═══ HEADER ═══ */}
-            <View className="flex-row justify-between items-center px-5 py-3 border-b border-seed-border bg-seed-bg">
-                <TouchableOpacity onPress={onOpenSettings} className="p-2">
+            <View style={styles.header}>
+                <TouchableOpacity onPress={onOpenSettings} style={styles.iconButton}>
                     <Menu size={22} color="#78350F" strokeWidth={1.5} />
                 </TouchableOpacity>
-                <View className="flex-row items-center justify-center gap-2">
+                <View style={styles.headerTitleContainer}>
                     <Logo size={24} />
-                    <Text className="text-lg font-bold text-seed-text">
+                    <Text style={styles.headerTitleText}>
                         KeepYourSeed
                     </Text>
                 </View>
-                <TouchableOpacity onPress={onGoToHistory} className="p-2">
+                <TouchableOpacity onPress={onGoToHistory} style={styles.iconButton}>
                     <Clock size={22} color="#78350F" strokeWidth={1.5} />
                 </TouchableOpacity>
             </View>
 
             {/* ═══ CONTENU PRINCIPAL — 3 zones ═══ */}
-            <View className="flex-1 justify-between px-5 py-4">
+            <View style={styles.mainContent}>
 
                 {/* ─── ZONE 1 : RÉCOMPENSE (Pensée du Passé) ─── */}
                 {!isRecording && session?.user && (
-                    <View className="w-full items-center">
-                        <View className="w-full max-w-[350px] bg-seed-card rounded-seed px-3 py-2 border border-seed-border">
+                    <View style={styles.zone1Container}>
+                        <View style={styles.memoryCard}>
                             {renderMemoryCard()}
                         </View>
                     </View>
@@ -404,39 +400,37 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 {(isRecording || !session?.user) && <View />}
 
                 {/* ─── ZONE 2 : ACTION PRINCIPALE (Timer + CTA) ─── */}
-                <View className="items-center">
-                    <View className="mb-10 items-center">
+                <View style={styles.zone2Container}>
+                    <View style={styles.timerContainer}>
                         <Text
-                            className="text-6xl font-extralight text-seed-text"
-                            style={{ fontVariant: ['tabular-nums'] }}
+                            style={[styles.timerText, { fontVariant: ['tabular-nums'] }]}
                         >
                             {formatDuration(duration)}
                         </Text>
                         {isRecording && (
-                            <View className="flex-row items-center mt-3 gap-2">
-                                <View className="w-2.5 h-2.5 rounded-full bg-seed-danger" />
-                                <Text className="text-seed-danger text-sm font-medium">
+                            <View style={styles.recordingIndicatorRow}>
+                                <View style={styles.recordingDot} />
+                                <Text style={styles.recordingText}>
                                     Enregistrement...
                                 </Text>
                             </View>
                         )}
                     </View>
 
-                    <View className="w-full max-w-[300px]">
+                    <View style={styles.actionButtonContainer}>
                         {isUploading ? (
                             <ActivityIndicator size="large" color="#78350F" />
                         ) : (
                             <TouchableOpacity
                                 onPress={handlePress}
-                                className="py-4 px-6 rounded-seed items-center flex-row justify-center gap-2"
-                                style={{ backgroundColor: isRecording ? '#B91C1C' : '#78350F' }}
+                                style={[styles.actionButton, { backgroundColor: isRecording ? '#B91C1C' : '#78350F' }]}
                             >
                                 {isRecording ? (
                                     <Square size={18} color="#FFFFFF" strokeWidth={1.5} />
                                 ) : (
                                     <Mic size={18} color="#FFFFFF" strokeWidth={1.5} />
                                 )}
-                                <Text className="text-white font-semibold text-base">
+                                <Text style={styles.actionButtonText}>
                                     {isRecording ? "Arrêter" : "Capturer une pensée"}
                                 </Text>
                             </TouchableOpacity>
@@ -446,15 +440,15 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
 
                 {/* ─── ZONE 3 : MOTIVATION (Footer) ─── */}
                 {!isRecording ? (
-                    <View className="w-full items-center border-t border-seed-border pt-3">
-                        <View className="flex-row items-center gap-2">
+                    <View style={styles.footerContainer}>
+                        <View style={styles.footerRow}>
                             <Flame size={16} color="#D97706" strokeWidth={1.5} />
-                            <Text className="text-sm text-seed-muted">
+                            <Text style={styles.footerText}>
                                 Continue comme ça !
                             </Text>
                         </View>
                         {session?.user && (
-                            <Text className="text-xs text-seed-muted mt-1">
+                            <Text style={styles.footerEmail}>
                                 {session.user.email}
                             </Text>
                         )}
@@ -481,3 +475,37 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     );
 }
 
+const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: '#FAF7F2', width: '100%' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#D4A574', backgroundColor: '#FAF7F2' },
+    iconButton: { padding: 8 },
+    headerTitleContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+    headerTitleText: { fontSize: 18, fontWeight: 'bold', color: '#292524' },
+    mainContent: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
+    zone1Container: { width: '100%', alignItems: 'center' },
+    memoryCard: { width: '100%', maxWidth: 350, backgroundColor: '#F5F0E8', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#D4A574' },
+    emptyMemoryText: { fontSize: 14, color: '#78716C', fontStyle: 'italic', paddingVertical: 16, textAlign: 'center' },
+    memoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    memoryTextContainer: { flex: 1 },
+    memoryDateText: { fontSize: 12, color: '#D97706', fontWeight: '500', marginBottom: 2 },
+    memoryTitleText: { fontSize: 16, fontWeight: '600', color: '#292524' },
+    playButtonIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    lockedMemoryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
+    lockedMemoryTitle: { fontSize: 14, color: '#292524', fontWeight: '500' },
+    lockedMemoryHelper: { fontSize: 12, color: '#78716C', marginTop: 2 },
+    progressBarTrack: { width: '100%', height: 4, borderRadius: 9999, backgroundColor: '#F5F0E8' },
+    progressBarFill: { height: '100%', borderRadius: 9999, backgroundColor: '#D97706' },
+    zone2Container: { alignItems: 'center' },
+    timerContainer: { marginBottom: 40, alignItems: 'center' },
+    timerText: { fontSize: 60, fontWeight: '200', color: '#292524' },
+    recordingIndicatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 8 },
+    recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#B91C1C' },
+    recordingText: { color: '#B91C1C', fontSize: 14, fontWeight: '500' },
+    actionButtonContainer: { width: '100%', maxWidth: 300 },
+    actionButton: { paddingVertical: 16, paddingHorizontal: 24, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+    actionButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 16 },
+    footerContainer: { width: '100%', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#D4A574', paddingTop: 12 },
+    footerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    footerText: { fontSize: 14, color: '#78716C' },
+    footerEmail: { fontSize: 12, color: '#78716C', marginTop: 4 }
+});
