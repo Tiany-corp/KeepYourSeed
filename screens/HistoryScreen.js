@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert
 import { getRecordings, clearRecordings, getAudioSource } from '../services/storage';
 import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
 import { Audio } from 'expo-av';
+import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Menu, Trash2 } from 'lucide-react-native';
 
 export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [recordings, setRecordings] = useState([]);
@@ -57,7 +58,7 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             const userId = session?.user?.id || 'public';
             const publicUrl = await uploadRecordingToCloud(item.id, item.localUri, userId);
             if (publicUrl) {
-                Alert.alert("Succès", "Fichier envoyé sur le cloud ! ☁️");
+                Alert.alert("Succès", "Fichier envoyé sur le cloud !");
                 // Recharger la liste pour afficher le nouveau status
                 await loadRecordings();
             } else {
@@ -117,13 +118,12 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     }
 
     // Icône du bouton cloud selon le status
-    const getStatusIcon = (item) => {
-        if (uploadingId === item.id) return '...';
+    const renderStatusIcon = (item) => {
+        if (uploadingId === item.id) return <CloudUpload size={20} color="#78716C" />;
         switch (item.status) {
-            case 'synced': return '✅';
-            case 'uploading': return '⏳';
-            case 'error': return '❌';
-            default: return '☁️'; // pending
+            case 'synced': return <Cloud size={20} color="#16a34a" />;
+            case 'error': return <CloudOff size={20} color="#ef4444" />;
+            default: return <Cloud size={20} color="#78350F" />; // pending
         }
     };
 
@@ -135,19 +135,25 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
 
     const formatDate = (isoString) => {
         const date = new Date(isoString);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleDateString('fr-FR') + ' • ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }
 
     const renderItem = ({ item }) => (
         <View style={styles.itemContainer}>
             <TouchableOpacity style={styles.item} onPress={() => playSound(item)}>
+                <View style={[styles.playButtonIcon, playingId === item.id && styles.playButtonIconActive]}>
+                    {playingId === item.id ? (
+                        <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
+                    ) : (
+                        <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
+                    )}
+                </View>
                 <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle}>{item.title || 'Sans titre'}</Text>
                     <Text style={styles.itemDate}>{formatDate(item.date)}</Text>
                 </View>
                 <View style={styles.itemMeta}>
                     <Text style={styles.itemDuration}>{formatDuration(item.duration)}</Text>
-                    <Text style={styles.playIcon}>{playingId === item.id ? '⏸️' : '▶️'}</Text>
                 </View>
             </TouchableOpacity>
 
@@ -160,9 +166,7 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                 onPress={() => handleUpload(item)}
                 disabled={uploadingId === item.id || item.status === 'synced'}
             >
-                <Text style={styles.uploadButtonText}>
-                    {getStatusIcon(item)}
-                </Text>
+                {renderStatusIcon(item)}
             </TouchableOpacity>
         </View>
     );
@@ -170,12 +174,13 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={onOpenSettings} style={styles.backButton}>
-                    <Text style={{ fontSize: 22 }}>☰</Text>
+                <TouchableOpacity onPress={onOpenSettings} style={styles.iconButton}>
+                    <Menu size={24} color="#78350F" strokeWidth={1.5} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Historique</Text>
                 <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>← Retour</Text>
+                    <ArrowLeft size={16} color="#78350F" strokeWidth={2} style={{ marginRight: 4 }} />
+                    <Text style={styles.backButtonText}>Retour</Text>
                 </TouchableOpacity>
             </View>
 
@@ -193,94 +198,119 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#FAF7F2', // seed-bg
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 20,
-        backgroundColor: '#fff',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#FAF7F2',
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        borderBottomColor: '#D4A574', // seed-border
+    },
+    iconButton: {
+        padding: 8,
     },
     backButton: {
-        padding: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#F5F0E8',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#D4A574',
     },
     backButtonText: {
-        fontSize: 16,
-        color: '#007bff',
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#78350F', // seed-primary
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
+        color: '#292524',
     },
     listContent: {
-        padding: 20,
+        padding: 16,
     },
     itemContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     item: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
+        backgroundColor: '#F5F0E8', // seed-card
+        padding: 12,
+        borderRadius: 16,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#D4A574',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.05,
         shadowRadius: 2,
-        elevation: 2,
-        flex: 1, // Take remaining space
+        elevation: 1,
+        flex: 1,
         marginRight: 10,
     },
+    playButtonIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#78350F',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    playButtonIconActive: {
+        backgroundColor: '#B91C1C',
+    },
     uploadButton: {
-        backgroundColor: '#e1e1e1',
+        backgroundColor: '#F5F0E8',
         width: 44,
         height: 44,
         borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#D4A574',
     },
     uploadButtonDisabled: {
         opacity: 0.5,
     },
     uploadButtonSynced: {
-        backgroundColor: '#d4edda',
-    },
-    uploadButtonText: {
-        fontSize: 20,
+        backgroundColor: '#dcfce7',
+        borderColor: '#86efac',
     },
     itemInfo: {
         flex: 1,
     },
     itemTitle: {
         fontSize: 16,
-        fontWeight: '500',
-        marginBottom: 4,
+        fontWeight: '600',
+        color: '#292524',
+        marginBottom: 2,
     },
     itemDate: {
         fontSize: 12,
-        color: '#888',
+        color: '#78716C',
     },
     itemMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        justifyContent: 'center',
     },
     itemDuration: {
-        marginRight: 10,
-        color: '#666',
-    },
-    playIcon: {
-        fontSize: 20,
+        color: '#78716C',
+        fontSize: 14,
+        fontWeight: '500',
     },
     emptyText: {
         textAlign: 'center',
         marginTop: 50,
-        color: '#888',
+        color: '#78716C',
+        fontStyle: 'italic',
     }
 });

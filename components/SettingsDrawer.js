@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, Platform, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet } from 'react-native';
 import { supabase } from '../services/supabase';
 import { clearRecordings } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
+import { Settings, X, Trash2, LogOut } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -19,12 +20,12 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 Animated.timing(slideAnim, {
                     toValue: 0,
                     duration: 250,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(overlayOpacity, {
                     toValue: 1,
                     duration: 250,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
             ]).start();
         } else {
@@ -32,12 +33,12 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 Animated.timing(slideAnim, {
                     toValue: -DRAWER_WIDTH,
                     duration: 200,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
                 Animated.timing(overlayOpacity, {
                     toValue: 0,
                     duration: 200,
-                    useNativeDriver: true,
+                    useNativeDriver: false,
                 }),
             ]).start(() => setIsRendered(false));
         }
@@ -83,74 +84,96 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     if (!isRendered) return null;
 
     return (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, elevation: 999 }}>
+        <View style={styles.container}>
             {/* Overlay sombre cliquable pour fermer */}
             <Animated.View
-                style={{ ...{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' }, opacity: overlayOpacity }}
+                style={[styles.overlay, { opacity: overlayOpacity }]}
             >
-                <TouchableOpacity className="flex-1" onPress={onClose} activeOpacity={1} />
+                <TouchableOpacity style={styles.overlayTouchable} onPress={onClose} activeOpacity={1} />
             </Animated.View>
 
             {/* Drawer animé */}
             <Animated.View
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    width: DRAWER_WIDTH,
-                    backgroundColor: '#fff',
-                    transform: [{ translateX: slideAnim }],
-                    ...(Platform.OS === 'web'
+                style={[
+                    styles.drawer,
+                    { transform: [{ translateX: slideAnim }] },
+                    Platform.OS === 'web'
                         ? { boxShadow: '4px 0 15px rgba(0,0,0,0.15)' }
-                        : { shadowColor: '#000', shadowOffset: { width: 4, height: 0 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 10 }),
-                }}
+                        : { shadowColor: '#000', shadowOffset: { width: 4, height: 0 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 10 }
+                ]}
             >
                 {/* Header */}
-                <View className={`flex-row justify-between items-center px-5 pb-4 border-b border-gray-100 ${Platform.OS === 'web' ? 'pt-5' : 'pt-12'}`}>
-                    <Text className="text-lg font-bold text-gray-800">⚙️ Paramètres</Text>
-                    <TouchableOpacity onPress={onClose}>
-                        <Text className="text-xl text-gray-400 p-1">✕</Text>
+                <View style={[styles.header, Platform.OS === 'web' ? { paddingTop: 20 } : { paddingTop: 48 }]}>
+                    <View style={styles.headerTitleContainer}>
+                        <Settings size={20} color="#292524" style={{ marginRight: 8 }} />
+                        <Text style={styles.headerTitle}>Paramètres</Text>
+                    </View>
+                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                        <X size={24} color="#78716C" />
                     </TouchableOpacity>
                 </View>
 
                 {/* Infos utilisateur */}
                 {session?.user && (
-                    <View className="items-center py-6 px-5">
-                        <View className="w-16 h-16 rounded-full bg-blue-500 justify-center items-center mb-3">
-                            <Text className="text-white text-2xl font-bold">
+                    <View style={styles.userInfoContainer}>
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>
                                 {session.user.email?.charAt(0).toUpperCase()}
                             </Text>
                         </View>
-                        <Text className="text-sm text-gray-500" numberOfLines={1}>
+                        <Text style={styles.emailText} numberOfLines={1}>
                             {session.user.email}
                         </Text>
                     </View>
                 )}
 
-                <View className="h-px bg-gray-100 mx-5" />
+                <View style={styles.separator} />
 
                 {/* Menu items */}
-                <View className="flex-1 pt-2">
-                    <TouchableOpacity className="flex-row items-center py-4 px-5" onPress={handleEmptyBucket}>
-                        <Text className="text-xl mr-4">🗑️</Text>
-                        <Text className="text-base text-red-500">Vider le cloud</Text>
+                <View style={styles.menuContainer}>
+                    <TouchableOpacity style={styles.menuItem} onPress={handleEmptyBucket}>
+                        <Trash2 size={20} color="#ef4444" style={styles.menuIcon} />
+                        <Text style={styles.menuItemTextDanger}>Vider le cloud</Text>
                     </TouchableOpacity>
 
-                    <View className="h-px bg-gray-100 mx-5" />
+                    <View style={styles.separator} />
 
-                    <TouchableOpacity className="flex-row items-center py-4 px-5" onPress={handleLogout}>
-                        <Text className="text-xl mr-4">🚪</Text>
-                        <Text className="text-base text-gray-800">Se déconnecter</Text>
+                    <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+                        <LogOut size={20} color="#292524" style={styles.menuIcon} />
+                        <Text style={styles.menuItemText}>Se déconnecter</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Footer */}
-                <View className="p-5 border-t border-gray-100 items-center">
-                    <Logo size={24} style={{ marginBottom: 6 }} />
-                    <Text className="text-xs text-gray-400">KeepYourSeed v1.0</Text>
+                <View style={styles.footer}>
+                    <Logo size={24} style={styles.footerLogo} />
+                    <Text style={styles.footerText}>KeepYourSeed v1.0</Text>
                 </View>
             </Animated.View>
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, elevation: 999 },
+    overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
+    overlayTouchable: { flex: 1 },
+    drawer: { position: 'absolute', top: 0, left: 0, bottom: 0, width: DRAWER_WIDTH, backgroundColor: '#FAF7F2' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#D4A574' },
+    headerTitleContainer: { flexDirection: 'row', alignItems: 'center' },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#292524' },
+    closeButton: { padding: 4 },
+    userInfoContainer: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 20 },
+    avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#78350F', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+    avatarText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
+    emailText: { fontSize: 14, color: '#78716C' },
+    separator: { height: 1, backgroundColor: '#D4A574', marginHorizontal: 20 },
+    menuContainer: { flex: 1, paddingTop: 8 },
+    menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20 },
+    menuIcon: { marginRight: 16 },
+    menuItemTextDanger: { fontSize: 16, color: '#ef4444' },
+    menuItemText: { fontSize: 16, color: '#292524' },
+    footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#D4A574', alignItems: 'center' },
+    footerLogo: { marginBottom: 6 },
+    footerText: { fontSize: 12, color: '#78716C' }
+});
