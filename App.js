@@ -1,26 +1,53 @@
 import "./global.css";
+import React, { Component, useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View } from 'react-native';
-import { useState, useEffect } from 'react';
-import { supabase } from './services/supabase'; // Import Supabase client
+import { StyleSheet, View, Text, Platform } from 'react-native';
+import { supabase } from './services/supabase';
 import RecordScreen from './screens/RecordScreen';
 import HistoryScreen from './screens/HistoryScreen';
-import AuthScreen from './screens/AuthScreen'; // Import AuthScreen
+import AuthScreen from './screens/AuthScreen';
 import SettingsDrawer from './components/SettingsDrawer';
 
-export default function App() {
+// --- ERROR BOUNDARY ---
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#FEE2E2' }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#B91C1C', marginBottom: 10 }}>
+            ❌ Erreur de rendu
+          </Text>
+          <Text style={{ fontSize: 14, color: '#292524', textAlign: 'center' }}>
+            {this.state.error?.toString()}
+          </Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AppContent() {
   const [session, setSession] = useState(null);
-  const [currentScreen, setCurrentScreen] = useState('record'); // 'record' | 'history'
+  const [currentScreen, setCurrentScreen] = useState('record');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    // 1. Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    // 2. Listen for auth changes (login, logout, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -47,7 +74,13 @@ export default function App() {
   );
 }
 
-import { Platform } from 'react-native';
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
