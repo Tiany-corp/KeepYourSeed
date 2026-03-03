@@ -1,64 +1,32 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Mic, Square } from 'lucide-react-native';
-import { saveRecording } from '../services/storage';
-import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 
+/**
+ * Bouton d'enregistrement simplifié.
+ * 
+ * Responsabilité UNIQUE : démarrer / arrêter l'enregistrement.
+ * Quand l'user arrête, il appelle onRecordingComplete(uri, duration)
+ * et c'est le PARENT (RecordScreen) qui gère la suite (modale titre, sauvegarde, upload).
+ */
 export default function RecordButton({
-    session,
     isRecording,
     duration,
     formatDuration,
     startRecording,
-    stopRecording
+    stopRecording,
+    onRecordingComplete, // 🆕 callback vers le parent
 }) {
-    const [isUploading, setIsUploading] = useState(false);
-
     const handlePress = async () => {
         if (isRecording) {
+            // 1. Arrête l'enregistrement → récupère l'URI du fichier audio local
             const uri = await stopRecording();
             if (uri) {
-                const recordingId = Date.now().toString();
-                const recordingTitle = `Note ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-                const newRecording = {
-                    id: recordingId,
-                    localUri: uri,
-                    remoteUrl: null,
-                    status: 'pending',
-                    date: new Date().toISOString(),
-                    duration: duration,
-                    title: recordingTitle,
-                };
-
-                await saveRecording(newRecording);
-
-                if (session?.user) {
-                    setIsUploading(true);
-                    try {
-                        const publicUrl = await uploadRecordingToCloud(recordingId, uri, session.user.id);
-                        if (publicUrl) {
-                            await saveRecordingToDatabase(
-                                session.user.id,
-                                recordingTitle,
-                                publicUrl,
-                                duration
-                            );
-                            Alert.alert("Succès", "Note enregistrée et synchronisée !");
-                        } else {
-                            Alert.alert("Attention", "Note sauvegardée localement, mais l'upload a échoué.");
-                        }
-                    } catch (error) {
-                        console.error("Upload failed", error);
-                        Alert.alert("Erreur", "L'upload a échoué, mais la note est sauvegardée localement.");
-                    } finally {
-                        setIsUploading(false);
-                    }
-                } else {
-                    Alert.alert("Sauvegardé", "Note enregistrée localement.");
-                }
+                // 2. Passe la main au parent avec les infos brutes
+                onRecordingComplete(uri, duration);
             }
         } else {
+            // Démarre l'enregistrement
             startRecording();
         }
     };
@@ -78,23 +46,19 @@ export default function RecordButton({
             </View>
 
             <View style={styles.actionButtonContainer}>
-                {isUploading ? (
-                    <ActivityIndicator size="large" color="#78350F" />
-                ) : (
-                    <TouchableOpacity
-                        onPress={handlePress}
-                        style={[styles.actionButton, { backgroundColor: isRecording ? '#B91C1C' : '#78350F' }]}
-                    >
-                        {isRecording ? (
-                            <Square size={18} color="#FFFFFF" strokeWidth={1.5} />
-                        ) : (
-                            <Mic size={18} color="#FFFFFF" strokeWidth={1.5} />
-                        )}
-                        <Text style={styles.actionButtonText}>
-                            {isRecording ? "Arrêter" : "Capturer une pensée"}
-                        </Text>
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                    onPress={handlePress}
+                    style={[styles.actionButton, { backgroundColor: isRecording ? '#B91C1C' : '#78350F' }]}
+                >
+                    {isRecording ? (
+                        <Square size={18} color="#FFFFFF" strokeWidth={1.5} />
+                    ) : (
+                        <Mic size={18} color="#FFFFFF" strokeWidth={1.5} />
+                    )}
+                    <Text style={styles.actionButtonText}>
+                        {isRecording ? "Arrêter" : "Capturer une pensée"}
+                    </Text>
+                </TouchableOpacity>
             </View>
         </View>
     );
