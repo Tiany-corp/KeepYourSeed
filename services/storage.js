@@ -62,6 +62,59 @@ const universalStorage = {
     },
 };
 
+// --- GOOGLE DRIVE HELPER ---
+// Extrait l'ID d'un fichier depuis n'importe quel format d'URL Google Drive
+const extractGoogleDriveFileId = (url) => {
+    if (!url || !url.includes('drive.google.com')) return null;
+    // Format: /file/d/{ID}/... ou ?id={ID}
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
+};
+
+// Télécharge un fichier Google Drive et retourne un blob:// URL jouable
+// Essaie plusieurs stratégies pour contourner les restrictions CORS
+const fetchGoogleDriveAsBlob = async (fileId) => {
+    // Liste d'URLs à essayer dans l'ordre (du plus fiable au moins fiable)
+    const urlsToTry = [
+        // 1. Endpoint Google Drive usercontent (parfois OK sans proxy)
+        `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`,
+        // 2. Proxy allorigins
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`,
+        // 3. Proxy corsproxy.io
+        `https://corsproxy.io/?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`,
+    ];
+
+    for (const url of urlsToTry) {
+        try {
+            console.log('Tentative fetch audio:', url.substring(0, 60) + '...');
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn(`HTTP ${response.status} pour ${url.substring(0, 60)}`);
+                continue;
+            }
+            const contentType = response.headers.get('content-type') || '';
+            // Si on reçoit du HTML au lieu de l'audio, c'est la page de confirmation Google → skip
+            if (contentType.includes('text/html')) {
+                console.warn('Reçu HTML au lieu d\'audio, tentative suivante...');
+                continue;
+            }
+            const blob = await response.blob();
+            if (blob.size < 1000) {
+                console.warn('Blob trop petit, probablement pas de l\'audio:', blob.size);
+                continue;
+            }
+            console.log('Audio Google Drive chargé avec succès:', blob.size, 'octets');
+            return URL.createObjectURL(blob);
+        } catch (e) {
+            console.warn('Échec fetch:', e.message);
+            continue;
+        }
+    }
+
+    console.error('Impossible de charger l\'audio Google Drive après toutes les tentatives');
+    return null;
+};
+
 // --- SÉLECTEUR INTELLIGENT D'URL AUDIO ---
 // Choisit automatiquement la meilleure source audio pour la lecture :
 //   1. Local d'abord (zéro latence)
@@ -72,9 +125,14 @@ export const getAudioSource = async (recording) => {
         // Sur Web, les indexeddb:// doivent être résolues en blob:// temporaire jouable
         if (Platform.OS === 'web' && recording.localUri.startsWith('indexeddb://')) {
             const audioId = recording.localUri.replace('indexeddb://', '');
-            const blobUrl = await universalStorage.getAudioBlobUrl(audioId); // Ca ca attrape l'url du cloud
+            const blobUrl = await universalStorage.getAudioBlobUrl(audioId);
             if (blobUrl) return { uri: blobUrl };
             // Si le blob local a disparu, on tombe sur le cloud ci-dessous
+        } else if (Platform.OS === 'web' && extractGoogleDriveFileId(recording.localUri)) {
+            // Google Drive : fetch via proxy CORS → blob:// URL jouable
+            const fileId = extractGoogleDriveFileId(recording.localUri);
+            const blobUrl = await fetchGoogleDriveAsBlob(fileId);
+            if (blobUrl) return { uri: blobUrl };
         } else {
             return { uri: recording.localUri }; // Mobile file:// ou autre URL directe
         }
@@ -144,15 +202,6 @@ export const getRecordings = async () => {
                     duration: 125,
                     title: 'Présentation de KeepYourSeed',
                 },
-                {
-                    id: 'demo-2',
-                    localUri: 'https://www2.cs.uic.edu/~i101/SoundFiles/BabyElephantWalk60.wav',
-                    remoteUrl: null,
-                    status: 'pending',
-                    date: new Date().toISOString(),
-                    duration: 60,
-                    title: 'Note rapide du matin',
-                }
             ];
         }
         return data;

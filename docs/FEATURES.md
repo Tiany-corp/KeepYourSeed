@@ -38,3 +38,8 @@ Ces fonctionnalités sont indispensables pour la première version.
 ## 🔴 Priorité 3 : Futur (V2.0)
 - [ ] **Statistiques** : "Vous avez enregistré 10 heures de votre vie".
 - [ ] **Recherche** : Par date ou par tags.
+
+Tu fais tes modifications de code.
+Tu lances npm run build:web (Génère le dossier dist tout neuf).
+Tu lances npm run test:prod (Prend le dossier dist, recrée l'architecture serveur dans temp_serve et te lance le serveur web).
+Tu vas sur http://localhost:3000/kys-web-app/ et tu testes ton appli.
