@@ -62,57 +62,38 @@ const universalStorage = {
     },
 };
 
-// --- GOOGLE DRIVE HELPER ---
-// Extrait l'ID d'un fichier depuis n'importe quel format d'URL Google Drive
-const extractGoogleDriveFileId = (url) => {
-    if (!url || !url.includes('drive.google.com')) return null;
-    // Format: /file/d/{ID}/... ou ?id={ID}
-    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null;
-};
+// --- CACHE AUDIO DEPUIS SUPABASE VERS LOCAL ---
+// Télécharge les fichiers audio Supabase en arrière-plan et les stocke en local (IndexedDB web)
+// pour une lecture instantanée sans réseau aux prochains accès.
+const cacheSupabaseAudioLocally = async (recordings) => {
+    try {
+        const { getSignedAudioUrl } = require('./cloud');
 
-// Télécharge un fichier Google Drive et retourne un blob:// URL jouable
-// Essaie plusieurs stratégies pour contourner les restrictions CORS
-const fetchGoogleDriveAsBlob = async (fileId) => {
-    // Liste d'URLs à essayer dans l'ordre (du plus fiable au moins fiable)
-    const urlsToTry = [
-        // 1. Endpoint Google Drive usercontent (parfois OK sans proxy)
-        `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`,
-        // 2. Proxy allorigins
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`,
-        // 3. Proxy corsproxy.io
-        `https://corsproxy.io/?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`,
-    ];
+        for (const rec of recordings) {
+            // Seulement si c'est un fichier Supabase sans copie locale
+            if (!rec.remoteUrl || rec.localUri) continue;
 
-    for (const url of urlsToTry) {
-        try {
-            console.log('Tentative fetch audio:', url.substring(0, 60) + '...');
-            const response = await fetch(url);
-            if (!response.ok) {
-                console.warn(`HTTP ${response.status} pour ${url.substring(0, 60)}`);
-                continue;
-            }
-            const contentType = response.headers.get('content-type') || '';
-            // Si on reçoit du HTML au lieu de l'audio, c'est la page de confirmation Google → skip
-            if (contentType.includes('text/html')) {
-                console.warn('Reçu HTML au lieu d\'audio, tentative suivante...');
-                continue;
-            }
+            console.log('Cache audio en arrière-plan:', rec.remoteUrl);
+            const signedUrl = await getSignedAudioUrl(rec.remoteUrl);
+            if (!signedUrl) continue;
+
+            const response = await fetch(signedUrl);
+            if (!response.ok) continue;
+
             const blob = await response.blob();
-            if (blob.size < 1000) {
-                console.warn('Blob trop petit, probablement pas de l\'audio:', blob.size);
-                continue;
-            }
-            console.log('Audio Google Drive chargé avec succès:', blob.size, 'octets');
-            return URL.createObjectURL(blob);
-        } catch (e) {
-            console.warn('Échec fetch:', e.message);
-            continue;
-        }
-    }
+            const audioId = `demo_${rec.id}`;
 
-    console.error('Impossible de charger l\'audio Google Drive après toutes les tentatives');
-    return null;
+            // Stocker le blob dans IndexedDB
+            await universalStorage.saveAudioBlob(audioId, blob);
+
+            // Mettre à jour l'enregistrement avec le chemin local
+            await updateRecording(rec.id, { localUri: `indexeddb://${audioId}` });
+            console.log('Audio mis en cache local:', audioId, `(${blob.size} octets)`);
+        }
+    } catch (e) {
+        // Erreur non-critique : la lecture cloud continue de fonctionner
+        console.warn('Cache audio en arrière-plan échoué (non-bloquant):', e.message);
+    }
 };
 
 // --- SÉLECTEUR INTELLIGENT D'URL AUDIO ---
@@ -128,11 +109,6 @@ export const getAudioSource = async (recording) => {
             const blobUrl = await universalStorage.getAudioBlobUrl(audioId);
             if (blobUrl) return { uri: blobUrl };
             // Si le blob local a disparu, on tombe sur le cloud ci-dessous
-        } else if (Platform.OS === 'web' && extractGoogleDriveFileId(recording.localUri)) {
-            // Google Drive : fetch via proxy CORS → blob:// URL jouable
-            const fileId = extractGoogleDriveFileId(recording.localUri);
-            const blobUrl = await fetchGoogleDriveAsBlob(fileId);
-            if (blobUrl) return { uri: blobUrl };
         } else {
             return { uri: recording.localUri }; // Mobile file:// ou autre URL directe
         }
@@ -191,18 +167,24 @@ export const getRecordings = async () => {
 
         // WEB DEMO: Injecte des données de démo si l'historique est vide sur le web
         if (Platform.OS === 'web' && data.length === 0) {
-            console.log('Web Demo: Injecting Fake Data');
-            return [
+            console.log('Web Demo: Injecting demo data from Supabase');
+            const demoRecordings = [
                 {
                     id: 'demo-1',
-                    localUri: 'https://drive.google.com/file/d/1u3kI1nzmTSilkexNndY2hJ-OIxkl09NQ/view?usp=drive_link',
-                    remoteUrl: null,
-                    status: 'pending',
+                    localUri: null,
+                    remoteUrl: 'public/WelcomeInKYS.mp3', // Chemin dans le bucket Supabase "audios"
+                    status: 'synced',
                     date: new Date(Date.now() - 86400000).toISOString(),
                     duration: 125,
                     title: 'Présentation de KeepYourSeed',
                 },
             ];
+
+            // Sauvegarder les démo en local, puis télécharger l'audio en arrière-plan
+            await universalStorage.saveData(STORAGE_KEY, demoRecordings);
+            cacheSupabaseAudioLocally(demoRecordings);
+
+            return demoRecordings;
         }
         return data;
     } catch (e) {
