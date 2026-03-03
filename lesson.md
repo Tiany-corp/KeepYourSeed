@@ -76,3 +76,33 @@ Quand une logique implique un calcul sur des données en base (tri, filtrage com
 - **Plus performant** : 1 requête au lieu de N.
 - **Plus robuste** : la logique est centralisée dans la base, pas éparpillée dans le code client.
 - **Plus maintenable** : si l'algorithme change, on modifie la fonction SQL sans toucher à l'app.
+
+---
+
+## Vérification régulière du Build de Production & Erreurs "is not a function"
+
+**Problème rencontré :**
+Lors du développement, l'application fonctionnait parfaitement sur le serveur de développement local (`expo start`), mais le build de production web générait une page blanche avec une erreur obscure du type : `TypeError: u.create is not a function` (qui correspondait en réalité à `StyleSheet.create is not a function`).
+
+**Cause racine :**
+Les erreurs du type `X is not a function` dans un build proviennent très souvent de **fichiers de configuration globaux** (comme `babel.config.js` ou `metro.config.cjs`) ou de problèmes d'imports résolus différemment en production qu'en développement. Dans notre cas, c'était le plugin Babel de **NativeWind** qui entrait en conflit avec la version web lors de la compilation de production.
+
+**Retenir pour la suite :**
+91. **Les fichiers de configuration sont souvent coupables :** Si une erreur incompréhensible comme `is not a function` survient en production alors que tout marche en dev, c'est que les outils de compilation (Babel, Metro) transforment mal le code. Il faut isoler le problème en vérifiant les configurations et les imports globaux.
+92. **Vérifier la version buildée régulièrement :** Ne pas attendre d'avoir terminé le développement pour tester un build de production. Il faut exporter régulièrement (ex: `npx expo export --platform web`) et tester localement le build (avec un script personnalisé serve-prod.js) pour s'assurer qu'aucune configuration n'a cassé le rendu final.
+
+---
+
+## Pièges de l'égalité référentielle dans les Hooks React
+
+**Le Problème (suite à un refacto) :**
+Lors de la simplification des props d'un composant, une erreur classique d'architecture a été tentée : passer directement l'objet entier retourné par un *custom hook* en tant que prop à un composant enfant (ex. `<AudioPlayer player={player} />` au lieu d'une dizaine de props isolées), et de l'utiliser dans le tableau de dépendances d'un `useCallback` (ex. `[player]`).
+
+**La Cause (Comment React gère la mémoire) :**
+Un *custom hook* (`useMemoryPlayer` par exemple) retourne généralement un **nouvel objet** `{ isPlaying, showPlayer, toggle... }` à **chaque rendu** du composant appelant.
+1. **Passage d'objet global** : En passant `{player}` entier en prop, React détruit complètement "l'égalité référentielle". Le composant recevra *techniquement* un nouvel objet mémoire à chaque frame, causant un re-rendu perpétuel et bloquant toute optimisation avec `React.memo`. 
+2. **Tableaux de dépendances** : Utiliser un objet retourné par un hook dans un dépendance de `useEffect` ou `useCallback` (`[player]`) empêche l'optimisation. La fonction sera recréée à chaque rendu du composant, car la référence de l'objet `{player}` aura muté par rapport au rendu précédent.
+
+**Retenir pour la suite :**
+- **Préférer l'aplatissement (Props Drilling sélectif)** : Même si l'écriture est plus longue `<AudioPlayer isPlaying={player.isPlaying} position={player.position} />`, cette syntaxe est infiniment plus sûre et optimale. React sait comparer des booléens (`isPlaying`) et des entiers (`position`), mais échoue sur les nouveaux objets générés à la volée.
+- **Isoler les dépendances** : Les fonctions internes utiles dans un hook doivent être stabilisées (via `useCallback` intérieur). Et le composant utilisant ce hook, au lieu de dépendre du hook entier, doit dépendre de ses propriétés stables une à une (ex: utiliser `[player.toggle]` plutôt que `[player]`).
