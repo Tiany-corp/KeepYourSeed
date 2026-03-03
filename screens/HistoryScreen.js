@@ -3,7 +3,8 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert
 import { getRecordings, clearRecordings, getAudioSource } from '../services/storage';
 import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
 import { Audio } from 'expo-av';
-import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Menu, Trash2 } from 'lucide-react-native';
+import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Trash2 } from 'lucide-react-native';
+import AppHeader from '../components/AppHeader';
 
 export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [recordings, setRecordings] = useState([]);
@@ -173,16 +174,17 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onOpenSettings} style={styles.iconButton}>
-                    <Menu size={24} color="#78350F" strokeWidth={1.5} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Historique</Text>
-                <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
-                    <ArrowLeft size={16} color="#78350F" strokeWidth={2} style={{ marginRight: 4 }} />
-                    <Text style={styles.backButtonText}>Retour</Text>
-                </TouchableOpacity>
-            </View>
+            <AppHeader
+                onOpenSettings={onOpenSettings}
+                title="Historique"
+                showLogo={false}
+                rightContent={
+                    <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
+                        <ArrowLeft size={16} color="#78350F" strokeWidth={2} style={{ marginRight: 4 }} />
+                        <Text style={styles.backButtonText}>Retour</Text>
+                    </TouchableOpacity>
+                }
+            />
 
             <FlatList
                 data={recordings}
@@ -199,19 +201,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#FAF7F2', // seed-bg
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#FAF7F2',
-        borderBottomWidth: 1,
-        borderBottomColor: '#D4A574', // seed-border
-    },
-    iconButton: {
-        padding: 8,
     },
     backButton: {
         flexDirection: 'row',
