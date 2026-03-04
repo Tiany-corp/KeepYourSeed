@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, Text, Platform } from 'react-native';
 import { supabase } from './services/supabase';
 import { AudioPlayerProvider } from './contexts/AudioPlayerContext';
+import { AlertProvider } from './contexts/AlertContext';
 import RecordScreen from './screens/RecordScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import AuthScreen from './screens/AuthScreen';
@@ -59,23 +60,17 @@ function AppContent() {
 
   return (
     <View style={styles.container}>
-      {!session ? (
-        <AuthScreen />
-      ) : (
-        <>
-          <View style={{ flex: 1 }}>
-            {currentScreen === 'record' ? (
-              <RecordScreen session={session} onGoToHistory={() => setCurrentScreen('history')} onOpenSettings={() => setDrawerOpen(true)} />
-            ) : (
-              <HistoryScreen key={refreshKey} onGoBack={() => setCurrentScreen('record')} session={session} onOpenSettings={() => setDrawerOpen(true)} />
-            )}
-          </View>
+      <View style={{ flex: 1 }}>
+        {currentScreen === 'record' ? (
+          <RecordScreen session={session} onGoToHistory={() => setCurrentScreen('history')} onOpenSettings={() => setDrawerOpen(true)} />
+        ) : (
+          <HistoryScreen key={refreshKey} onGoBack={() => setCurrentScreen('record')} session={session} onOpenSettings={() => setDrawerOpen(true)} />
+        )}
+      </View>
 
-          {/* Mini player bar global — persiste entre les écrans */}
-          <AudioPlayer />
-        </>
-      )}
-      {session && <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} />}
+      {/* Mini player bar global — persiste entre les écrans */}
+      <AudioPlayer />
+      <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} />
       <StatusBar style="auto" />
     </View>
   );
@@ -84,9 +79,11 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AudioPlayerProvider>
-        <AppContent />
-      </AudioPlayerProvider>
+      <AlertProvider>
+        <AudioPlayerProvider>
+          <AppContent />
+        </AudioPlayerProvider>
+      </AlertProvider>
     </ErrorBoundary>
   );
 }

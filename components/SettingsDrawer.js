@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet } from 'react-native';
+import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
@@ -12,6 +13,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
     const overlayOpacity = useRef(new Animated.Value(0)).current;
     const [isRendered, setIsRendered] = useState(false);
+    const { showAlert } = useAlert();
 
     useEffect(() => {
         if (visible) {
@@ -58,9 +60,9 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         if (success) {
             await clearRecordings();
             if (onDataCleared) onDataCleared();
-            Alert.alert('✅ Succès', 'Le cloud et le stockage local ont été vidés.');
+            showAlert('Succès', 'Le cloud et le stockage local ont été vidés.', 'success');
         } else {
-            Alert.alert('❌ Erreur', 'Impossible de vider le bucket.');
+            showAlert('Erreur', 'Impossible de vider le bucket.', 'error');
         }
     };
 
@@ -114,7 +116,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 </View>
 
                 {/* Infos utilisateur */}
-                {session?.user && (
+                {session?.user ? (
                     <View style={styles.userInfoContainer}>
                         <View style={styles.avatar}>
                             <Text style={styles.avatarText}>
@@ -125,24 +127,41 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             {session.user.email}
                         </Text>
                     </View>
+                ) : (
+                    <View style={styles.userInfoContainer}>
+                        <View style={[styles.avatar, { backgroundColor: '#A8A29E' }]}>
+                            <Text style={styles.avatarText}>?</Text>
+                        </View>
+                        <Text style={styles.notConnectedText}>
+                            Connecte-toi pour sauvegarder{'\n'}tes pensées dans le cloud
+                        </Text>
+                    </View>
                 )}
 
                 <View style={styles.separator} />
 
-                {/* Menu items */}
-                <View style={styles.menuContainer}>
-                    <TouchableOpacity style={styles.menuItem} onPress={handleEmptyBucket}>
-                        <Trash2 size={20} color="#ef4444" style={styles.menuIcon} />
-                        <Text style={styles.menuItemTextDanger}>Vider le cloud</Text>
-                    </TouchableOpacity>
+                {/* Menu items — seulement si connecté */}
+                {session?.user ? (
+                    <View style={styles.menuContainer}>
+                        <TouchableOpacity style={styles.menuItem} onPress={handleEmptyBucket}>
+                            <Trash2 size={20} color="#ef4444" style={styles.menuIcon} />
+                            <Text style={styles.menuItemTextDanger}>Vider le cloud</Text>
+                        </TouchableOpacity>
 
-                    <View style={styles.separator} />
+                        <View style={styles.separator} />
 
-                    <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                        <LogOut size={20} color="#292524" style={styles.menuIcon} />
-                        <Text style={styles.menuItemText}>Se déconnecter</Text>
-                    </TouchableOpacity>
-                </View>
+                        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+                            <LogOut size={20} color="#292524" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Se déconnecter</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View style={styles.menuContainer}>
+                        <Text style={styles.guestHint}>
+                            Les enregistrements sont sauvegardés{'\n'}localement sur cet appareil.
+                        </Text>
+                    </View>
+                )}
 
                 {/* Footer */}
                 <View style={styles.footer}>
@@ -175,5 +194,7 @@ const styles = StyleSheet.create({
     menuItemText: { fontSize: 16, color: '#292524' },
     footer: { padding: 20, borderTopWidth: 1, borderTopColor: '#D4A574', alignItems: 'center' },
     footerLogo: { marginBottom: 6 },
-    footerText: { fontSize: 12, color: '#78716C' }
+    footerText: { fontSize: 12, color: '#78716C' },
+    notConnectedText: { fontSize: 14, color: '#78716C', textAlign: 'center', lineHeight: 20 },
+    guestHint: { fontSize: 14, color: '#A8A29E', textAlign: 'center', paddingHorizontal: 20, paddingVertical: 24, lineHeight: 20, fontStyle: 'italic' }
 });

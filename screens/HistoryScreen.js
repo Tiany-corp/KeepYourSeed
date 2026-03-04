@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { getRecordings, clearRecordings } from '../services/storage';
 import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
 import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Trash2 } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
+import { useAlert } from '../contexts/AlertContext';
 
 export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [recordings, setRecordings] = useState([]);
     const [uploadingId, setUploadingId] = useState(null);
 
-    // Lecteur audio global
     const audioPlayer = useAudioPlayer();
+    const { showAlert } = useAlert();
 
     useEffect(() => {
         loadRecordings();
@@ -41,18 +42,23 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     }
 
     async function handleUpload(item) {
+        // Pas connecté → message
+        if (!session?.user) {
+            showAlert("Connexion requise", "Connecte-toi pour sauvegarder tes enregistrements dans le cloud.", "warning");
+            return;
+        }
+
         setUploadingId(item.id);
         try {
-            const userId = session?.user?.id || 'public';
-            const publicUrl = await uploadRecordingToCloud(item.id, item.localUri, userId);
+            const publicUrl = await uploadRecordingToCloud(item.id, item.localUri, session.user.id);
             if (publicUrl) {
-                Alert.alert("Succès", "Fichier envoyé sur le cloud !");
+                showAlert("Succès", "Fichier envoyé sur le cloud !", "success");
                 await loadRecordings();
             } else {
-                Alert.alert("Erreur", "L'envoi a échoué.");
+                showAlert("Erreur", "L'envoi a échoué.", "error");
             }
         } catch (e) {
-            Alert.alert("Erreur", "Une erreur est survenue.");
+            showAlert("Erreur", "Une erreur est survenue.", "error");
         } finally {
             setUploadingId(null);
         }

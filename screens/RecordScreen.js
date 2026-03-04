@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ActivityIndicator } from 'react-native';
 import useAudioRecorder from '../hooks/useAudioRecorder';
 import useRevealAnimation from '../hooks/useRevealAnimation';
 import { getDailyMemory, saveRecording } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
+import { useAlert } from '../contexts/AlertContext';
 
 import AppHeader from '../components/AppHeader';
 import MemoryCard from '../components/MemoryCard';
@@ -22,8 +23,8 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     const [showTitleModal, setShowTitleModal] = useState(false);
     const [pendingRecording, setPendingRecording] = useState(null);
 
-    // Lecteur audio global (remplace useMemoryPlayer)
     const audioPlayer = useAudioPlayer();
+    const { showAlert } = useAlert();
 
     const revealProps = useRevealAnimation({
         onRevealComplete: () => {
@@ -80,18 +81,18 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 const publicUrl = await uploadRecordingToCloud(recordingId, uri, session.user.id);
                 if (publicUrl) {
                     await saveRecordingToDatabase(session.user.id, title, publicUrl, recDuration);
-                    Alert.alert("Succès", "Note enregistrée et synchronisée !");
+                    showAlert("Succès", "Note enregistrée et synchronisée !", "success");
                 } else {
-                    Alert.alert("Attention", "Note sauvegardée localement, mais l'upload a échoué.");
+                    showAlert("Attention", "Note sauvegardée localement, mais l'upload a échoué.", "warning");
                 }
             } catch (error) {
                 console.error("Upload failed", error);
-                Alert.alert("Erreur", "L'upload a échoué, mais la note est sauvegardée localement.");
+                showAlert("Erreur", "L'upload a échoué, mais la note est sauvegardée localement.", "error");
             } finally {
                 setIsUploading(false);
             }
         } else {
-            Alert.alert("Sauvegardé", "Note enregistrée localement.");
+            showAlert("Sauvegardé", "Note enregistrée localement.", "success");
         }
 
         setPendingRecording(null);
