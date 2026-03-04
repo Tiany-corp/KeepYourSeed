@@ -1,13 +1,14 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { Mic, Square } from 'lucide-react-native';
+import { Mic, Square, Mail } from 'lucide-react-native';
 
 /**
- * Bouton d'enregistrement simplifié.
+ * Bouton d'enregistrement avec deux modes : Note classique ou Message au futur.
  * 
- * Responsabilité UNIQUE : démarrer / arrêter l'enregistrement.
+ * Quand pas en train d'enregistrer → affiche 2 boutons côte à côte.
+ * Quand en train d'enregistrer → affiche le bouton Stop.
  * Quand l'user arrête, il appelle onRecordingComplete(uri, duration)
- * et c'est le PARENT (RecordScreen) qui gère la suite (modale titre, sauvegarde, upload).
+ * et c'est le PARENT (RecordScreen) qui gère la suite.
  */
 export default function RecordButton({
     isRecording,
@@ -15,20 +16,19 @@ export default function RecordButton({
     formatDuration,
     startRecording,
     stopRecording,
-    onRecordingComplete, // 🆕 callback vers le parent
+    onRecordingComplete,
+    onModeChange,        // callback pour informer le parent du mode choisi
 }) {
-    const handlePress = async () => {
-        if (isRecording) {
-            // 1. Arrête l'enregistrement → récupère l'URI du fichier audio local
-            const uri = await stopRecording();
-            if (uri) {
-                // 2. Passe la main au parent avec les infos brutes
-                onRecordingComplete(uri, duration);
-            }
-        } else {
-            // Démarre l'enregistrement
-            startRecording();
+    const handleStop = async () => {
+        const uri = await stopRecording();
+        if (uri) {
+            onRecordingComplete(uri, duration);
         }
+    };
+
+    const handleStart = (mode) => {
+        if (onModeChange) onModeChange(mode);
+        startRecording();
     };
 
     return (
@@ -46,19 +46,33 @@ export default function RecordButton({
             </View>
 
             <View style={styles.actionButtonContainer}>
-                <TouchableOpacity
-                    onPress={handlePress}
-                    style={[styles.actionButton, { backgroundColor: isRecording ? '#B91C1C' : '#78350F' }]}
-                >
-                    {isRecording ? (
+                {isRecording ? (
+                    <TouchableOpacity
+                        onPress={handleStop}
+                        style={[styles.actionButton, styles.stopButton]}
+                    >
                         <Square size={18} color="#FFFFFF" strokeWidth={1.5} />
-                    ) : (
-                        <Mic size={18} color="#FFFFFF" strokeWidth={1.5} />
-                    )}
-                    <Text style={styles.actionButtonText}>
-                        {isRecording ? "Arrêter" : "Capturer une pensée"}
-                    </Text>
-                </TouchableOpacity>
+                        <Text style={styles.actionButtonText}>Arrêter</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.buttonsColumn}>
+                        <TouchableOpacity
+                            onPress={() => handleStart('note')}
+                            style={[styles.actionButton, styles.mainButton]}
+                        >
+                            <Mic size={20} color="#FFFFFF" strokeWidth={1.5} />
+                            <Text style={styles.mainButtonText}>Capturer une pensée</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => handleStart('message')}
+                            style={styles.secondaryButton}
+                        >
+                            <Mail size={16} color="#78716C" strokeWidth={1.5} />
+                            <Text style={styles.secondaryButtonText}>S'envoyer un message au futur</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
         </View>
     );
@@ -71,7 +85,13 @@ const styles = StyleSheet.create({
     recordingIndicatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 8 },
     recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#B91C1C' },
     recordingText: { color: '#B91C1C', fontSize: 14, fontWeight: '500' },
-    actionButtonContainer: { width: '100%', maxWidth: 300 },
-    actionButton: { paddingVertical: 16, paddingHorizontal: 24, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
-    actionButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 16 }
+    actionButtonContainer: { width: '100%', maxWidth: 320, alignItems: 'center' },
+    buttonsColumn: { width: '100%', alignItems: 'center' },
+    actionButton: { width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10 },
+    mainButton: { backgroundColor: '#78350F', shadowColor: '#78350F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    mainButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 17 },
+    secondaryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, paddingVertical: 8, paddingHorizontal: 16 },
+    secondaryButtonText: { color: '#78716C', fontSize: 14, fontWeight: '500' },
+    stopButton: { backgroundColor: '#B91C1C' },
+    actionButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 17 },
 });

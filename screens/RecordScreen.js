@@ -22,6 +22,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     // --- État pour la modale de titre ---
     const [showTitleModal, setShowTitleModal] = useState(false);
     const [pendingRecording, setPendingRecording] = useState(null);
+    const [recordingMode, setRecordingMode] = useState('note'); // 'note' | 'message'
 
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
@@ -57,7 +58,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     };
 
     // --- ÉTAPE 2 : L'user a confirmé le titre → on sauvegarde tout ---
-    const handleTitleConfirm = async (title) => {
+    const handleTitleConfirm = async (title, type = 'note', deliverDate = null) => {
         setShowTitleModal(false);
         if (!pendingRecording) return;
 
@@ -71,6 +72,8 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             date: new Date().toISOString(),
             duration: recDuration,
             title: title,
+            type: type,
+            deliverDate: deliverDate,
         };
 
         await saveRecording(newRecording);
@@ -80,14 +83,14 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             try {
                 const publicUrl = await uploadRecordingToCloud(recordingId, uri, session.user.id);
                 if (publicUrl) {
-                    await saveRecordingToDatabase(session.user.id, title, publicUrl, recDuration);
-                    showAlert("Succès", "Note enregistrée et synchronisée !", "success");
+                    await saveRecordingToDatabase(session.user.id, title, publicUrl, recDuration, type, deliverDate);
+                    showAlert("Succès", type === 'message' ? "Message envoyé à ton futur toi !" : "Note enregistrée et synchronisée !", "success");
                 } else {
-                    showAlert("Attention", "Note sauvegardée localement, mais l'upload a échoué.", "warning");
+                    showAlert("Attention", "Sauvegardée localement, mais l'upload a échoué.", "warning");
                 }
             } catch (error) {
                 console.error("Upload failed", error);
-                showAlert("Erreur", "L'upload a échoué, mais la note est sauvegardée localement.", "error");
+                showAlert("Erreur", "L'upload a échoué, mais sauvegardée localement.", "error");
             } finally {
                 setIsUploading(false);
             }
@@ -95,6 +98,11 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             showAlert("Sauvegardé", "Note enregistrée localement.", "success");
         }
 
+        setPendingRecording(null);
+    };
+
+    const handleTitleCancel = () => {
+        setShowTitleModal(false);
         setPendingRecording(null);
     };
 
@@ -128,6 +136,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                             startRecording={startRecording}
                             stopRecording={stopRecording}
                             onRecordingComplete={handleRecordingComplete}
+                            onModeChange={setRecordingMode}
                         />
                     )}
                 </View>
@@ -139,7 +148,9 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             <TitleModal
                 visible={showTitleModal}
                 defaultTitle={pendingRecording?.defaultTitle || ''}
+                initialMode={recordingMode}
                 onConfirm={handleTitleConfirm}
+                onCancel={handleTitleCancel}
             />
         </SafeAreaView>
     );

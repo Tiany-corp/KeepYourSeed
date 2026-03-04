@@ -217,9 +217,7 @@ const getTodayKey = () => {
 };
 
 /**
- * Récupère le souvenir du jour.
- * - Si un souvenir est déjà en cache pour aujourd'hui → le retourne instantanément.
- * - Sinon → demande un aléatoire à Supabase, le met en cache, et le retourne.
+ * Récupère le contenu du jour : un message reçu en priorité, sinon un souvenir aléatoire.
  * @param {string} userId - UUID de l'utilisateur connecté
  * @returns {Promise<Object|null>} - Un recording au format app, ou null
  */
@@ -234,14 +232,24 @@ export const getDailyMemory = async (userId) => {
             return cached;
         }
 
-        // 2. Pas de cache → demander à Supabase
-        const { fetchRandomRecording } = require('./cloud');
+        // 2. Vérifier s'il y a un message en attente (prioritaire)
+        const { fetchPendingMessage, markMessageAsOpened, fetchRandomRecording } = require('./cloud');
+        const pendingMessage = await fetchPendingMessage(userId);
+
+        if (pendingMessage) {
+            if (pendingMessage.dbId) await markMessageAsOpened(pendingMessage.dbId);
+            await universalStorage.saveData(todayKey, pendingMessage);
+            console.log('Message du passé reçu:', pendingMessage.title);
+            return pendingMessage;
+        }
+
+        // 3. Sinon → souvenir aléatoire
         const randomRecording = await fetchRandomRecording(userId);
 
         if (randomRecording) {
-            // 3. Sauvegarder en cache pour le reste de la journée
+            randomRecording.type = randomRecording.type || 'note';
             await universalStorage.saveData(todayKey, randomRecording);
-            console.log('Nouveau souvenir du jour mis en cache:', randomRecording.title);
+            console.log('Souvenir du jour mis en cache:', randomRecording.title);
         }
 
         return randomRecording;

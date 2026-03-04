@@ -24,6 +24,8 @@ export default function Logo({ size = 100, color = '#4D7C0F', style }) {
                 {/* Little decorative dot indicating life/germination */}
                 <Circle cx="60" cy="75" r="4" fill="#D4A574" />
             </Svg>
+
+
         </View>
     );
 }

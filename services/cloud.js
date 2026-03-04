@@ -80,20 +80,26 @@ export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
  * @param {string} title - Title of the recording
  * @param {string} audioUrl - Public URL of the audio file
  * @param {number} duration - Duration in seconds
+ * @param {string} type - 'note' or 'message'
+ * @param {string|null} deliverDate - ISO date for message delivery (null for notes)
  * @returns {Promise<Object|null>} - The inserted record or null if failed
  */
-export const saveRecordingToDatabase = async (userId, title, audioUrl, duration) => {
+export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null) => {
     try {
+        const insertData = {
+            user_id: userId,
+            title: title,
+            audio_url: audioUrl,
+            duration_seconds: duration,
+            type: type,
+        };
+        if (deliverDate) {
+            insertData.deliver_date = deliverDate;
+        }
+
         const { data, error } = await supabase
             .from('recordings')
-            .insert([
-                {
-                    user_id: userId,
-                    title: title,
-                    audio_url: audioUrl,
-                    duration_seconds: duration,
-                },
-            ])
+            .insert([insertData])
             .select();
 
         if (error) {
@@ -228,10 +234,72 @@ export const fetchRandomRecording = async (userId) => {
             date: row.created_at,
             duration: row.duration_seconds || 0,
             title: row.title || 'Sans titre',
+            type: row.type || 'note',
         };
 
     } catch (e) {
         console.error('Failed to fetch random recording:', e);
         return null;
+    }
+};
+
+/**
+ * Récupère le plus ancien message non ouvert dont la date de livraison est passée.
+ * @param {string} userId - UUID de l'utilisateur
+ * @returns {Promise<Object|null>} - Un recording de type 'message' ou null
+ */
+export const fetchPendingMessage = async (userId) => {
+    try {
+        const now = new Date().toISOString();
+        const { data, error } = await supabase
+            .from('recordings')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('type', 'message')
+            .eq('opened', false)
+            .lte('deliver_date', now)
+            .order('deliver_date', { ascending: true })
+            .limit(1);
+
+        if (error) {
+            console.error('fetchPendingMessage error:', error);
+            return null;
+        }
+
+        if (!data || data.length === 0) return null;
+
+        const row = data[0];
+        return {
+            id: `cloud_${row.id}`,
+            dbId: row.id,
+            localUri: null,
+            remoteUrl: row.audio_url,
+            status: 'synced',
+            date: row.created_at,
+            duration: row.duration_seconds || 0,
+            title: row.title || 'Sans titre',
+            type: 'message',
+            deliverDate: row.deliver_date,
+        };
+    } catch (e) {
+        console.error('Failed to fetch pending message:', e);
+        return null;
+    }
+};
+
+/**
+ * Marque un message comme ouvert dans la base de données.
+ * @param {number} recordId - ID de l'enregistrement dans Supabase
+ */
+export const markMessageAsOpened = async (recordId) => {
+    try {
+        const { error } = await supabase
+            .from('recordings')
+            .update({ opened: true })
+            .eq('id', recordId);
+
+        if (error) console.error('markMessageAsOpened error:', error);
+    } catch (e) {
+        console.error('Failed to mark message as opened:', e);
     }
 };
