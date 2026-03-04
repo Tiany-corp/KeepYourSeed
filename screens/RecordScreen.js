@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import useAudioRecorder from '../hooks/useAudioRecorder';
-import useMemoryPlayer from '../hooks/useMemoryPlayer';
 import useRevealAnimation from '../hooks/useRevealAnimation';
 import { getDailyMemory, saveRecording } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
+import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 
 import AppHeader from '../components/AppHeader';
 import MemoryCard from '../components/MemoryCard';
 import RecordButton from '../components/RecordButton';
 import TitleModal from '../components/TitleModal';
 import Footer from '../components/Footer';
-import AudioPlayer from '../components/AudioPlayer';
 
 export default function RecordScreen({ session, onGoToHistory, onOpenSettings }) {
     const { isRecording, duration, startRecording, stopRecording, formatDuration } = useAudioRecorder();
@@ -21,14 +20,17 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
 
     // --- État pour la modale de titre ---
     const [showTitleModal, setShowTitleModal] = useState(false);
-    const [pendingRecording, setPendingRecording] = useState(null); // { uri, duration, id, defaultTitle }
+    const [pendingRecording, setPendingRecording] = useState(null);
 
-    const player = useMemoryPlayer(dailyMemory);
+    // Lecteur audio global (remplace useMemoryPlayer)
+    const audioPlayer = useAudioPlayer();
 
     const revealProps = useRevealAnimation({
         onRevealComplete: () => {
-            player.setShowPlayer(true);
-            player.play();
+            if (dailyMemory) {
+                audioPlayer.play(dailyMemory);
+                audioPlayer.openModal(); // Ouvre la modale fullscreen après le reveal
+            }
         }
     });
 
@@ -49,7 +51,6 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
         const recordingId = Date.now().toString();
         const defaultTitle = `Note ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
-        // On stocke les infos temporaires et on ouvre la modale
         setPendingRecording({ uri, duration: recordedDuration, id: recordingId, defaultTitle });
         setShowTitleModal(true);
     };
@@ -61,7 +62,6 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
 
         const { uri, duration: recDuration, id: recordingId } = pendingRecording;
 
-        // Créer l'objet recording avec le titre choisi par l'user
         const newRecording = {
             id: recordingId,
             localUri: uri,
@@ -69,13 +69,11 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             status: 'pending',
             date: new Date().toISOString(),
             duration: recDuration,
-            title: title, // ← le titre personnalisé !
+            title: title,
         };
 
-        // Sauvegarde locale
         await saveRecording(newRecording);
 
-        // Upload cloud si connecté
         if (session?.user) {
             setIsUploading(true);
             try {
@@ -96,7 +94,6 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             Alert.alert("Sauvegardé", "Note enregistrée localement.");
         }
 
-        // Nettoyage
         setPendingRecording(null);
     };
 
@@ -112,7 +109,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                                 dailyMemory={dailyMemory}
                                 isMemoryLoading={isMemoryLoading}
                                 revealProps={revealProps}
-                                onOpenPlayer={() => { player.setShowPlayer(true); player.toggle(); }}
+                                onOpenPlayer={() => audioPlayer.toggle(dailyMemory)}
                             />
                         </View>
                     </View>
@@ -142,14 +139,6 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 visible={showTitleModal}
                 defaultTitle={pendingRecording?.defaultTitle || ''}
                 onConfirm={handleTitleConfirm}
-            />
-
-            <AudioPlayer
-                showPlayer={player.showPlayer} isMemoryPlaying={player.isPlaying}
-                dailyMemory={dailyMemory} playbackPosition={player.position}
-                playbackDuration={player.duration} memorySoundRef={player.soundRef}
-                toggleMemoryPlayback={player.toggle} closePlayerModal={player.stop}
-                setShowPlayer={player.setShowPlayer} dismissToMiniPlayer={() => player.setShowPlayer(false)}
             />
         </SafeAreaView>
     );

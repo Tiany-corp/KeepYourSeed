@@ -1,37 +1,41 @@
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { Play, Pause, X } from 'lucide-react-native';
 import { getRelativeDate, formatTime } from '../utils/date';
+import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 
-export default function AudioPlayer({
-    showPlayer,
-    isMemoryPlaying,
-    dailyMemory,
-    playbackPosition,
-    playbackDuration,
-    memorySoundRef,
-    toggleMemoryPlayback,
-    closePlayerModal,
-    setShowPlayer,
-    dismissToMiniPlayer,
-}) {
-    if (!dailyMemory) return null;
+/**
+ * Lecteur audio global (mini bar + modale).
+ * Lit son état depuis AudioPlayerContext → persiste entre les écrans.
+ * À placer dans App.js au-dessus de tous les écrans.
+ */
+export default function AudioPlayer() {
+    const { currentTrack, isPlaying, position, duration, toggle, stop, modalVisible, openModal, closeModal } = useAudioPlayer();
+
+    // Pas de track → rien à afficher
+    if (!currentTrack) return null;
+
+    const dismissToMiniPlayer = () => closeModal();
+
+    const closePlayer = async () => {
+        await stop();
+    };
 
     return (
         <>
-            {/* ═══ MINI PLAYER BAR (visible quand modal fermée + audio chargé) ═══ */}
-            {!showPlayer && memorySoundRef.current && (
+            {/* ═══ MINI PLAYER BAR (toujours visible quand un track est actif) ═══ */}
+            {!modalVisible && (
                 <TouchableOpacity
-                    onPress={() => setShowPlayer(true)}
+                    onPress={openModal}
                     activeOpacity={0.9}
                     style={styles.miniPlayerContainer}
                 >
                     <View style={styles.miniPlayerRow}>
                         {/* Play/Pause mini */}
                         <TouchableOpacity
-                            onPress={toggleMemoryPlayback}
+                            onPress={() => toggle()}
                             style={styles.miniPlayButton}
                         >
-                            {isMemoryPlaying ? (
+                            {isPlaying ? (
                                 <Pause size={16} color="#FFFFFF" strokeWidth={1.5} />
                             ) : (
                                 <Play size={16} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 2 }} />
@@ -41,15 +45,15 @@ export default function AudioPlayer({
                         {/* Info + progress */}
                         <View style={styles.miniPlayerInfo}>
                             <Text style={styles.miniPlayerTitle} numberOfLines={1}>
-                                {dailyMemory.title}
+                                {currentTrack.title || 'Sans titre'}
                             </Text>
                             <View style={styles.miniProgressBarTrack}>
                                 <View
                                     style={[
                                         styles.miniProgressBarFill,
                                         {
-                                            width: playbackDuration > 0
-                                                ? `${(playbackPosition / playbackDuration) * 100}%`
+                                            width: duration > 0
+                                                ? `${(position / duration) * 100}%`
                                                 : '0%',
                                         }
                                     ]}
@@ -59,11 +63,11 @@ export default function AudioPlayer({
 
                         {/* Temps restant */}
                         <Text style={styles.miniPlayerTime}>
-                            {formatTime(playbackDuration - playbackPosition)}
+                            {formatTime(duration - position)}
                         </Text>
 
                         {/* Fermer (stoppe l'audio) */}
-                        <TouchableOpacity onPress={closePlayerModal} style={styles.closeIconButton}>
+                        <TouchableOpacity onPress={closePlayer} style={styles.closeIconButton}>
                             <X size={16} color="#78716C" strokeWidth={1.5} />
                         </TouchableOpacity>
                     </View>
@@ -72,7 +76,7 @@ export default function AudioPlayer({
 
             {/* ═══ MODAL AUDIO PLAYER ═══ */}
             <Modal
-                visible={showPlayer}
+                visible={modalVisible}
                 transparent
                 animationType="fade"
                 onRequestClose={dismissToMiniPlayer}
@@ -89,7 +93,7 @@ export default function AudioPlayer({
                     >
                         {/* Bouton fermer (stoppe l'audio) */}
                         <TouchableOpacity
-                            onPress={closePlayerModal}
+                            onPress={closePlayer}
                             style={styles.modalCloseButton}
                         >
                             <X size={20} color="#78716C" strokeWidth={1.5} />
@@ -98,21 +102,21 @@ export default function AudioPlayer({
                         {/* Contenu centré */}
                         <View style={styles.modalContent}>
                             <Text style={styles.modalDateText}>
-                                {getRelativeDate(dailyMemory.date)}
+                                {getRelativeDate(currentTrack.date)}
                             </Text>
 
                             <Text style={styles.modalTitleText} numberOfLines={2}>
-                                {dailyMemory.title || 'Souvenir'}
+                                {currentTrack.title || 'Sans titre'}
                             </Text>
 
                             <TouchableOpacity
-                                onPress={toggleMemoryPlayback}
+                                onPress={() => toggle()}
                                 style={[
                                     styles.modalPlayButton,
-                                    { backgroundColor: isMemoryPlaying ? '#B91C1C' : '#78350F' }
+                                    { backgroundColor: isPlaying ? '#B91C1C' : '#78350F' }
                                 ]}
                             >
-                                {isMemoryPlaying ? (
+                                {isPlaying ? (
                                     <Pause size={32} color="#FFFFFF" strokeWidth={1.5} />
                                 ) : (
                                     <Play size={32} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 4 }} />
@@ -127,16 +131,16 @@ export default function AudioPlayer({
                                     style={[
                                         styles.modalProgressBarFill,
                                         {
-                                            width: playbackDuration > 0
-                                                ? `${(playbackPosition / playbackDuration) * 100}%`
+                                            width: duration > 0
+                                                ? `${(position / duration) * 100}%`
                                                 : '0%',
                                         }
                                     ]}
                                 />
                             </View>
                             <View style={styles.timeRow}>
-                                <Text style={styles.timeText}>{formatTime(playbackPosition)}</Text>
-                                <Text style={styles.timeText}>{formatTime(playbackDuration)}</Text>
+                                <Text style={styles.timeText}>{formatTime(position)}</Text>
+                                <Text style={styles.timeText}>{formatTime(duration)}</Text>
                             </View>
                         </View>
                     </Pressable>
@@ -147,7 +151,7 @@ export default function AudioPlayer({
 }
 
 const styles = StyleSheet.create({
-    miniPlayerContainer: { borderTopWidth: 1, borderTopColor: '#D4A574', backgroundColor: '#F5F0E8', paddingHorizontal: 16, paddingVertical: 12 },
+    miniPlayerContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, borderTopColor: '#D4A574', backgroundColor: '#F5F0E8', paddingHorizontal: 16, paddingVertical: 12 },
     miniPlayerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     miniPlayButton: { borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#78350F', width: 36, height: 36 },
     miniPlayerInfo: { flex: 1 },

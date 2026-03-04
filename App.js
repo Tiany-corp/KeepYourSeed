@@ -3,10 +3,12 @@ import React, { Component, useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, Text, Platform } from 'react-native';
 import { supabase } from './services/supabase';
+import { AudioPlayerProvider } from './contexts/AudioPlayerContext';
 import RecordScreen from './screens/RecordScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import AuthScreen from './screens/AuthScreen';
 import SettingsDrawer from './components/SettingsDrawer';
+import AudioPlayer from './components/AudioPlayer';
 
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends Component {
@@ -61,11 +63,16 @@ function AppContent() {
         <AuthScreen />
       ) : (
         <>
-          {currentScreen === 'record' ? (
-            <RecordScreen session={session} onGoToHistory={() => setCurrentScreen('history')} onOpenSettings={() => setDrawerOpen(true)} />
-          ) : (
-            <HistoryScreen key={refreshKey} onGoBack={() => setCurrentScreen('record')} session={session} onOpenSettings={() => setDrawerOpen(true)} />
-          )}
+          <View style={{ flex: 1 }}>
+            {currentScreen === 'record' ? (
+              <RecordScreen session={session} onGoToHistory={() => setCurrentScreen('history')} onOpenSettings={() => setDrawerOpen(true)} />
+            ) : (
+              <HistoryScreen key={refreshKey} onGoBack={() => setCurrentScreen('record')} session={session} onOpenSettings={() => setDrawerOpen(true)} />
+            )}
+          </View>
+
+          {/* Mini player bar global — persiste entre les écrans */}
+          <AudioPlayer />
         </>
       )}
       {session && <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} />}
@@ -77,7 +84,9 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppContent />
+      <AudioPlayerProvider>
+        <AppContent />
+      </AudioPlayerProvider>
     </ErrorBoundary>
   );
 }

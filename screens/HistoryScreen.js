@@ -1,54 +1,41 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform } from 'react-native';
-import { getRecordings, clearRecordings, getAudioSource } from '../services/storage';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { getRecordings, clearRecordings } from '../services/storage';
 import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
-import { Audio } from 'expo-av';
 import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Trash2 } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
+import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 
 export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [recordings, setRecordings] = useState([]);
-    const [sound, setSound] = useState();
-    const [playingId, setPlayingId] = useState(null);
     const [uploadingId, setUploadingId] = useState(null);
+
+    // Lecteur audio global
+    const audioPlayer = useAudioPlayer();
 
     useEffect(() => {
         loadRecordings();
-        return () => {
-            if (sound) {
-                console.log('Unloading Sound');
-                sound.unloadAsync();
-            }
-        };
     }, []);
 
     async function loadRecordings() {
-        // 1. Charger les enregistrements locaux
         const localData = await getRecordings();
 
-        // 2. Si connecté, récupérer aussi les enregistrements cloud
         let mergedData = localData;
         if (session?.user) {
             try {
                 const cloudData = await fetchCloudRecordings(session.user.id);
-
-                // 3. Fusionner : on garde les locaux et on ajoute les cloud
-                //    qui n'existent pas déjà localement (dédoublonnage par remoteUrl)
                 const localRemoteUrls = new Set(
                     localData.filter(r => r.remoteUrl).map(r => r.remoteUrl)
                 );
-
                 const newCloudRecordings = cloudData.filter(
                     cloudRec => !localRemoteUrls.has(cloudRec.remoteUrl)
                 );
-
                 mergedData = [...localData, ...newCloudRecordings];
             } catch (e) {
                 console.error('Failed to sync cloud recordings:', e);
             }
         }
 
-        // 4. Trier par date décroissante
         mergedData.sort((a, b) => new Date(b.date) - new Date(a.date));
         setRecordings(mergedData);
     }
@@ -60,7 +47,6 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             const publicUrl = await uploadRecordingToCloud(item.id, item.localUri, userId);
             if (publicUrl) {
                 Alert.alert("Succès", "Fichier envoyé sur le cloud !");
-                // Recharger la liste pour afficher le nouveau status
                 await loadRecordings();
             } else {
                 Alert.alert("Erreur", "L'envoi a échoué.");
@@ -70,52 +56,6 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         } finally {
             setUploadingId(null);
         }
-    }
-
-    async function playSound(recording) {
-        console.log('Loading Sound for', recording.id);
-
-        // If already playing this one, stop it (toggle)
-        if (sound && playingId === recording.id) {
-            try {
-                const status = await sound.getStatusAsync();
-                if (status.isLoaded) {
-                    await sound.stopAsync();
-                    await sound.unloadAsync();
-                }
-            } catch (e) { /* son déjà déchargé, on ignore */ }
-            setSound(null);
-            setPlayingId(null);
-            return;
-        }
-
-        // If playing another one, unload it first
-        if (sound) {
-            try { await sound.unloadAsync(); } catch (e) { /* ignore */ }
-            setSound(null);
-        }
-
-        // Utilise le sélecteur intelligent : local d'abord, cloud ensuite
-        const source = await getAudioSource(recording);
-        if (!source) {
-            Alert.alert('Erreur', 'Fichier audio introuvable (ni local, ni cloud).');
-            return;
-        }
-
-        const { sound: newSound } = await Audio.Sound.createAsync(source);
-        setSound(newSound);
-        setPlayingId(recording.id);
-
-        console.log('Playing Sound');
-        await newSound.playAsync();
-
-        newSound.setOnPlaybackStatusUpdate((status) => {
-            if (status.didJustFinish) {
-                setPlayingId(null);
-                setSound(null);
-                newSound.unloadAsync();
-            }
-        });
     }
 
     // Icône du bouton cloud selon le status
@@ -139,11 +79,14 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         return date.toLocaleDateString('fr-FR') + ' • ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }
 
+    // Vérifie si CE recording est en train de jouer dans le player global
+    const isItemPlaying = (item) => audioPlayer.currentTrack?.id === item.id;
+
     const renderItem = ({ item }) => (
         <View style={styles.itemContainer}>
-            <TouchableOpacity style={styles.item} onPress={() => playSound(item)}>
-                <View style={[styles.playButtonIcon, playingId === item.id && styles.playButtonIconActive]}>
-                    {playingId === item.id ? (
+            <TouchableOpacity style={styles.item} onPress={() => audioPlayer.toggle(item)}>
+                <View style={[styles.playButtonIcon, isItemPlaying(item) && styles.playButtonIconActive]}>
+                    {isItemPlaying(item) && audioPlayer.isPlaying ? (
                         <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
                     ) : (
                         <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
@@ -200,7 +143,7 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAF7F2', // seed-bg
+        backgroundColor: '#FAF7F2',
     },
     backButton: {
         flexDirection: 'row',
@@ -215,12 +158,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#78350F', // seed-primary
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#292524',
+        color: '#78350F',
     },
     listContent: {
         padding: 16,
@@ -231,7 +169,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     item: {
-        backgroundColor: '#F5F0E8', // seed-card
+        backgroundColor: '#F5F0E8',
         padding: 12,
         borderRadius: 16,
         flexDirection: 'row',
