@@ -149,6 +149,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 visible={showTitleModal}
                 defaultTitle={pendingRecording?.defaultTitle || ''}
                 initialMode={recordingMode}
+                recordingDuration={pendingRecording?.duration || 0}
                 onConfirm={handleTitleConfirm}
                 onCancel={handleTitleCancel}
             />
