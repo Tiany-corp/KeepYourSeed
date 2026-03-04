@@ -58,10 +58,19 @@ function AppContent() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Quand l'utilisateur se connecte, retourner automatiquement sur record
+  useEffect(() => {
+    if (session && currentScreen === 'auth') {
+      setCurrentScreen('record');
+    }
+  }, [session]);
+
   return (
     <View style={styles.container}>
       <View style={{ flex: 1 }}>
-        {currentScreen === 'record' ? (
+        {currentScreen === 'auth' ? (
+          <AuthScreen onGoBack={() => setCurrentScreen('record')} />
+        ) : currentScreen === 'record' ? (
           <RecordScreen session={session} onGoToHistory={() => setCurrentScreen('history')} onOpenSettings={() => setDrawerOpen(true)} />
         ) : (
           <HistoryScreen key={refreshKey} onGoBack={() => setCurrentScreen('record')} session={session} onOpenSettings={() => setDrawerOpen(true)} />
@@ -70,7 +79,7 @@ function AppContent() {
 
       {/* Mini player bar global — persiste entre les écrans */}
       <AudioPlayer />
-      <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} />
+      <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} onGoToAuth={() => setCurrentScreen('auth')} />
       <StatusBar style="auto" />
     </View>
   );

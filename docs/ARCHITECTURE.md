@@ -30,14 +30,25 @@ App.js          # Point d'entrée + routing conditionnel
 ### Arbre de décision principal (`App.js`)
 
 ```
-App
-├── ❌ Pas de session → AuthScreen (login)
-└── ✅ Session active
-    ├── currentScreen === 'record' → RecordScreen
-    ├── currentScreen === 'history' → HistoryScreen
-    ├── 🎵 AudioPlayer (global, toujours visible si un track est actif)
-    └── ⚙️ SettingsDrawer (overlay)
+App (AlertProvider → AudioPlayerProvider)
+│
+├── currentScreen === 'auth' → AuthScreen
+│   ├── LoginScreen (+ bouton "Continuer sans compte")
+│   └── SignUpScreen (+ bouton "Continuer sans compte")
+│   └── Si connexion réussie → auto-redirect vers 'record'
+│
+├── currentScreen === 'record' → RecordScreen
+├── currentScreen === 'history' → HistoryScreen
+│
+├── 🎵 AudioPlayer (global, toujours visible si un track est actif)
+├── ⚙️ SettingsDrawer (overlay)
+│   ├── Connecté → avatar, email, "Vider le cloud", "Se déconnecter"
+│   └── Invité → "Se connecter" / "Créer un compte" → navigue vers AuthScreen
+└── 🔔 AlertContext (modales cross-platform : info/success/warning/error)
 ```
+
+> **Note** : L'app est accessible sans compte (mode invité).
+> Les fonctionnalités cloud sont conditionnées par `session?.user`.
 
 ### 📱 RecordScreen
 
@@ -80,6 +91,7 @@ HistoryScreen
         │   └── Après fin → replay depuis le début
         │
         └── Bouton Cloud
+            ├── !session.user → showAlert("Connexion requise")
             ├── status 'synced' → ☁️ vert (désactivé)
             ├── status 'error' → ☁️ rouge
             ├── uploadingId → spinner

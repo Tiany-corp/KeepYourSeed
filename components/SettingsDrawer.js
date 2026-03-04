@@ -4,12 +4,12 @@ import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
-import { Settings, X, Trash2, LogOut } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
 
-export default function SettingsDrawer({ visible, onClose, session, onDataCleared }) {
+export default function SettingsDrawer({ visible, onClose, session, onDataCleared, onGoToAuth }) {
     const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
     const overlayOpacity = useRef(new Animated.Value(0)).current;
     const [isRendered, setIsRendered] = useState(false);
@@ -160,6 +160,20 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         <Text style={styles.guestHint}>
                             Les enregistrements sont sauvegardés{'\n'}localement sur cet appareil.
                         </Text>
+
+                        <TouchableOpacity
+                            style={styles.authButton}
+                            onPress={() => { onClose(); if (onGoToAuth) onGoToAuth('login'); }}
+                        >
+                            <Text style={styles.authButtonText}>Se connecter</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.authButton, styles.authButtonOutline]}
+                            onPress={() => { onClose(); if (onGoToAuth) onGoToAuth('signup'); }}
+                        >
+                            <Text style={styles.authButtonOutlineText}>Créer un compte</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -196,5 +210,9 @@ const styles = StyleSheet.create({
     footerLogo: { marginBottom: 6 },
     footerText: { fontSize: 12, color: '#78716C' },
     notConnectedText: { fontSize: 14, color: '#78716C', textAlign: 'center', lineHeight: 20 },
-    guestHint: { fontSize: 14, color: '#A8A29E', textAlign: 'center', paddingHorizontal: 20, paddingVertical: 24, lineHeight: 20, fontStyle: 'italic' }
+    guestHint: { fontSize: 14, color: '#A8A29E', textAlign: 'center', paddingHorizontal: 20, paddingVertical: 24, lineHeight: 20, fontStyle: 'italic' },
+    authButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#78350F', marginHorizontal: 20, marginBottom: 12, paddingVertical: 14, borderRadius: 12 },
+    authButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+    authButtonOutline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#78350F' },
+    authButtonOutlineText: { fontSize: 16, fontWeight: '600', color: '#78350F' }
 });

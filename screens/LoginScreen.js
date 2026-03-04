@@ -3,7 +3,7 @@ import { Alert, View, Text, TextInput, TouchableOpacity, ActivityIndicator, Styl
 import { supabase } from '../services/supabase';
 import Logo from '../components/Logo';
 
-export default function LoginScreen({ onSwitchToSignUp }) {
+export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -68,6 +68,12 @@ export default function LoginScreen({ onSwitchToSignUp }) {
                         <Text style={styles.secondaryButtonText}>Créer un compte</Text>
                     </TouchableOpacity>
                 </View>
+
+                {onGoBack && (
+                    <TouchableOpacity onPress={onGoBack} style={{ marginTop: 24, alignItems: 'center' }}>
+                        <Text style={{ color: '#78716C', fontSize: 14 }}>Continuer sans compte</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
