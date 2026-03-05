@@ -84,7 +84,7 @@ export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
  * @param {string|null} deliverDate - ISO date for message delivery (null for notes)
  * @returns {Promise<Object|null>} - The inserted record or null if failed
  */
-export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null) => {
+export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], parentId = null) => {
     try {
         const insertData = {
             user_id: userId,
@@ -95,6 +95,12 @@ export const saveRecordingToDatabase = async (userId, title, audioUrl, duration,
         };
         if (deliverDate) {
             insertData.deliver_date = deliverDate;
+        }
+        if (tags && tags.length > 0) {
+            insertData.tags = tags;
+        }
+        if (parentId) {
+            insertData.parent_id = parentId;
         }
 
         const { data, error } = await supabase
@@ -144,6 +150,8 @@ export const fetchCloudRecordings = async (userId) => {
             date: row.created_at,             // Date de création Supabase
             duration: row.duration_seconds || 0,
             title: row.title || 'Sans titre',
+            tags: row.tags || [],
+            parentId: row.parent_id || null,
         }));
 
     } catch (e) {
@@ -235,6 +243,8 @@ export const fetchRandomRecording = async (userId) => {
             duration: row.duration_seconds || 0,
             title: row.title || 'Sans titre',
             type: row.type || 'note',
+            tags: row.tags || [],
+            parentId: row.parent_id || null,
         };
 
     } catch (e) {
@@ -280,6 +290,8 @@ export const fetchPendingMessage = async (userId) => {
             title: row.title || 'Sans titre',
             type: 'message',
             deliverDate: row.deliver_date,
+            tags: row.tags || [],
+            parentId: row.parent_id || null,
         };
     } catch (e) {
         console.error('Failed to fetch pending message:', e);

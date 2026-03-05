@@ -206,6 +206,35 @@ export const saveAudioBlobWeb = universalStorage.saveAudioBlob;
 export const getAudioBlobUrlWeb = universalStorage.getAudioBlobUrl;
 export const removeAudioBlobWeb = universalStorage.removeAudioBlob;
 
+// --- PENSÉE ÉPINGLÉE ---
+const PINNED_THOUGHT_KEY = '@pinned_thought_v1';
+
+export const getPinnedThought = async () => {
+    try {
+        return await universalStorage.getData(PINNED_THOUGHT_KEY);
+    } catch { return null; }
+};
+
+export const setPinnedThought = async (recording) => {
+    try {
+        await universalStorage.saveData(PINNED_THOUGHT_KEY, recording);
+    } catch (e) { console.warn('Failed to pin thought', e); }
+};
+
+export const clearPinnedThought = async () => {
+    try {
+        await universalStorage.removeData(PINNED_THOUGHT_KEY);
+    } catch (e) { console.warn('Failed to clear pinned thought', e); }
+};
+
+// --- ENFANTS D'UNE PENSÉE ---
+export const getChildRecordings = async (parentId) => {
+    try {
+        const all = await getRecordings();
+        return all.filter(r => r.parentId === parentId);
+    } catch { return []; }
+};
+
 // --- SOUVENIR DU JOUR ---
 // Cache un enregistrement aléatoire pour la journée entière.
 // Clé de stockage : @daily_memory_YYYY-MM-DD

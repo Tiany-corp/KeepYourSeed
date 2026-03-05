@@ -13,7 +13,7 @@ import Logo from './Logo';
  * - rightContent (JSX)       : contenu custom à droite (remplace le bouton Clock par défaut)
  * - onGoToHistory (fn)       : si pas de rightContent, affiche le bouton Clock
  */
-export default function AppHeader({
+export default function AppHeader({ // Mon composant app header recoit en propriété un titre, un objet contenant
     onOpenSettings,
     title = 'KeepYourSeed',
     showLogo = true,
@@ -28,10 +28,14 @@ export default function AppHeader({
 
             <View style={styles.headerTitleContainer}>
                 {showLogo && <Logo size={24} />}
-                <Text style={styles.headerTitleText}>{title}</Text>
+                {typeof title === 'string' ? (
+                    <Text style={styles.headerTitleText}>{title}</Text>
+                ) : (
+                    title
+                )}
             </View>
 
-            {rightContent ? (
+            {rightContent ? ( // Si mon objet rightContent n'est pas vide 
                 rightContent
             ) : onGoToHistory ? (
                 <TouchableOpacity onPress={onGoToHistory} style={styles.iconButton}>

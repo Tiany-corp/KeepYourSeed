@@ -1,22 +1,28 @@
 import { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { getRecordings, clearRecordings } from '../services/storage';
+import { getRecordings, clearRecordings, getDailyMemory, setPinnedThought } from '../services/storage';
 import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
-import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Trash2 } from 'lucide-react-native';
+import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Trash2, Pin } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
+import Logo from '../components/Logo';
+import { AVAILABLE_TAGS } from '../components/TitleModal';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
 
 export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [recordings, setRecordings] = useState([]);
     const [uploadingId, setUploadingId] = useState(null);
+    const [dailyMemory, setDailyMemory] = useState(null);
 
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
 
     useEffect(() => {
         loadRecordings();
-    }, []);
+        if (session?.user) {
+            getDailyMemory(session.user.id).then(setDailyMemory);
+        }
+    }, [session]);
 
     async function loadRecordings() {
         const localData = await getRecordings();
@@ -40,6 +46,19 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         mergedData.sort((a, b) => new Date(b.date) - new Date(a.date));
         setRecordings(mergedData);
     }
+
+    // Grouper les recordings : parents (sans parentId) avec leurs enfants
+    const parentRecordings = recordings.filter(r => !r.parentId);
+    const childrenByParent = {};
+    recordings.filter(r => r.parentId).forEach(child => {
+        if (!childrenByParent[child.parentId]) childrenByParent[child.parentId] = [];
+        childrenByParent[child.parentId].push(child);
+    });
+
+    const handlePin = async (item) => {
+        await setPinnedThought(item);
+        showAlert('Épinglée', `"${item.title}" est maintenant sur ton accueil.`, 'success');
+    };
 
     async function handleUpload(item) {
         // Pas connecté → message
@@ -85,41 +104,121 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         return date.toLocaleDateString('fr-FR') + ' • ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }
 
+    const getTagInfo = (tagId) => {
+        const found = AVAILABLE_TAGS.find(t => t.id === tagId);
+        if (found) return found;
+        // Custom tag: derive label from id
+        if (tagId.startsWith('custom_')) {
+            const label = tagId.replace('custom_', '').replace(/_/g, ' ');
+            return { id: tagId, label: label.charAt(0).toUpperCase() + label.slice(1), emoji: '🏷️' };
+        }
+        return null;
+    };
+
+    const renderTags = (tags) => {
+        if (!tags || tags.length === 0) return null;
+        return (
+            <View style={styles.tagsRow}>
+                {tags.map(tagId => {
+                    const tag = getTagInfo(tagId);
+                    if (!tag) return null;
+                    return (
+                        <View key={tagId} style={styles.tagPill}>
+                            <Text style={styles.tagPillText}>{tag.emoji} {tag.label}</Text>
+                        </View>
+                    );
+                })}
+            </View>
+        );
+    };
+
     // Vérifie si CE recording est en train de jouer dans le player global
     const isItemPlaying = (item) => audioPlayer.currentTrack?.id === item.id;
 
     const renderItem = ({ item }) => (
-        <View style={styles.itemContainer}>
-            <TouchableOpacity style={styles.item} onPress={() => audioPlayer.toggle(item)}>
-                <View style={[styles.playButtonIcon, isItemPlaying(item) && styles.playButtonIconActive]}>
-                    {isItemPlaying(item) && audioPlayer.isPlaying ? (
-                        <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
-                    ) : (
-                        <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
-                    )}
-                </View>
-                <View style={styles.itemInfo}>
-                    <Text style={styles.itemTitle}>{item.title || 'Sans titre'}</Text>
-                    <Text style={styles.itemDate}>{formatDate(item.date)}</Text>
-                </View>
-                <View style={styles.itemMeta}>
-                    <Text style={styles.itemDuration}>{formatDuration(item.duration)}</Text>
-                </View>
-            </TouchableOpacity>
+        <>
+            <View style={styles.itemContainer}>
+                <TouchableOpacity style={styles.item} onPress={() => audioPlayer.toggle(item)}>
+                    <View style={[styles.playButtonIcon, isItemPlaying(item) && styles.playButtonIconActive]}>
+                        {isItemPlaying(item) && audioPlayer.isPlaying ? (
+                            <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
+                        ) : (
+                            <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
+                        )}
+                    </View>
+                    <View style={styles.itemInfo}>
+                        <Text style={styles.itemTitle}>{item.title || 'Sans titre'}</Text>
+                        <Text style={styles.itemDate}>{formatDate(item.date)}</Text>
+                        {renderTags(item.tags)}
+                    </View>
+                    <View style={styles.itemMeta}>
+                        <Text style={styles.itemDuration}>{formatDuration(item.duration)}</Text>
+                    </View>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-                style={[
-                    styles.uploadButton,
-                    item.status === 'synced' && styles.uploadButtonSynced,
-                    uploadingId === item.id && styles.uploadButtonDisabled
-                ]}
-                onPress={() => handleUpload(item)}
-                disabled={uploadingId === item.id || item.status === 'synced'}
-            >
-                {renderStatusIcon(item)}
-            </TouchableOpacity>
-        </View>
+                <TouchableOpacity
+                    style={[
+                        styles.uploadButton,
+                        item.status === 'synced' && styles.uploadButtonSynced,
+                        uploadingId === item.id && styles.uploadButtonDisabled
+                    ]}
+                    onPress={() => handleUpload(item)}
+                    disabled={uploadingId === item.id || item.status === 'synced'}
+                >
+                    {renderStatusIcon(item)}
+                </TouchableOpacity>
+
+                {/* Bouton épingler */}
+                <TouchableOpacity
+                    style={styles.pinButton}
+                    onPress={() => handlePin(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <Pin size={16} color="#78350F" strokeWidth={2} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Enfants connectés */}
+            {childrenByParent[item.id] && childrenByParent[item.id].length > 0 && (
+                <View style={styles.childrenRow}>
+                    {childrenByParent[item.id].map(child => (
+                        <TouchableOpacity
+                            key={child.id}
+                            style={[styles.childSquare, isItemPlaying(child) && styles.childSquareActive]}
+                            onPress={() => audioPlayer.toggle(child)}
+                            activeOpacity={0.7}
+                        >
+                            <Logo size={18} color={isItemPlaying(child) ? '#FFFFFF' : '#78350F'} variant="outline" />
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )}
+        </>
     );
+
+    const renderDailyMemory = () => {
+        if (!dailyMemory) return null;
+
+        return (
+            <View style={styles.dailyMemorySection}>
+                <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir ⏳</Text>
+                <TouchableOpacity style={styles.dailyMemoryCard} onPress={() => { audioPlayer.play(dailyMemory); audioPlayer.openModal(); }}>
+                    <Logo size={28} color="#D97706" variant="outline" style={styles.dailyMemoryLogo} />
+                    <View style={styles.itemInfo}>
+                        <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
+                        <Text style={styles.itemDate}>{formatDate(dailyMemory.date)}</Text>
+                    </View>
+                    <View style={[styles.playButtonIcon, isItemPlaying(dailyMemory) && styles.playButtonIconActive]}>
+                        {isItemPlaying(dailyMemory) && audioPlayer.isPlaying ? (
+                            <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
+                        ) : (
+                            <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </View>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -136,7 +235,8 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             />
 
             <FlatList
-                data={recordings}
+                data={parentRecordings}
+                ListHeaderComponent={renderDailyMemory}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
                 contentContainerStyle={styles.listContent}
@@ -168,6 +268,36 @@ const styles = StyleSheet.create({
     },
     listContent: {
         padding: 16,
+    },
+    dailyMemorySection: {
+        marginBottom: 24,
+    },
+    dailyMemoryHeaderTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#D97706',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 8,
+        marginLeft: 4,
+    },
+    dailyMemoryCard: {
+        backgroundColor: '#F5EADB',
+        padding: 16,
+        borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E8D5BF',
+        // Ombre douce
+        shadowColor: '#78350F',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    dailyMemoryLogo: {
+        marginRight: 16,
     },
     itemContainer: {
         flexDirection: 'row',
@@ -245,5 +375,57 @@ const styles = StyleSheet.create({
         marginTop: 50,
         color: '#78716C',
         fontStyle: 'italic',
-    }
+    },
+    tagsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 4,
+        marginTop: 4,
+    },
+    tagPill: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        backgroundColor: '#F5F0E8',
+        borderRadius: 10,
+        borderWidth: 0.5,
+        borderColor: '#D4A574',
+    },
+    tagPillText: {
+        fontSize: 10,
+        fontWeight: '500',
+        color: '#78350F',
+    },
+    pinButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FAF7F2',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 6,
+        borderWidth: 1,
+        borderColor: '#D4A574',
+    },
+    childrenRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        paddingLeft: 52,
+        marginBottom: 8,
+        marginTop: -4,
+    },
+    childSquare: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        backgroundColor: '#F5F0E8',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#D4A574',
+    },
+    childSquareActive: {
+        backgroundColor: '#78350F',
+        borderColor: '#78350F',
+    },
 });

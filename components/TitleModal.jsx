@@ -8,9 +8,49 @@ import {
     StyleSheet,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
 } from 'react-native';
-import { Trash2 } from 'lucide-react-native';
+import { Trash2, Plus, X } from 'lucide-react-native';
 import CustomDatePicker from './CustomDatePicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { get, set } from 'idb-keyval';
+
+const CUSTOM_TAGS_KEY = '@custom_tags_v1';
+
+export const AVAILABLE_TAGS = [
+    { id: 'enseignement', label: 'Enseignement', emoji: '🌱' },
+    { id: 'gratitude', label: 'Gratitude', emoji: '💛' },
+    { id: 'idee', label: 'Idée', emoji: '💡' },
+    { id: 'reflexion', label: 'Réflexion', emoji: '🧠' },
+    { id: 'souvenir', label: 'Souvenir', emoji: '🌿' },
+    { id: 'priere', label: 'Prière exaucée', emoji: '🙏' },
+    { id: 'objectif', label: 'Objectif', emoji: '🎯' },
+    { id: 'temoignage', label: 'Témoignage', emoji: '💬' },
+];
+
+// --- Persistence des tags custom ---
+const loadCustomTags = async () => {
+    try {
+        if (Platform.OS === 'web') {
+            const data = await get(CUSTOM_TAGS_KEY);
+            return data ? JSON.parse(data) : [];
+        } else {
+            const data = await AsyncStorage.getItem(CUSTOM_TAGS_KEY);
+            return data ? JSON.parse(data) : [];
+        }
+    } catch { return []; }
+};
+
+const persistCustomTags = async (tags) => {
+    try {
+        const str = JSON.stringify(tags);
+        if (Platform.OS === 'web') {
+            await set(CUSTOM_TAGS_KEY, str);
+        } else {
+            await AsyncStorage.setItem(CUSTOM_TAGS_KEY, str);
+        }
+    } catch (e) { console.warn('Failed to save custom tags', e); }
+};
 
 /**
  * Modale qui s'ouvre après l'enregistrement pour demander un titre.
@@ -27,6 +67,9 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
     const [title, setTitle] = useState('');
     const [mode, setMode] = useState('note');
     const [deliverDate, setDeliverDate] = useState('');
+    const [selectedTags, setSelectedTags] = useState([]);
+    const [customTags, setCustomTags] = useState([]);
+    const [newTagText, setNewTagText] = useState('');
     const [showConfirmCancel, setShowConfirmCancel] = useState(false);
     const inputRef = useRef(null);
 
@@ -35,7 +78,10 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
             setTitle(defaultTitle || '');
             setMode(initialMode);
             setDeliverDate('');
+            setSelectedTags([]);
+            setNewTagText('');
             setShowConfirmCancel(false);
+            loadCustomTags().then(setCustomTags);
             setTimeout(() => inputRef.current?.focus(), 300);
         }
     }, [visible, defaultTitle, initialMode]);
@@ -77,11 +123,45 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
         return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
     };
 
+    const toggleTag = (tagId) => {
+        setSelectedTags(prev =>
+            prev.includes(tagId)
+                ? prev.filter(t => t !== tagId)
+                : [...prev, tagId]
+        );
+    };
+
+    const handleAddCustomTag = () => {
+        const label = newTagText.trim();
+        if (!label) return;
+        const id = 'custom_' + label.toLowerCase().replace(/\s+/g, '_');
+        // Vérifier que ce tag n'existe pas déjà
+        if (AVAILABLE_TAGS.some(t => t.id === id) || customTags.some(t => t.id === id)) {
+            setNewTagText('');
+            return;
+        }
+        const newTag = { id, label, emoji: '🏷️' };
+        const updated = [...customTags, newTag];
+        setCustomTags(updated);
+        persistCustomTags(updated);
+        setSelectedTags(prev => [...prev, id]);
+        setNewTagText('');
+    };
+
+    const handleDeleteCustomTag = (tagId) => {
+        const updated = customTags.filter(t => t.id !== tagId);
+        setCustomTags(updated);
+        persistCustomTags(updated);
+        setSelectedTags(prev => prev.filter(t => t !== tagId));
+    };
+
+    const allTags = [...AVAILABLE_TAGS, ...customTags];
+
     const handleConfirm = () => {
         const finalTitle = title.trim() || defaultTitle || 'Sans titre';
         if (mode === 'message' && !deliverDate) return;
         const finalDeliverDate = mode === 'message' ? new Date(deliverDate).toISOString() : null;
-        onConfirm(finalTitle, mode, finalDeliverDate);
+        onConfirm(finalTitle, mode, finalDeliverDate, selectedTags);
     };
 
     const handleCancel = () => {
@@ -123,6 +203,60 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
                         onSubmitEditing={handleConfirm}
                         returnKeyType="done"
                     />
+
+                    {/* Sélecteur de tags/catégories */}
+                    <View style={styles.tagsSection}>
+                        <Text style={styles.tagsLabel}>Étiquettes</Text>
+                        <View style={styles.tagsRow}>
+                            {allTags.map(tag => {
+                                const isActive = selectedTags.includes(tag.id);
+                                const isCustom = tag.id.startsWith('custom_');
+                                return (
+                                    <View key={tag.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <TouchableOpacity
+                                            style={[styles.tagChip, isActive && styles.tagChipActive]}
+                                            onPress={() => toggleTag(tag.id)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={[styles.tagChipText, isActive && styles.tagChipTextActive]}>
+                                                {tag.emoji} {tag.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        {isCustom && (
+                                            <TouchableOpacity
+                                                style={styles.deleteTagBtn}
+                                                onPress={() => handleDeleteCustomTag(tag.id)}
+                                                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                                            >
+                                                <X size={10} color="#78716C" strokeWidth={2.5} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                );
+                            })}
+                        </View>
+
+                        {/* Input pour créer un nouveau tag */}
+                        <View style={styles.newTagRow}>
+                            <TextInput
+                                style={styles.newTagInput}
+                                value={newTagText}
+                                onChangeText={setNewTagText}
+                                placeholder="Nouveau tag..."
+                                placeholderTextColor="#A8A29E"
+                                maxLength={30}
+                                onSubmitEditing={handleAddCustomTag}
+                                returnKeyType="done"
+                            />
+                            <TouchableOpacity
+                                style={[styles.newTagButton, !newTagText.trim() && { opacity: 0.4 }]}
+                                onPress={handleAddCustomTag}
+                                disabled={!newTagText.trim()}
+                            >
+                                <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
 
                     {/* Sélecteur de date pour les messages */}
                     {mode === 'message' && (
@@ -382,6 +516,70 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#78716C',
         fontWeight: '500',
+    },
+    tagsSection: {
+        marginBottom: 16,
+    },
+    tagsLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#78716C',
+        marginBottom: 8,
+    },
+    tagsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    tagChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        backgroundColor: '#F5F0E8',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#D4A574',
+    },
+    tagChipActive: {
+        backgroundColor: '#78350F',
+        borderColor: '#78350F',
+    },
+    tagChipText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#78350F',
+    },
+    tagChipTextActive: {
+        color: '#FFFFFF',
+    },
+    deleteTagBtn: {
+        marginLeft: -4,
+        marginRight: 4,
+        padding: 2,
+    },
+    newTagRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 10,
+    },
+    newTagInput: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#D4A574',
+        borderRadius: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: '#292524',
+    },
+    newTagButton: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#78350F',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     confirmCancelSection: {
         marginTop: 24,
