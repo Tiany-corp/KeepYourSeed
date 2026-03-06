@@ -1,18 +1,31 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { getRecordings, clearRecordings, getDailyMemory, setPinnedThought } from '../services/storage';
 import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
 import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Trash2, Pin } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import Logo from '../components/Logo';
+import TagFilterBar from '../components/TagFilterBar';
 import { AVAILABLE_TAGS } from '../components/TitleModal';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
+
+function getTagInfo(tagId) {
+    const found = AVAILABLE_TAGS.find(t => t.id === tagId);
+    if (found) return found;
+    // Custom tag: derive label from id
+    if (tagId.startsWith('custom_')) {
+        const label = tagId.replace('custom_', '').replace(/_/g, ' ');
+        return { id: tagId, label: label.charAt(0).toUpperCase() + label.slice(1), emoji: '🏷️' };
+    }
+    return null;
+}
 
 export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [recordings, setRecordings] = useState([]);
     const [uploadingId, setUploadingId] = useState(null);
     const [dailyMemory, setDailyMemory] = useState(null);
+    const [selectedFilterTag, setSelectedFilterTag] = useState(null);
 
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
@@ -53,6 +66,16 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     recordings.filter(r => r.parentId).forEach(child => {
         if (!childrenByParent[child.parentId]) childrenByParent[child.parentId] = [];
         childrenByParent[child.parentId].push(child);
+    });
+
+    // Extraction des tags uniques
+    const uniqueTagIds = [...new Set(recordings.flatMap(r => r.tags || []))];
+    const availableTags = uniqueTagIds.map(getTagInfo).filter(Boolean);
+
+    // Filtrage dynamique
+    const filteredParentRecordings = parentRecordings.filter(r => {
+        if (!selectedFilterTag) return true; // pas de filtre
+        return r.tags?.includes(selectedFilterTag);
     });
 
     const handlePin = async (item) => {
@@ -103,17 +126,6 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         const date = new Date(isoString);
         return date.toLocaleDateString('fr-FR') + ' • ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }
-
-    const getTagInfo = (tagId) => {
-        const found = AVAILABLE_TAGS.find(t => t.id === tagId);
-        if (found) return found;
-        // Custom tag: derive label from id
-        if (tagId.startsWith('custom_')) {
-            const label = tagId.replace('custom_', '').replace(/_/g, ' ');
-            return { id: tagId, label: label.charAt(0).toUpperCase() + label.slice(1), emoji: '🏷️' };
-        }
-        return null;
-    };
 
     const renderTags = (tags) => {
         if (!tags || tags.length === 0) return null;
@@ -196,26 +208,39 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         </>
     );
 
-    const renderDailyMemory = () => {
-        if (!dailyMemory) return null;
+    const renderListHeader = () => {
+        const hasFilters = availableTags.length > 0;
+        if (!dailyMemory && !hasFilters) return null;
 
         return (
-            <View style={styles.dailyMemorySection}>
-                <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir ⏳</Text>
-                <TouchableOpacity style={styles.dailyMemoryCard} onPress={() => { audioPlayer.play(dailyMemory); audioPlayer.openModal(); }}>
-                    <Logo size={28} color="#D97706" variant="outline" style={styles.dailyMemoryLogo} />
-                    <View style={styles.itemInfo}>
-                        <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
-                        <Text style={styles.itemDate}>{formatDate(dailyMemory.date)}</Text>
+            <View>
+                {/* Pensée Souvenir */}
+                {dailyMemory && (
+                    <View style={styles.dailyMemorySection}>
+                        <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir ⏳</Text>
+                        <TouchableOpacity style={styles.dailyMemoryCard} onPress={() => { audioPlayer.play(dailyMemory); audioPlayer.openModal(); }}>
+                            <Logo size={28} color="#D97706" variant="outline" style={styles.dailyMemoryLogo} />
+                            <View style={styles.itemInfo}>
+                                <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
+                                <Text style={styles.itemDate}>{formatDate(dailyMemory.date)}</Text>
+                            </View>
+                            <View style={[styles.playButtonIcon, isItemPlaying(dailyMemory) && styles.playButtonIconActive]}>
+                                {isItemPlaying(dailyMemory) && audioPlayer.isPlaying ? (
+                                    <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
+                                ) : (
+                                    <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
+                                )}
+                            </View>
+                        </TouchableOpacity>
                     </View>
-                    <View style={[styles.playButtonIcon, isItemPlaying(dailyMemory) && styles.playButtonIconActive]}>
-                        {isItemPlaying(dailyMemory) && audioPlayer.isPlaying ? (
-                            <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
-                        ) : (
-                            <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
-                        )}
-                    </View>
-                </TouchableOpacity>
+                )}
+
+                {/* Barre de filtres (Tags) */}
+                <TagFilterBar
+                    availableTags={availableTags}
+                    selectedTag={selectedFilterTag}
+                    onSelectTag={setSelectedFilterTag}
+                />
             </View>
         );
     };
@@ -235,8 +260,8 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             />
 
             <FlatList
-                data={parentRecordings}
-                ListHeaderComponent={renderDailyMemory}
+                data={filteredParentRecordings}
+                ListHeaderComponent={renderListHeader}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
                 contentContainerStyle={styles.listContent}
@@ -270,7 +295,7 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     dailyMemorySection: {
-        marginBottom: 24,
+        marginBottom: 13,
     },
     dailyMemoryHeaderTitle: {
         fontSize: 14,
@@ -279,7 +304,6 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         marginBottom: 8,
-        marginLeft: 4,
     },
     dailyMemoryCard: {
         backgroundColor: '#F5EADB',
