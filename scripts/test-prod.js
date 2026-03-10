@@ -29,7 +29,24 @@ function copySync(src, dest) {
 // 4. Perform the copy
 if (fs.existsSync(srcDir)) {
     copySync(srcDir, destDir);
-    console.log(`✅ Success! Copied ${srcDir} to ${destDir}`);
+
+    // Create a serve.json file to disable caching for local testing
+    const serveJsonPath = path.join(__dirname, '../temp_serve/serve.json');
+    const serveConfig = {
+        "headers": [
+            {
+                "source": "**/*",
+                "headers": [
+                    { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, proxy-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" }
+                ]
+            }
+        ]
+    };
+    fs.writeFileSync(serveJsonPath, JSON.stringify(serveConfig, null, 2));
+
+    console.log(`✅ Success! Copied ${srcDir} to ${destDir} and generated serve.json`);
 } else {
     console.error(`❌ Error: The 'dist' directory does not exist. Please run 'npm run build:web' first.`);
     process.exit(1);

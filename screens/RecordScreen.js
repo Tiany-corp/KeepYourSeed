@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import useAudioRecorder from '../hooks/useAudioRecorder';
-import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought } from '../services/storage';
+import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getCurrentStreak } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
@@ -24,6 +24,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     const [showTitleModal, setShowTitleModal] = useState(false);
     const [pendingRecording, setPendingRecording] = useState(null);
     const [recordingMode, setRecordingMode] = useState('note'); // 'note' | 'message'
+    const [streakCount, setStreakCount] = useState(0);
 
     // --- Pensée épinglée ---
     const [pinnedThought, setPinnedThoughtState] = useState(null);
@@ -42,6 +43,9 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
         } else {
             setIsMemoryLoading(false);
         }
+
+        // Charger la streak actuelle
+        getCurrentStreak().then(setStreakCount);
     }, [session]);
 
     // Charger la pensée épinglée
@@ -96,6 +100,9 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
 
         await saveRecording(newRecording);
 
+        // Mettre à jour la streak dynamiquement après un nouvel enregistrement
+        getCurrentStreak().then(setStreakCount);
+
         if (session?.user) {
             setIsUploading(true);
             try {
@@ -128,15 +135,10 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     const formattedDate = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
     const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 
-    // Composant titre personnalisé avec Date et Flamme sur une seule ligne
+    // Composant titre personnalisé : Juste la Date élégante au centre
     const CustomHeaderTitle = (
         <View style={styles.headerTitleContainer}>
-            <View style={styles.streakHeader}>
-                <Flame size={14} color="#D97706" strokeWidth={2.5} />
-                <Text style={styles.streakHeaderText}>12</Text>
-            </View>
-            <Text style={styles.headerDot}>•</Text>
-            <Text style={styles.headerDate}>{capitalizedDate}</Text>
+            <Text style={styles.pageTitle}>Aujourd'hui, {capitalizedDate}</Text>
         </View>
     );
 
@@ -163,6 +165,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             />
 
             <View style={styles.mainContent}>
+                {/* Le titre est reparti dans le header ! */}
                 {pinnedThought ? (
                     <PinnedThought
                         thought={pinnedThought}
@@ -190,7 +193,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                     )}
                 </View>
 
-                <Footer session={session} isRecording={isRecording} />
+                <Footer session={session} isRecording={isRecording} streakCount={streakCount} />
             </View>
 
             {/* Modale de titre après enregistrement */}
@@ -210,11 +213,9 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#FAF7F2', width: '100%' },
     mainContent: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
     zone2Container: { alignItems: 'center', width: '100%' },
-    headerTitleContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-    headerDate: { fontSize: 16, fontWeight: '600', color: '#78350F' },
-    headerDot: { fontSize: 16, color: '#D4A574', fontWeight: 'bold' },
-    streakHeader: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    streakHeaderText: { fontSize: 13, fontWeight: '800', color: '#D97706' },
+    headerTitleContainer: { alignItems: 'center', justifyContent: 'center' },
+    pageTitle: { fontSize: 20, fontWeight: '700', color: '#78350F', letterSpacing: -0.5 },
+    // Header History Styles
     historyButton: { padding: 4, position: 'relative', top: -2 }, // top -2 to perfectly center visually
     historyBadge: { position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#D97706', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FAF7F2' },
     historyBadgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '800', textAlign: 'center', lineHeight: 10 },

@@ -7,8 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "npx expo export -p web --clear",
-    "test:prod": "node scripts/test-prod.js && npx serve temp_serve"
+    "build:web": "rimraf dist && npx expo export -p web --clear",
+    "test:prod": "npm run build:web && node scripts/test-prod.js && npx serve temp_serve"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

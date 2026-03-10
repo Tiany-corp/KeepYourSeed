@@ -47,15 +47,21 @@ function AppContent() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    let authSubscription;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    authSubscription = data?.subscription;
+
+    return () => {
+      if (authSubscription) authSubscription.unsubscribe();
+    };
   }, []);
 
   // Quand l'utilisateur se connecte, retourner automatiquement sur record

@@ -12,23 +12,23 @@ import { ChevronDown, Check } from 'lucide-react-native';
  */
 export default function TagFilterBar({ availableTags, selectedTag, onSelectTag }) {
     const [modalVisible, setModalVisible] = useState(false);
-
-    if (!availableTags || availableTags.length === 0) return null;
-
-    const selectedTagObject = selectedTag ? availableTags.find(t => t.id === selectedTag) : null;
+    const hasTags = availableTags && availableTags.length > 0;
+    const selectedTagObject = selectedTag && hasTags ? availableTags.find(t => t.id === selectedTag) : null;
     const buttonText = selectedTagObject ? `${selectedTagObject.emoji} ${selectedTagObject.label}` : 'Tous';
 
     return (
         <View style={styles.filterContainer}>
             <Text style={styles.historyTitle}>Historique</Text>
 
-            <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setModalVisible(true)}
-            >
-                <Text style={styles.dropdownButtonText}>{buttonText}</Text>
-                <ChevronDown size={16} color="#78350F" style={styles.dropdownIcon} />
-            </TouchableOpacity>
+            {hasTags && (
+                <TouchableOpacity
+                    style={styles.dropdownButton}
+                    onPress={() => setModalVisible(true)}
+                >
+                    <Text style={styles.dropdownButtonText}>{buttonText}</Text>
+                    <ChevronDown size={16} color="#78350F" style={styles.dropdownIcon} />
+                </TouchableOpacity>
+            )}
 
             <Modal
                 visible={modalVisible}

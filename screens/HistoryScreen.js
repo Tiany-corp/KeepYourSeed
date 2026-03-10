@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { getRecordings, clearRecordings, getDailyMemory, setPinnedThought } from '../services/storage';
 import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
-import { Play, Pause, Cloud, CloudOff, CloudUpload, ArrowLeft, Trash2, Pin } from 'lucide-react-native';
+import { Play, Pause, ArrowLeft, Trash2, Pin, Pencil } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import Logo from '../components/Logo';
 import TagFilterBar from '../components/TagFilterBar';
@@ -83,37 +83,10 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         showAlert('Épinglée', `"${item.title}" est maintenant sur ton accueil.`, 'success');
     };
 
-    async function handleUpload(item) {
-        // Pas connecté → message
-        if (!session?.user) {
-            showAlert("Connexion requise", "Connecte-toi pour sauvegarder tes enregistrements dans le cloud.", "warning");
-            return;
-        }
-
-        setUploadingId(item.id);
-        try {
-            const publicUrl = await uploadRecordingToCloud(item.id, item.localUri, session.user.id);
-            if (publicUrl) {
-                showAlert("Succès", "Fichier envoyé sur le cloud !", "success");
-                await loadRecordings();
-            } else {
-                showAlert("Erreur", "L'envoi a échoué.", "error");
-            }
-        } catch (e) {
-            showAlert("Erreur", "Une erreur est survenue.", "error");
-        } finally {
-            setUploadingId(null);
-        }
-    }
-
-    // Icône du bouton cloud selon le status
-    const renderStatusIcon = (item) => {
-        if (uploadingId === item.id) return <CloudUpload size={20} color="#78716C" />;
-        switch (item.status) {
-            case 'synced': return <Cloud size={20} color="#16a34a" />;
-            case 'error': return <CloudOff size={20} color="#ef4444" />;
-            default: return <Cloud size={20} color="#78350F" />; // pending
-        }
+    // Fonctionnalité d'édition (Placeholder pour la logique future)
+    const handleEdit = (item) => {
+        // TODO: Implémenter la logique d'édition (ouvrir TitleModal avec les infos préremplies)
+        console.log("Editer", item.id);
     };
 
     const formatDuration = (seconds) => {
@@ -124,7 +97,13 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
 
     const formatDate = (isoString) => {
         const date = new Date(isoString);
-        return date.toLocaleDateString('fr-FR') + ' • ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const dayOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+        const timeOptions = { hour: '2-digit', minute: '2-digit' };
+
+        const dayStr = date.toLocaleDateString('fr-FR', dayOptions);
+        const timeStr = date.toLocaleTimeString('fr-FR', timeOptions);
+
+        return `${dayStr} • ${timeStr}`;
     }
 
     const renderTags = (tags) => {
@@ -144,6 +123,17 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         );
     };
 
+    // Formater la deuxième ligne : Date • Durée
+    const renderMetaLine = (item) => {
+        return (
+            <View style={styles.metaLineContainer}>
+                <Text style={styles.itemDate} numberOfLines={1}>{formatDate(item.date)}</Text>
+                <View style={{ flex: 1 }} />
+                <Text style={styles.itemDuration}>{formatDuration(item.duration)}</Text>
+            </View>
+        );
+    };
+
     // Vérifie si CE recording est en train de jouer dans le player global
     const isItemPlaying = (item) => audioPlayer.currentTrack?.id === item.id;
 
@@ -159,30 +149,25 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                         )}
                     </View>
                     <View style={styles.itemInfo}>
-                        <Text style={styles.itemTitle}>{item.title || 'Sans titre'}</Text>
-                        <Text style={styles.itemDate}>{formatDate(item.date)}</Text>
-                        {renderTags(item.tags)}
-                    </View>
-                    <View style={styles.itemMeta}>
-                        <Text style={styles.itemDuration}>{formatDuration(item.duration)}</Text>
+                        <Text style={styles.itemTitle} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                        {renderMetaLine(item)}
+                        {/* Ligne 3 : Tags isolés en bas */}
+                        {item.tags && item.tags.length > 0 && renderTags(item.tags)}
                     </View>
                 </TouchableOpacity>
 
+                {/* Bouton d'édition */}
                 <TouchableOpacity
-                    style={[
-                        styles.uploadButton,
-                        item.status === 'synced' && styles.uploadButtonSynced,
-                        uploadingId === item.id && styles.uploadButtonDisabled
-                    ]}
-                    onPress={() => handleUpload(item)}
-                    disabled={uploadingId === item.id || item.status === 'synced'}
+                    style={styles.editButton}
+                    onPress={() => handleEdit(item)}
+                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
                 >
-                    {renderStatusIcon(item)}
+                    <Pencil size={20} color="#78350F" strokeWidth={1.5} />
                 </TouchableOpacity>
 
                 {/* Bouton épingler */}
                 <TouchableOpacity
-                    style={styles.pinButton}
+                    style={styles.actionButton}
                     onPress={() => handlePin(item)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
@@ -356,25 +341,9 @@ const styles = StyleSheet.create({
     playButtonIconActive: {
         backgroundColor: '#B91C1C',
     },
-    uploadButton: {
-        backgroundColor: '#F5F0E8',
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#D4A574',
-    },
-    uploadButtonDisabled: {
-        opacity: 0.5,
-    },
-    uploadButtonSynced: {
-        backgroundColor: '#dcfce7',
-        borderColor: '#86efac',
-    },
     itemInfo: {
         flex: 1,
+        justifyContent: 'center',
     },
     itemTitle: {
         fontSize: 16,
@@ -386,8 +355,9 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#78716C',
     },
-    itemMeta: {
-        justifyContent: 'center',
+    metaLineContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     itemDuration: {
         color: '#78716C',
@@ -419,7 +389,18 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#78350F',
     },
-    pinButton: {
+    editButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F5F0E8',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 1,
+        borderWidth: 1,
+        borderColor: '#D4A574',
+    },
+    actionButton: {
         width: 36,
         height: 36,
         borderRadius: 18,
@@ -428,7 +409,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginLeft: 6,
         borderWidth: 1,
-        borderColor: '#D4A574',
+        borderColor: '#E8D5BF',
     },
     childrenRow: {
         flexDirection: 'row',

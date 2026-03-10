@@ -10,15 +10,15 @@ const universalStorage = {
     saveData: async (key, value) => {
         const stringValue = JSON.stringify(value);
         if (Platform.OS === 'web') {
-            await set(key, stringValue); // IndexedDB
+            await set(key, stringValue); // IndexedDB => fonction prédéfinie qui stocke une valeur dans le cache 
         } else {
             await AsyncStorage.setItem(key, stringValue); // SQLite/Fichier natif
         }
     },
 
-    getData: async (key) => {
+    getData: async (key) => { // D'ou viens la clé qu'on lui donne ? c'est l'id du user ? ou son cookie
         if (Platform.OS === 'web') {
-            const data = await get(key);
+            const data = await get(key); // Fonction prédéfinie qui prend toutes les valeurs correspondant à une clé donnée en entrée 
             return data ? JSON.parse(data) : null;
         } else {
             const data = await AsyncStorage.getItem(key);
@@ -163,12 +163,12 @@ export const updateRecording = async (id, updates) => {
 
 export const getRecordings = async () => {
     try {
-        const data = await universalStorage.getData(STORAGE_KEY) ?? [];
+        const data = await universalStorage.getData(STORAGE_KEY) ?? []; // Je charge mes audios locaux + remote qui sont renvoyé sous forme de json
 
         // WEB DEMO: Injecte des données de démo si l'historique est vide sur le web
         if (Platform.OS === 'web' && data.length === 0) {
             console.log('Web Demo: Injecting demo data from Supabase');
-            const demoRecordings = [
+            const demoRecordings = [ // Je stocke un record de la base de donnée supabase
                 {
                     id: 'demo-1',
                     localUri: null,
@@ -286,5 +286,69 @@ export const getDailyMemory = async (userId) => {
     } catch (e) {
         console.error('Erreur getDailyMemory:', e);
         return null;
+    }
+};
+
+// --- STREAK DU JOUEUR (FRONT-END ALGO) ---
+// Calcule la série de jours consécutifs où l'utilisateur a enregistré une pensée
+export const getCurrentStreak = async () => {
+    try {
+        const recordings = await getRecordings();
+        if (!recordings || recordings.length === 0) return 0;
+
+        // Fonction utilitaire pour extraire la date locale au format YYYY-MM-DD
+        // (Évite les bugs de décalage horaire liés à toISOString/UTC)
+        const toLocalDateString = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const uniqueDates = new Set();
+        recordings.forEach(rec => {
+            if (rec.date) {
+                const dateObj = new Date(rec.date);
+                if (!isNaN(dateObj)) {
+                    uniqueDates.add(toLocalDateString(dateObj));
+                }
+            }
+        });
+
+        if (uniqueDates.size === 0) return 0;
+
+        let streak = 0;
+        const today = new Date();
+        const todayStr = toLocalDateString(today);
+
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = toLocalDateString(yesterday);
+
+        let currentDate = new Date(today);
+        let dateToCheck = todayStr;
+
+        // Si pas d'enregistrement aujourd'hui, on vérifie hier.
+        // (La streak n'est pas brisée si l'utilisateur n'a pas *encore* enregistré aujourd'hui)
+        if (!uniqueDates.has(todayStr)) {
+            if (!uniqueDates.has(yesterdayStr)) {
+                return 0; // Streak brisée
+            }
+            // La streak est toujours en vie depuis hier
+            currentDate = yesterday;
+            dateToCheck = yesterdayStr;
+        }
+
+        // Remonter les jours un par un pour compter
+        while (uniqueDates.has(dateToCheck)) {
+            streak++;
+            currentDate.setDate(currentDate.getDate() - 1);
+            dateToCheck = toLocalDateString(currentDate);
+        }
+
+        return streak;
+    } catch (e) {
+        console.error('Erreur getCurrentStreak:', e);
+        return 0;
     }
 };
