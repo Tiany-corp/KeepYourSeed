@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Alert, View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { supabase } from '../services/supabase';
+import { signInWithGoogle } from '../services/googleAuth';
 import Logo from '../components/Logo';
 
 export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
 
     async function signInWithEmail() {
         setLoading(true);
@@ -17,6 +19,17 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
 
         if (error) Alert.alert('Erreur de connexion', error.message);
         setLoading(false);
+    }
+
+    async function handleGoogleSignIn() {
+        setGoogleLoading(true);
+        try {
+            await signInWithGoogle();
+        } catch (error) {
+            Alert.alert('Erreur', error.message);
+        } finally {
+            setGoogleLoading(false);
+        }
     }
 
     return (
@@ -52,9 +65,34 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
                     <TouchableOpacity
                         style={styles.primaryButton}
                         onPress={signInWithEmail}
-                        disabled={loading}
+                        disabled={loading || googleLoading}
                     >
                         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Se connecter</Text>}
+                    </TouchableOpacity>
+                </View>
+
+                {/* Separator */}
+                <View style={styles.separator}>
+                    <View style={styles.separatorLine} />
+                    <Text style={styles.separatorText}>ou</Text>
+                    <View style={styles.separatorLine} />
+                </View>
+
+                {/* Google Button */}
+                <View style={styles.inputContainer}>
+                    <TouchableOpacity
+                        style={styles.googleButton}
+                        onPress={handleGoogleSignIn}
+                        disabled={loading || googleLoading}
+                    >
+                        {googleLoading ? (
+                            <ActivityIndicator color="#292524" />
+                        ) : (
+                            <View style={styles.googleButtonContent}>
+                                <Text style={styles.googleIcon}>G</Text>
+                                <Text style={styles.googleButtonText}>Continuer avec Google</Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
                 </View>
 
@@ -63,7 +101,7 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
                     <TouchableOpacity
                         style={styles.secondaryButton}
                         onPress={onSwitchToSignUp}
-                        disabled={loading}
+                        disabled={loading || googleLoading}
                     >
                         <Text style={styles.secondaryButtonText}>Créer un compte</Text>
                     </TouchableOpacity>
@@ -155,5 +193,49 @@ const styles = StyleSheet.create({
         color: '#78350F',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    separator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 20,
+    },
+    separatorLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#D4A574',
+    },
+    separatorText: {
+        marginHorizontal: 12,
+        color: '#78716C',
+        fontSize: 14,
+    },
+    googleButton: {
+        padding: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#D4A574',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    googleButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    googleIcon: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#4285F4',
+        marginRight: 10,
+    },
+    googleButtonText: {
+        color: '#292524',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

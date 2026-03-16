@@ -2,6 +2,7 @@
   "expo": {
     "name": "KeepYourSeed",
     "slug": "KeepYourSeed",
+    "scheme": "keepyourseed",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,7 +25,8 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+      ],
+      "package": "com.tianyr.KeepYourSeed"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,7 +40,13 @@
         {
           "microphonePermission": "Allow KeepYourSeed to access your microphone."
         }
-      ]
-    ]
+      ],
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b7f4ff35-a30f-4cf1-afa0-86cca58d7f85"
+      }
+    }
   }
 }
