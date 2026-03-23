@@ -69,7 +69,7 @@ export default function RecordButton({
                             style={styles.secondaryButton}
                         >
                             <Mail size={16} color="#78716C" strokeWidth={1.5} />
-                            <Text style={styles.secondaryButtonText}>S'envoyer un message au futur</Text>
+                            <Text style={styles.secondaryButtonText}>Envoyer un message à ton futur</Text>
                         </TouchableOpacity>
                     </View>
                 )}

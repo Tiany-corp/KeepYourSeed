@@ -148,6 +148,17 @@ export function AudioPlayerProvider({ children }) {
         setModalVisible(false);
     }, [unloadSound]);
 
+    // --- Seek vers une position (ms) ---
+    const seekTo = useCallback(async (positionMillis) => {
+        if (!soundRef.current) return;
+        const status = await soundRef.current.getStatusAsync();
+        if (!status.isLoaded) return;
+
+        const clamped = Math.max(0, Math.min(positionMillis, status.durationMillis || 0));
+        await soundRef.current.setPositionAsync(clamped);
+        setPosition(clamped);
+    }, []);
+
     const value = {
         currentTrack,
         isPlaying,
@@ -159,6 +170,7 @@ export function AudioPlayerProvider({ children }) {
         pause,
         toggle,
         stop,
+        seekTo,
         openModal,
         closeModal,
     };

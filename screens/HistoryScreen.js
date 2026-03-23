@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
-import { getRecordings, clearRecordings, getDailyMemory, setPinnedThought } from '../services/storage';
-import { uploadRecordingToCloud, fetchCloudRecordings } from '../services/cloud';
-import { Play, Pause, ArrowLeft, Trash2, Pin, Pencil } from 'lucide-react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform } from 'react-native';
+import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording } from '../services/storage';
+import { fetchCloudRecordings, updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
+import { Play, Pause, ArrowLeft, Pin, Pencil } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import Logo from '../components/Logo';
 import TagFilterBar from '../components/TagFilterBar';
+import TitleModal from '../components/TitleModal';
 import { AVAILABLE_TAGS } from '../components/TitleModal';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
@@ -23,9 +24,10 @@ function getTagInfo(tagId) {
 
 export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [recordings, setRecordings] = useState([]);
-    const [uploadingId, setUploadingId] = useState(null);
     const [dailyMemory, setDailyMemory] = useState(null);
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
+    const [editingRecording, setEditingRecording] = useState(null);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
@@ -85,8 +87,109 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
 
     // Fonctionnalité d'édition (Placeholder pour la logique future)
     const handleEdit = (item) => {
-        // TODO: Implémenter la logique d'édition (ouvrir TitleModal avec les infos préremplies)
-        console.log("Editer", item.id);
+        setEditingRecording(item);
+        setShowEditModal(true);
+    };
+
+    const applyRecordingUpdateInState = (id, updates) => {
+        setRecordings(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
+        if (dailyMemory?.id === id) {
+            setDailyMemory(prev => (prev ? { ...prev, ...updates } : prev));
+        }
+    };
+
+    const handleEditCancel = () => {
+        setShowEditModal(false);
+        setEditingRecording(null);
+    };
+
+    const handleEditConfirm = async (title, type = 'note', deliverDate = null, tags = []) => {
+        if (!editingRecording) return;
+
+        const updates = { title, type, deliverDate, tags };
+
+        try {
+            await updateRecording(editingRecording.id, updates);
+            applyRecordingUpdateInState(editingRecording.id, updates);
+
+            if (session?.user && (editingRecording.dbId || editingRecording.remoteUrl)) {
+                const ok = await updateRecordingMetadataInDatabase({
+                    userId: session.user.id,
+                    recording: editingRecording,
+                    title,
+                    type,
+                    deliverDate,
+                    tags,
+                });
+                if (!ok) {
+                    showAlert('Attention', "Modification locale enregistree, mais la mise a jour cloud a echoue.", 'warning');
+                } else {
+                    showAlert('Succes', 'Enregistrement modifie.', 'success');
+                }
+            } else {
+                showAlert('Succes', 'Enregistrement modifie localement.', 'success');
+            }
+        } catch (e) {
+            console.error('Edit failed:', e);
+            showAlert('Erreur', "Impossible de modifier l'enregistrement.", 'error');
+        } finally {
+            handleEditCancel();
+        }
+    };
+
+    const executeDelete = async () => {
+        if (!editingRecording) return;
+        const recordingToDelete = editingRecording;
+
+        try {
+            await deleteRecording(recordingToDelete.id);
+
+            if (audioPlayer.currentTrack?.id === recordingToDelete.id) {
+                await audioPlayer.stop();
+            }
+
+            setRecordings(prev => prev.filter(rec => rec.id !== recordingToDelete.id));
+            if (dailyMemory?.id === recordingToDelete.id) {
+                setDailyMemory(null);
+            }
+
+            if (session?.user && (recordingToDelete.dbId || recordingToDelete.remoteUrl)) {
+                const ok = await deleteRecordingFromCloud({
+                    userId: session.user.id,
+                    recording: recordingToDelete,
+                });
+                if (!ok) {
+                    showAlert('Attention', 'Supprime localement, mais suppression cloud echouee.', 'warning');
+                } else {
+                    showAlert('Succes', 'Enregistrement supprime.', 'success');
+                }
+            } else {
+                showAlert('Succes', 'Enregistrement supprime localement.', 'success');
+            }
+        } catch (e) {
+            console.error('Delete failed:', e);
+            showAlert('Erreur', "Impossible de supprimer l'enregistrement.", 'error');
+        } finally {
+            handleEditCancel();
+        }
+    };
+
+    const handleEditDelete = () => {
+        const title = editingRecording?.title || 'cet enregistrement';
+        if (Platform.OS === 'web') {
+            if (window.confirm(`Supprimer "${title}" ?`)) {
+                executeDelete();
+            }
+            return;
+        }
+        Alert.alert(
+            'Supprimer',
+            `Voulez-vous supprimer "${title}" ?`,
+            [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer', style: 'destructive', onPress: executeDelete },
+            ]
+        );
     };
 
     const formatDuration = (seconds) => {
@@ -251,6 +354,19 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                 keyExtractor={item => item.id}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={<Text style={styles.emptyText}>Aucun enregistrement.</Text>}
+            />
+
+            <TitleModal
+                visible={showEditModal}
+                isEditMode
+                defaultTitle={editingRecording?.title || ''}
+                initialMode={editingRecording?.type || 'note'}
+                initialDeliverDate={editingRecording?.deliverDate || ''}
+                initialTags={editingRecording?.tags || []}
+                recordingDuration={0}
+                onConfirm={handleEditConfirm}
+                onCancel={handleEditCancel}
+                onDelete={handleEditDelete}
             />
         </SafeAreaView>
     );

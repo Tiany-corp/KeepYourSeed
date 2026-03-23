@@ -5,10 +5,9 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    Pressable,
     StyleSheet,
-    KeyboardAvoidingView,
     Platform,
-    ScrollView,
 } from 'react-native';
 import { Trash2, Plus, X } from 'lucide-react-native';
 import CustomDatePicker from './CustomDatePicker';
@@ -63,7 +62,18 @@ const persistCustomTags = async (tags) => {
  * - onConfirm (fn)        : callback → (title, type, deliverDate) => void
  * - onCancel (fn)         : callback si l'user annule
  */
-export default function TitleModal({ visible, defaultTitle, initialMode = 'note', recordingDuration = 0, onConfirm, onCancel }) {
+export default function TitleModal({
+    visible,
+    defaultTitle,
+    initialMode = 'note',
+    initialDeliverDate = '',
+    initialTags = [],
+    isEditMode = false,
+    recordingDuration = 0,
+    onConfirm,
+    onCancel,
+    onDelete
+}) {
     const [title, setTitle] = useState('');
     const [mode, setMode] = useState('note');
     const [deliverDate, setDeliverDate] = useState('');
@@ -77,14 +87,14 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
         if (visible) {
             setTitle(defaultTitle || '');
             setMode(initialMode);
-            setDeliverDate('');
-            setSelectedTags([]);
+            setDeliverDate(initialDeliverDate ? new Date(initialDeliverDate).toISOString().split('T')[0] : '');
+            setSelectedTags(Array.isArray(initialTags) ? initialTags : []);
             setNewTagText('');
             setShowConfirmCancel(false);
             loadCustomTags().then(setCustomTags);
             setTimeout(() => inputRef.current?.focus(), 300);
         }
-    }, [visible, defaultTitle, initialMode]);
+    }, [visible, defaultTitle, initialMode, initialDeliverDate, initialTags]);
 
     const getMinDate = () => {
         const tomorrow = new Date();
@@ -165,7 +175,7 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
     };
 
     const handleCancel = () => {
-        if (recordingDuration > 10 && !showConfirmCancel) {
+        if (!isEditMode && recordingDuration > 10 && !showConfirmCancel) {
             setShowConfirmCancel(true);
             return;
         }
@@ -175,20 +185,22 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
         }
     };
 
+    const handleDelete = () => {
+        if (onDelete) onDelete();
+    };
+
     return (
         <Modal
             visible={visible}
             transparent
             animationType="fade"
+            statusBarTranslucent
             onRequestClose={handleCancel}
         >
-            <KeyboardAvoidingView
-                style={styles.overlay}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                <View style={styles.card}>
+            <Pressable style={styles.overlay} onPress={handleCancel}>
+                <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
                     <Text style={styles.title}>
-                        {mode === 'message' ? 'Message au futur' : 'Nommer votre pensée'}
+                        {isEditMode ? 'Modifier votre pensee' : mode === 'message' ? 'Message au futur' : 'Nommer votre pensee'}
                     </Text>
 
                     <TextInput
@@ -331,10 +343,7 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
                     ) : (
                         <View style={styles.buttonRow}>
                             <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Trash2 size={14} color="#78716C" strokeWidth={1.5} />
-                                    <Text style={styles.cancelText}>Supprimer</Text>
-                                </View>
+                                <Text style={styles.cancelText}>{isEditMode ? 'Annuler' : 'Supprimer'}</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -343,10 +352,17 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
                                 disabled={mode === 'message' && !deliverDate}
                             >
                                 <Text style={styles.confirmText}>
-                                    {mode === 'message' ? 'Envoyer' : 'Enregistrer'}
+                                    {isEditMode ? 'Sauvegarder' : mode === 'message' ? 'Envoyer' : 'Enregistrer'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
+                    )}
+
+                    {isEditMode && (
+                        <TouchableOpacity style={styles.deleteEditButton} onPress={handleDelete}>
+                            <Trash2 size={14} color="#FFFFFF" strokeWidth={1.8} />
+                            <Text style={styles.deleteEditButtonText}>Supprimer l'enregistrement</Text>
+                        </TouchableOpacity>
                     )}
 
                     {/* Lien contextuel pour changer de mode */}
@@ -360,19 +376,20 @@ export default function TitleModal({ visible, defaultTitle, initialMode = 'note'
                                 : '📝 Enregistrer comme note classique'}
                         </Text>
                     </TouchableOpacity>
-                </View>
-            </KeyboardAvoidingView>
+                </Pressable>
+            </Pressable>
         </Modal >
     );
 }
 
 const styles = StyleSheet.create({
     overlay: {
-        flex: 1,
+        ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         alignItems: 'center',
         padding: 24,
+        paddingTop: 72,
     },
     card: {
         backgroundColor: '#FAF7F2',
@@ -628,6 +645,21 @@ const styles = StyleSheet.create({
         backgroundColor: '#DC2626',
     },
     confirmTextDanger: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    deleteEditButton: {
+        marginTop: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: '#B91C1C',
+    },
+    deleteEditButtonText: {
         fontSize: 14,
         fontWeight: '600',
         color: '#FFFFFF',

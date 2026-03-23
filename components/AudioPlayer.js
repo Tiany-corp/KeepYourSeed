@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { Play, Pause, X } from 'lucide-react-native';
 import { getRelativeDate, formatTime } from '../utils/date';
@@ -9,7 +10,9 @@ import { useAudioPlayer } from '../contexts/AudioPlayerContext';
  * À placer dans App.js au-dessus de tous les écrans.
  */
 export default function AudioPlayer() {
-    const { currentTrack, isPlaying, position, duration, toggle, stop, modalVisible, openModal, closeModal } = useAudioPlayer();
+    const { currentTrack, isPlaying, position, duration, toggle, stop, seekTo, modalVisible, openModal, closeModal } = useAudioPlayer();
+    const [miniProgressWidth, setMiniProgressWidth] = useState(0);
+    const [modalProgressWidth, setModalProgressWidth] = useState(0);
 
     // Pas de track → rien à afficher
     if (!currentTrack) return null;
@@ -18,6 +21,12 @@ export default function AudioPlayer() {
 
     const closePlayer = async () => {
         await stop();
+    };
+
+    const handleSeek = async (locationX, trackWidth) => {
+        if (!duration || !trackWidth) return;
+        const ratio = Math.max(0, Math.min(locationX / trackWidth, 1));
+        await seekTo(ratio * duration);
     };
 
     return (
@@ -47,7 +56,11 @@ export default function AudioPlayer() {
                             <Text style={styles.miniPlayerTitle} numberOfLines={1}>
                                 {currentTrack.title || 'Sans titre'}
                             </Text>
-                            <View style={styles.miniProgressBarTrack}>
+                            <Pressable
+                                style={styles.miniProgressBarTrack}
+                                onLayout={(e) => setMiniProgressWidth(e.nativeEvent.layout.width)}
+                                onPress={(e) => handleSeek(e.nativeEvent.locationX, miniProgressWidth)}
+                            >
                                 <View
                                     style={[
                                         styles.miniProgressBarFill,
@@ -58,7 +71,7 @@ export default function AudioPlayer() {
                                         }
                                     ]}
                                 />
-                            </View>
+                            </Pressable>
                         </View>
 
                         {/* Temps restant */}
@@ -126,7 +139,11 @@ export default function AudioPlayer() {
 
                         {/* Barre de progression + temps */}
                         <View style={styles.progressContainer}>
-                            <View style={styles.modalProgressBarTrack}>
+                            <Pressable
+                                style={styles.modalProgressBarTrack}
+                                onLayout={(e) => setModalProgressWidth(e.nativeEvent.layout.width)}
+                                onPress={(e) => handleSeek(e.nativeEvent.locationX, modalProgressWidth)}
+                            >
                                 <View
                                     style={[
                                         styles.modalProgressBarFill,
@@ -137,7 +154,7 @@ export default function AudioPlayer() {
                                         }
                                     ]}
                                 />
-                            </View>
+                            </Pressable>
                             <View style={styles.timeRow}>
                                 <Text style={styles.timeText}>{formatTime(position)}</Text>
                                 <Text style={styles.timeText}>{formatTime(duration)}</Text>

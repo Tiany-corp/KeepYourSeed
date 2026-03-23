@@ -141,6 +141,7 @@ export const fetchCloudRecordings = async (userId) => {
         // Convertir le format Supabase → format app
         return (data || []).map(row => ({
             id: `cloud_${row.id}`,           // Préfixe pour éviter les collisions d'ID
+            dbId: row.id,
             localUri: null,                   // Pas de fichier local sur ce device
             remoteUrl: row.audio_url,         // L'URL du bucket audios
             status: 'synced',                 // Déjà synchronisé par définition
@@ -153,6 +154,86 @@ export const fetchCloudRecordings = async (userId) => {
     } catch (e) {
         console.error('Failed to fetch cloud recordings:', e);
         return [];
+    }
+};
+
+/**
+ * Met a jour les metadonnees d'un enregistrement dans Supabase.
+ * Cible prioritaire: ID DB si disponible, sinon fallback par audio_url + user_id.
+ */
+export const updateRecordingMetadataInDatabase = async ({
+    userId,
+    recording,
+    title,
+    type,
+    deliverDate,
+    tags,
+}) => {
+    try {
+        if (!userId || !recording) return false;
+
+        const updates = {
+            title: title || 'Sans titre',
+            type: type || 'note',
+            tags: Array.isArray(tags) ? tags : [],
+            deliver_date: type === 'message' && deliverDate ? deliverDate : null,
+        };
+
+        let query = supabase.from('recordings').update(updates).eq('user_id', userId);
+        if (recording.dbId) {
+            query = query.eq('id', recording.dbId);
+        } else if (recording.remoteUrl) {
+            query = query.eq('audio_url', recording.remoteUrl);
+        } else {
+            return false;
+        }
+
+        const { error } = await query;
+        if (error) {
+            console.error('Supabase metadata update error:', error);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to update recording metadata:', e);
+        return false;
+    }
+};
+
+/**
+ * Supprime un enregistrement cloud (fichier bucket + ligne DB).
+ */
+export const deleteRecordingFromCloud = async ({ userId, recording }) => {
+    try {
+        if (!userId || !recording) return false;
+
+        if (recording.remoteUrl && !recording.remoteUrl.startsWith('http')) {
+            const { error: removeError } = await supabase.storage
+                .from('audios')
+                .remove([recording.remoteUrl]);
+            if (removeError) {
+                console.error('Cloud file delete error:', removeError);
+            }
+        }
+
+        let query = supabase.from('recordings').delete().eq('user_id', userId);
+        if (recording.dbId) {
+            query = query.eq('id', recording.dbId);
+        } else if (recording.remoteUrl) {
+            query = query.eq('audio_url', recording.remoteUrl);
+        } else {
+            return false;
+        }
+
+        const { error } = await query;
+        if (error) {
+            console.error('Cloud DB delete error:', error);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to delete cloud recording:', e);
+        return false;
     }
 };
 

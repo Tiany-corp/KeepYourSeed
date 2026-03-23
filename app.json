@@ -4,6 +4,14 @@
     "slug": "KeepYourSeed",
     "scheme": "keepyourseed",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b7f4ff35-a30f-4cf1-afa0-86cca58d7f85",
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

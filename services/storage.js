@@ -161,6 +161,18 @@ export const updateRecording = async (id, updates) => {
     }
 };
 
+export const deleteRecording = async (id) => {
+    try {
+        const recordings = await getRecordings();
+        const updatedRecordings = recordings.filter(rec => rec.id !== id);
+        await universalStorage.saveData(STORAGE_KEY, updatedRecordings);
+        return updatedRecordings;
+    } catch (e) {
+        console.error('Failed to delete recording', e);
+        return [];
+    }
+};
+
 export const getRecordings = async () => {
     try {
         const data = await universalStorage.getData(STORAGE_KEY) ?? []; // Je charge mes audios locaux + remote qui sont renvoyé sous forme de json
