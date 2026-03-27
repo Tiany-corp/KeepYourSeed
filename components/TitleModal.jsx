@@ -67,7 +67,7 @@ export default function TitleModal({
     defaultTitle,
     initialMode = 'note',
     initialDeliverDate = '',
-    initialTags = [],
+    initialTags = null,
     isEditMode = false,
     recordingDuration = 0,
     onConfirm,
@@ -82,9 +82,10 @@ export default function TitleModal({
     const [newTagText, setNewTagText] = useState('');
     const [showConfirmCancel, setShowConfirmCancel] = useState(false);
     const inputRef = useRef(null);
+    const wasVisibleRef = useRef(false);
 
     useEffect(() => {
-        if (visible) {
+        if (visible && !wasVisibleRef.current) {
             setTitle(defaultTitle || '');
             setMode(initialMode);
             setDeliverDate(initialDeliverDate ? new Date(initialDeliverDate).toISOString().split('T')[0] : '');
@@ -94,6 +95,7 @@ export default function TitleModal({
             loadCustomTags().then(setCustomTags);
             setTimeout(() => inputRef.current?.focus(), 300);
         }
+        wasVisibleRef.current = visible;
     }, [visible, defaultTitle, initialMode, initialDeliverDate, initialTags]);
 
     const getMinDate = () => {
@@ -168,7 +170,10 @@ export default function TitleModal({
     const allTags = [...AVAILABLE_TAGS, ...customTags];
 
     const handleConfirm = () => {
-        const finalTitle = title.trim() || defaultTitle || 'Sans titre';
+        const trimmedTitle = title.trim();
+        const finalTitle = isEditMode
+            ? (trimmedTitle || 'Sans titre')
+            : (trimmedTitle || defaultTitle || 'Sans titre');
         if (mode === 'message' && !deliverDate) return;
         const finalDeliverDate = mode === 'message' ? new Date(deliverDate).toISOString() : null;
         onConfirm(finalTitle, mode, finalDeliverDate, selectedTags);

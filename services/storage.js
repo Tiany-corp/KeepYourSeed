@@ -251,11 +251,14 @@ export const getChildRecordings = async (parentId) => {
 // Cache un enregistrement aléatoire pour la journée entière.
 // Clé de stockage : @daily_memory_YYYY-MM-DD
 const DAILY_MEMORY_PREFIX = '@daily_memory_';
+const SEEN_DAILY_MEMORY_PREFIX = '@seen_daily_memory_';
 
 const getTodayKey = () => {
     const today = new Date().toISOString().split('T')[0]; // "2026-02-27"
     return `${DAILY_MEMORY_PREFIX}${today}`;
 };
+
+const getSeenDailyMemoryKey = (userId) => `${SEEN_DAILY_MEMORY_PREFIX}${userId || 'guest'}`;
 
 /**
  * Récupère le contenu du jour : un message reçu en priorité, sinon un souvenir aléatoire.
@@ -298,6 +301,23 @@ export const getDailyMemory = async (userId) => {
     } catch (e) {
         console.error('Erreur getDailyMemory:', e);
         return null;
+    }
+};
+
+export const getSeenDailyMemoryId = async (userId) => {
+    try {
+        return await universalStorage.getData(getSeenDailyMemoryKey(userId));
+    } catch (e) {
+        console.error('Erreur getSeenDailyMemoryId:', e);
+        return null;
+    }
+};
+
+export const setSeenDailyMemoryId = async (userId, memoryId) => {
+    try {
+        await universalStorage.saveData(getSeenDailyMemoryKey(userId), memoryId || null);
+    } catch (e) {
+        console.error('Erreur setSeenDailyMemoryId:', e);
     }
 };
 

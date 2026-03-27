@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import useAudioRecorder from '../hooks/useAudioRecorder';
-import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getCurrentStreak } from '../services/storage';
+import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getCurrentStreak, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
@@ -18,6 +18,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     const { isRecording, duration, startRecording, stopRecording, formatDuration } = useAudioRecorder();
     const [dailyMemory, setDailyMemory] = useState(null);
     const [isMemoryLoading, setIsMemoryLoading] = useState(true);
+    const [hasUnseenMemory, setHasUnseenMemory] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
     // --- État pour la modale de titre ---
@@ -47,6 +48,24 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
         // Charger la streak actuelle
         getCurrentStreak().then(setStreakCount);
     }, [session]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const syncSeenState = async () => {
+            if (!dailyMemory?.id) {
+                if (!cancelled) setHasUnseenMemory(false);
+                return;
+            }
+            const seenId = await getSeenDailyMemoryId(session?.user?.id);
+            if (!cancelled) {
+                setHasUnseenMemory(seenId !== dailyMemory.id);
+            }
+        };
+        syncSeenState();
+        return () => {
+            cancelled = true;
+        };
+    }, [dailyMemory?.id, session?.user?.id]);
 
     // Charger la pensée épinglée
     useEffect(() => {
@@ -131,6 +150,14 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
         setPendingRecording(null);
     };
 
+    const handleGoToHistory = async () => {
+        if (dailyMemory?.id) {
+            await setSeenDailyMemoryId(session?.user?.id, dailyMemory.id);
+            setHasUnseenMemory(false);
+        }
+        onGoToHistory();
+    };
+
     // Format de la date (ex: "5 mars", sans l'année pour alléger)
     const formattedDate = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
     const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
@@ -145,9 +172,9 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
     // Icône Historique personnalisée avec la graine et le badge numéroté
     // Couleur marron (#78350F) pour équilibrer avec le menu hamburger à gauche
     const HistoryButton = (
-        <TouchableOpacity onPress={onGoToHistory} style={styles.historyButton}>
+        <TouchableOpacity onPress={handleGoToHistory} style={styles.historyButton}>
             <Logo size={28} color="#78350F" variant="outline" />
-            {dailyMemory && !isMemoryLoading && (
+            {hasUnseenMemory && !isMemoryLoading && (
                 <View style={styles.historyBadge}>
                     <Text style={styles.historyBadgeText}>1</Text>
                 </View>
