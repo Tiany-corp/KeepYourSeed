@@ -13,21 +13,21 @@
       "fallbackToCacheTimeout": 0
     },
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/oragnicKYS.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/oragnicKYS.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FAF7F2"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/oragnicKYS.png",
+        "backgroundColor": "#FAF7F2"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -37,7 +37,7 @@
       "package": "com.tianyr.KeepYourSeed"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/oragnicKYS.png"
     },
     "experiments": {
       "baseUrl": "/kys-web-app"
