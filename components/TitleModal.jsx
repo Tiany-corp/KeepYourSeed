@@ -16,6 +16,11 @@ import { get, set } from 'idb-keyval';
 
 const CUSTOM_TAGS_KEY = '@custom_tags_v1';
 
+const CUSTOM_TAG_EMOJIS = [
+    '🔥', '⭐', '💪', '❤️', '🎵', '📖', '✨', '🌍',
+    '🏆', '💎', '🕊️', '🌙', '⚡', '🎨', '📌', '🔑',
+];
+
 export const AVAILABLE_TAGS = [
     { id: 'enseignement', label: 'Enseignement', emoji: '🌱' },
     { id: 'gratitude', label: 'Gratitude', emoji: '💛' },
@@ -80,6 +85,8 @@ export default function TitleModal({
     const [selectedTags, setSelectedTags] = useState([]);
     const [customTags, setCustomTags] = useState([]);
     const [newTagText, setNewTagText] = useState('');
+    const [selectedNewEmoji, setSelectedNewEmoji] = useState(CUSTOM_TAG_EMOJIS[0]);
+    const [showNewTagForm, setShowNewTagForm] = useState(false);
     const [showConfirmCancel, setShowConfirmCancel] = useState(false);
     const inputRef = useRef(null);
     const wasVisibleRef = useRef(false);
@@ -91,6 +98,8 @@ export default function TitleModal({
             setDeliverDate(initialDeliverDate ? new Date(initialDeliverDate).toISOString().split('T')[0] : '');
             setSelectedTags(Array.isArray(initialTags) ? initialTags : []);
             setNewTagText('');
+            setSelectedNewEmoji(CUSTOM_TAG_EMOJIS[0]);
+            setShowNewTagForm(false);
             setShowConfirmCancel(false);
             loadCustomTags().then(setCustomTags);
             setTimeout(() => inputRef.current?.focus(), 300);
@@ -152,16 +161,20 @@ export default function TitleModal({
             setNewTagText('');
             return;
         }
-        const newTag = { id, label, emoji: '🏷️' };
+        const newTag = { id, label, emoji: selectedNewEmoji };
         const updated = [...customTags, newTag];
         setCustomTags(updated);
         persistCustomTags(updated);
         setSelectedTags(prev => [...prev, id]);
         setNewTagText('');
+        setSelectedNewEmoji(CUSTOM_TAG_EMOJIS[0]);
+        setShowNewTagForm(false);
     };
 
     const handleDeleteCustomTag = (tagId) => {
-        const updated = customTags.filter(t => t.id !== tagId);
+        const updated = customTags.filter(t => t.id !== tagId); // filter recois le return d'une fonction qui renvoie vrai si le tag t existe dans tagID => t il vient d'ou ? c'est une props de tagID, c'est quoi la différence entre t et tagid si on compare les deux ?
+        // Garde tous les tag t qui sont différent de celui qui a été séléectionné en tagID
+        // t c'est l'élément courant qu'on est en train d'observer dans le tableau et tagId c'est le tag qui a été séléctionné par l'utilisateur
         setCustomTags(updated);
         persistCustomTags(updated);
         setSelectedTags(prev => prev.filter(t => t !== tagId));
@@ -229,7 +242,7 @@ export default function TitleModal({
                                 const isActive = selectedTags.includes(tag.id);
                                 const isCustom = tag.id.startsWith('custom_');
                                 return (
-                                    <View key={tag.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <View key={tag.id}>
                                         <TouchableOpacity
                                             style={[styles.tagChip, isActive && styles.tagChipActive]}
                                             onPress={() => toggleTag(tag.id)}
@@ -238,41 +251,72 @@ export default function TitleModal({
                                             <Text style={[styles.tagChipText, isActive && styles.tagChipTextActive]}>
                                                 {tag.emoji} {tag.label}
                                             </Text>
+                                            {isCustom && (
+                                                <TouchableOpacity
+                                                    style={[styles.deleteTagBtn, isActive && styles.deleteTagBtnActive]}
+                                                    onPress={() => handleDeleteCustomTag(tag.id)}
+                                                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                                                >
+                                                    <X size={10} color={isActive ? '#FFFFFF' : '#78716C'} strokeWidth={2.5} />
+                                                </TouchableOpacity>
+                                            )}
                                         </TouchableOpacity>
-                                        {isCustom && (
-                                            <TouchableOpacity
-                                                style={styles.deleteTagBtn}
-                                                onPress={() => handleDeleteCustomTag(tag.id)}
-                                                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                                            >
-                                                <X size={10} color="#78716C" strokeWidth={2.5} />
-                                            </TouchableOpacity>
-                                        )}
                                     </View>
                                 );
                             })}
-                        </View>
 
-                        {/* Input pour créer un nouveau tag */}
-                        <View style={styles.newTagRow}>
-                            <TextInput
-                                style={styles.newTagInput}
-                                value={newTagText}
-                                onChangeText={setNewTagText}
-                                placeholder="Nouveau tag..."
-                                placeholderTextColor="#A8A29E"
-                                maxLength={30}
-                                onSubmitEditing={handleAddCustomTag}
-                                returnKeyType="done"
-                            />
+                            {/* Chip "+ Nouveau" intégré dans la ligne de tags */}
                             <TouchableOpacity
-                                style={[styles.newTagButton, !newTagText.trim() && { opacity: 0.4 }]}
-                                onPress={handleAddCustomTag}
-                                disabled={!newTagText.trim()}
+                                style={[styles.tagChip, styles.addTagChip]}
+                                onPress={() => setShowNewTagForm(!showNewTagForm)}
+                                activeOpacity={0.7}
                             >
-                                <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
+                                <Text style={styles.addTagChipText}>+ Nouveau</Text>
                             </TouchableOpacity>
                         </View>
+
+                        {/* Formulaire de création (Progressive Disclosure) */}
+                        {showNewTagForm && (
+                            <View style={styles.newTagFormContainer}>
+                                <View style={styles.newTagRow}>
+                                    <TouchableOpacity style={styles.emojiPreview}>
+                                        <Text style={styles.emojiPreviewText}>{selectedNewEmoji}</Text>
+                                    </TouchableOpacity>
+                                    <TextInput
+                                        style={styles.newTagInput}
+                                        value={newTagText}
+                                        onChangeText={setNewTagText}
+                                        placeholder="Nom du tag..."
+                                        placeholderTextColor="#A8A29E"
+                                        maxLength={30}
+                                        onSubmitEditing={handleAddCustomTag}
+                                        returnKeyType="done"
+                                        autoFocus
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.newTagButton, !newTagText.trim() && { opacity: 0.4 }]}
+                                        onPress={handleAddCustomTag}
+                                        disabled={!newTagText.trim()}
+                                    >
+                                        <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Grille d'emojis */}
+                                <View style={styles.emojiGrid}>
+                                    {CUSTOM_TAG_EMOJIS.map(emoji => (
+                                        <TouchableOpacity
+                                            key={emoji}
+                                            style={[styles.emojiOption, selectedNewEmoji === emoji && styles.emojiOptionActive]}
+                                            onPress={() => setSelectedNewEmoji(emoji)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={styles.emojiOptionText}>{emoji}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
                     </View>
 
                     {/* Sélecteur de date pour les messages */}
@@ -554,6 +598,8 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     tagChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 12,
         paddingVertical: 7,
         backgroundColor: '#F5F0E8',
@@ -573,10 +619,36 @@ const styles = StyleSheet.create({
     tagChipTextActive: {
         color: '#FFFFFF',
     },
+    addTagChip: {
+        backgroundColor: 'transparent',
+        borderStyle: 'dashed',
+        borderColor: '#A8A29E',
+        borderWidth: 1,
+    },
+    addTagChipText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#A8A29E',
+    },
+    newTagFormContainer: {
+        marginTop: 10,
+        padding: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#E8D5BF',
+    },
     deleteTagBtn: {
-        marginLeft: -4,
-        marginRight: 4,
-        padding: 2,
+        marginLeft: 6,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: 'rgba(0,0,0,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    deleteTagBtnActive: {
+        backgroundColor: 'rgba(255,255,255,0.25)',
     },
     newTagRow: {
         flexDirection: 'row',
@@ -602,6 +674,42 @@ const styles = StyleSheet.create({
         backgroundColor: '#78350F',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    emojiPreview: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#F5F0E8',
+        borderWidth: 1,
+        borderColor: '#D4A574',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emojiPreviewText: {
+        fontSize: 16,
+    },
+    emojiGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginTop: 10,
+    },
+    emojiOption: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#F5F0E8',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#E8D5BF',
+    },
+    emojiOptionActive: {
+        backgroundColor: '#78350F',
+        borderColor: '#78350F',
+    },
+    emojiOptionText: {
+        fontSize: 18,
     },
     confirmCancelSection: {
         marginTop: 24,
