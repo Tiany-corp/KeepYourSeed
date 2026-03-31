@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal } from 'react-native';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording } from '../services/storage';
 import { fetchCloudRecordings, updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
-import { Play, Pause, ArrowLeft, Pin, Pencil } from 'lucide-react-native';
+import { Play, Pause, ArrowLeft, Pin, Pencil, MoreVertical, Trash2 } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import Logo from '../components/Logo';
 import TagFilterBar from '../components/TagFilterBar';
@@ -28,6 +28,7 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
     const [editingRecording, setEditingRecording] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [selectedOptionsItem, setSelectedOptionsItem] = useState(null);
 
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
@@ -137,26 +138,25 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         }
     };
 
-    const executeDelete = async () => {
-        if (!editingRecording) return;
-        const recordingToDelete = editingRecording;
+    const executeDelete = async (itemToDelete) => {
+        if (!itemToDelete) return;
 
         try {
-            await deleteRecording(recordingToDelete.id);
+            await deleteRecording(itemToDelete.id);
 
-            if (audioPlayer.currentTrack?.id === recordingToDelete.id) {
+            if (audioPlayer.currentTrack?.id === itemToDelete.id) {
                 await audioPlayer.stop();
             }
 
-            setRecordings(prev => prev.filter(rec => rec.id !== recordingToDelete.id));
-            if (dailyMemory?.id === recordingToDelete.id) {
+            setRecordings(prev => prev.filter(rec => rec.id !== itemToDelete.id));
+            if (dailyMemory?.id === itemToDelete.id) {
                 setDailyMemory(null);
             }
 
-            if (session?.user && (recordingToDelete.dbId || recordingToDelete.remoteUrl)) {
+            if (session?.user && (itemToDelete.dbId || itemToDelete.remoteUrl)) {
                 const ok = await deleteRecordingFromCloud({
                     userId: session.user.id,
-                    recording: recordingToDelete,
+                    recording: itemToDelete,
                 });
                 if (!ok) {
                     showAlert('Attention', 'Supprime localement, mais suppression cloud echouee.', 'warning');
@@ -170,15 +170,17 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             console.error('Delete failed:', e);
             showAlert('Erreur', "Impossible de supprimer l'enregistrement.", 'error');
         } finally {
-            handleEditCancel();
+            if (editingRecording?.id === itemToDelete.id) {
+                handleEditCancel();
+            }
         }
     };
 
-    const handleEditDelete = () => {
-        const title = editingRecording?.title || 'cet enregistrement';
+    const handleDeleteItem = (item) => {
+        const title = item?.title || 'cet enregistrement';
         if (Platform.OS === 'web') {
             if (window.confirm(`Supprimer "${title}" ?`)) {
-                executeDelete();
+                executeDelete(item);
             }
             return;
         }
@@ -187,9 +189,15 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             `Voulez-vous supprimer "${title}" ?`,
             [
                 { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: executeDelete },
+                { text: 'Supprimer', style: 'destructive', onPress: () => executeDelete(item) },
             ]
         );
+    };
+
+    const handleEditDelete = () => {
+        if (editingRecording) {
+            handleDeleteItem(editingRecording);
+        }
     };
 
     const formatDuration = (seconds) => {
@@ -252,29 +260,23 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                         )}
                     </View>
                     <View style={styles.itemInfo}>
-                        <Text style={styles.itemTitle} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                            {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
+                            <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                        </View>
                         {renderMetaLine(item)}
                         {/* Ligne 3 : Tags isolés en bas */}
                         {item.tags && item.tags.length > 0 && renderTags(item.tags)}
                     </View>
                 </TouchableOpacity>
 
-                {/* Bouton d'édition */}
+                {/* Menu Options (Kebab Menu) */}
                 <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => handleEdit(item)}
-                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
+                    style={styles.optionsButton}
+                    onPress={() => setSelectedOptionsItem(item)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Pencil size={20} color="#78350F" strokeWidth={1.5} />
-                </TouchableOpacity>
-
-                {/* Bouton épingler */}
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handlePin(item)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <Pin size={16} color="#78350F" strokeWidth={2} />
+                    <MoreVertical size={20} color="#78716C" strokeWidth={2} />
                 </TouchableOpacity>
             </View>
 
@@ -355,6 +357,63 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={<Text style={styles.emptyText}>Aucun enregistrement.</Text>}
             />
+
+            {/* Modale d'options (...) */}
+            <Modal
+                visible={!!selectedOptionsItem}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSelectedOptionsItem(null)}
+            >
+                <TouchableOpacity
+                    style={styles.optionsOverlay}
+                    activeOpacity={1}
+                    onPress={() => setSelectedOptionsItem(null)}
+                >
+                    <TouchableOpacity activeOpacity={1} style={styles.optionsMenuContainer}>
+                        <View style={styles.optionsMenuHeader}>
+                            <Text style={styles.optionsMenuTitle} numberOfLines={1}>
+                                {selectedOptionsItem?.title || 'Enregistrement'}
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity style={styles.optionItem} onPress={() => {
+                            const item = selectedOptionsItem;
+                            setSelectedOptionsItem(null);
+                            handlePin(item);
+                        }}>
+                            <Pin size={20} color="#78350F" strokeWidth={1.5} fill={selectedOptionsItem?.pinned ? '#78350F' : 'transparent'} />
+                            <Text style={styles.optionText}>{selectedOptionsItem?.pinned ? 'Détacher cette pensée' : 'Épingler en haut'}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.optionItem} onPress={() => {
+                            const item = selectedOptionsItem;
+                            setSelectedOptionsItem(null);
+                            handleEdit(item);
+                        }}>
+                            <Pencil size={20} color="#78350F" strokeWidth={1.5} />
+                            <Text style={styles.optionText}>Modifier</Text>
+                        </TouchableOpacity>
+
+
+
+                        <View style={styles.optionDivider} />
+
+                        <TouchableOpacity style={styles.optionItem} onPress={() => {
+                            const item = selectedOptionsItem;
+                            setSelectedOptionsItem(null);
+                            handleDeleteItem(item);
+                        }}>
+                            <Trash2 size={20} color="#DC2626" strokeWidth={1.5} />
+                            <Text style={[styles.optionText, { color: '#DC2626' }]}>Supprimer l'enregistrement</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.optionCancelBtn} onPress={() => setSelectedOptionsItem(null)}>
+                            <Text style={styles.optionCancelText}>Annuler</Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
 
             <TitleModal
                 visible={showEditModal}
@@ -444,6 +503,70 @@ const styles = StyleSheet.create({
         elevation: 1,
         flex: 1,
         marginRight: 10,
+    },
+    optionsButton: {
+        paddingHorizontal: 8,
+        paddingVertical: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // Options Menu Styles
+    optionsOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+    },
+    optionsMenuContainer: {
+        backgroundColor: '#FFFFFF',
+        width: '100%',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 16, // Safe area bottom
+        paddingTop: 8,
+    },
+    optionsMenuHeader: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F5F5',
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        marginBottom: 8,
+    },
+    optionsMenuTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#292524',
+        textAlign: 'center',
+    },
+    optionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+    },
+    optionText: {
+        fontSize: 16,
+        color: '#292524',
+        marginLeft: 16,
+        fontWeight: '500',
+    },
+    optionDivider: {
+        height: 1,
+        backgroundColor: '#F5F5F5',
+        marginVertical: 4,
+    },
+    optionCancelBtn: {
+        marginTop: 8,
+        paddingVertical: 16,
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        marginHorizontal: 16,
+        borderRadius: 12,
+    },
+    optionCancelText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#78716C',
     },
     playButtonIcon: {
         width: 40,
