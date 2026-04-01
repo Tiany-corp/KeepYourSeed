@@ -62,8 +62,9 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             // Écoute réseau "one-shot" pour déclencher le sync au passage en Wi-Fi
             const NetInfo = require('@react-native-community/netinfo');
             let hasSyncedInWifi = false;
+            let unsubscribe = null;
 
-            const unsubscribe = NetInfo.addEventListener(state => {
+            unsubscribe = NetInfo.addEventListener(state => {
                 const isWifi = state.type === 'wifi' || state.type === 'ethernet';
                 if (isWifi && state.isConnected && !hasSyncedInWifi) {
                     console.log('Wi-Fi détecté – Déclenchement de la synchronisation one-shot');
@@ -75,11 +76,21 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                             });
                         }
                     });
-                    unsubscribe(); 
+                    
+                    // Désabonnement sécurisé (gère le cas où l'événement est appelé de manière synchrone via Babel)
+                    if (typeof unsubscribe === 'function') {
+                        unsubscribe(); 
+                    } else {
+                        setTimeout(() => {
+                            if (typeof unsubscribe === 'function') unsubscribe();
+                        }, 10);
+                    }
                 }
             });
 
-            return () => unsubscribe();
+            return () => {
+                if (typeof unsubscribe === 'function') unsubscribe();
+            };
         }
     }, [session]);
 

@@ -2,9 +2,9 @@ import { Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { get, set, del } from 'idb-keyval';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
-const STORAGE_KEY = '@recordings_v2';
+export const STORAGE_KEY = '@recordings_v2';
 
 // --- UTILITIES ---
 async function computeHash(uri) {
