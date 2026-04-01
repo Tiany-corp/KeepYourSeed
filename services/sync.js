@@ -7,24 +7,57 @@ import { supabase } from './supabase';
  * @param {string} userId - UUID de l'utilisateur
  * @returns {Promise<{success: boolean, pushed: number, pulled: number}>}
  */
-export const syncAll = async (userId) => {
+/**
+ * Synchronisation complète : Push (Local -> Cloud) + Pull (Cloud -> Local)
+ * @param {string} userId - UUID de l'utilisateur
+ * @param {boolean} isManual - Si true, bypass certaines restrictions
+ * @returns {Promise<{success: boolean, pushed: number, pulled: number, status: string}>}
+ */
+export const syncAll = async (userId, isManual = false) => {
     try {
         if (!userId) return { success: false, pushed: 0, pulled: 0 };
 
-        console.log('--- DÉBUT SYNCHRONISATION GLOBALE ---');
-
-        // 1. PUSH : Envoyer ce qui est nouveau en local
-        const pushedCount = await pushLocalRecordings(userId);
-
-        // 2. PULL : Récupérer ce qui est nouveau sur le cloud
-        const pulledCount = await pullCloudRecordings(userId);
-
-        console.log(`--- FIN SYNCHRONISATION : Envois: ${pushedCount}, Récupérations: ${pulledCount} ---`);
+        const NetInfo = require('@react-native-community/netinfo');
+        const { getWifiOnlyPreference } = require('./storage');
         
-        return { success: true, pushed: pushedCount, pulled: pulledCount };
+        const netState = await NetInfo.fetch();
+        const isWifi = netState.type === 'wifi' || netState.type === 'ethernet';
+        const isConnected = netState.isConnected;
+        const wifiOnly = await getWifiOnlyPreference();
+
+        if (!isConnected) return { success: false, pushed: 0, pulled: 0, status: 'no-connection' };
+
+        console.log(`--- DÉBUT SYNCHRONISATION (Wifi: ${isWifi}, WifiOnly: ${wifiOnly}, Manual: ${isManual}) ---`);
+
+        let pushedCount = 0;
+        let pulledCount = 0;
+
+        // 1. PUSH : Autorisé si (Wifi) OR (4G ET !wifiOnly) OR (Manual)
+        const canPush = isManual || isWifi || !wifiOnly;
+        if (canPush) {
+            pushedCount = await pushLocalRecordings(userId);
+        } else {
+            console.log('Push sauté (Wi-Fi requis)');
+        }
+
+        // 2. PULL : Autorisé si (Wifi) OR (Manual)
+        // Note: Le pull télécharge des fichiers audio, donc on le restreint plus strictement
+        const canPull = isManual || isWifi;
+        if (canPull) {
+            pulledCount = await pullCloudRecordings(userId);
+        } else {
+            console.log('Pull sauté (Wi-Fi requis pour téléchargement)');
+        }
+
+        return { 
+            success: true, 
+            pushed: pushedCount, 
+            pulled: pulledCount,
+            status: (!isWifi && wifiOnly && !isManual) ? 'wifi-required' : 'done'
+        };
     } catch (error) {
         console.error('Erreur syncAll:', error);
-        return { success: false, pushed: 0, pulled: 0 };
+        return { success: false, pushed: 0, pulled: 0, error: error.message };
     }
 };
 

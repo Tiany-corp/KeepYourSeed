@@ -40,12 +40,11 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
             const localData = await getRecordings();
             setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
 
-            // 2. Lancer la synchronisation globale en arrière-plan (Push/Pull/Cache)
+            // 2. Lancer la synchronisation initiale
             if (session?.user) {
                 try {
                     const result = await syncAll(session.user.id);
                     if (result.success && (result.pushed > 0 || result.pulled > 0)) {
-                        // Re-charger si des choses ont changé
                         const updatedData = await getRecordings();
                         setRecordings(updatedData.sort((a, b) => new Date(b.date) - new Date(a.date)));
                     }
@@ -59,6 +58,28 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         
         if (session?.user) {
             getDailyMemory(session.user.id).then(setDailyMemory);
+            
+            // Écoute réseau "one-shot" pour déclencher le sync au passage en Wi-Fi
+            const NetInfo = require('@react-native-community/netinfo');
+            let hasSyncedInWifi = false;
+
+            const unsubscribe = NetInfo.addEventListener(state => {
+                const isWifi = state.type === 'wifi' || state.type === 'ethernet';
+                if (isWifi && state.isConnected && !hasSyncedInWifi) {
+                    console.log('Wi-Fi détecté – Déclenchement de la synchronisation one-shot');
+                    hasSyncedInWifi = true;
+                    syncAll(session.user.id).then(result => {
+                        if (result.success && (result.pushed > 0 || result.pulled > 0)) {
+                            getRecordings().then(data => {
+                                setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+                            });
+                        }
+                    });
+                    unsubscribe(); 
+                }
+            });
+
+            return () => unsubscribe();
         }
     }, [session]);
 

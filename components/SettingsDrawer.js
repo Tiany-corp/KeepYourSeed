@@ -62,7 +62,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         setIsSyncing(true);
         try {
             const { syncAll } = require('../services/sync');
-            const result = await syncAll(session.user.id);
+            const result = await syncAll(session.user.id, true); // true = Manual sync
             if (result.success) {
                 if (result.pushed > 0 || result.pulled > 0) {
                     let msg = '';
