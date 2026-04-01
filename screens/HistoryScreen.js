@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal } from 'react-native';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording } from '../services/storage';
-import { fetchCloudRecordings, updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
-import { Play, Pause, ArrowLeft, Pin, Pencil, MoreVertical, Trash2 } from 'lucide-react-native';
+import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
+import { syncAll } from '../services/sync';
+import { Play, Pause, ArrowLeft, Pin, Pencil, MoreVertical, Trash2, Cloud, CloudOff } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import Logo from '../components/Logo';
 import TagFilterBar from '../components/TagFilterBar';
@@ -34,33 +35,37 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     const { showAlert } = useAlert();
 
     useEffect(() => {
-        loadRecordings();
+        const initializeRecordings = async () => {
+            // 1. Charger le local immédiatement pour la réactivité
+            const localData = await getRecordings();
+            setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+
+            // 2. Lancer la synchronisation globale en arrière-plan (Push/Pull/Cache)
+            if (session?.user) {
+                try {
+                    const result = await syncAll(session.user.id);
+                    if (result.success && (result.pushed > 0 || result.pulled > 0)) {
+                        // Re-charger si des choses ont changé
+                        const updatedData = await getRecordings();
+                        setRecordings(updatedData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+                    }
+                } catch (e) {
+                    console.error('Initial sync failed:', e);
+                }
+            }
+        };
+
+        initializeRecordings();
+        
         if (session?.user) {
             getDailyMemory(session.user.id).then(setDailyMemory);
         }
     }, [session]);
 
     async function loadRecordings() {
-        const localData = await getRecordings();
-
-        let mergedData = localData;
-        if (session?.user) {
-            try {
-                const cloudData = await fetchCloudRecordings(session.user.id);
-                const localRemoteUrls = new Set(
-                    localData.filter(r => r.remoteUrl).map(r => r.remoteUrl)
-                );
-                const newCloudRecordings = cloudData.filter(
-                    cloudRec => !localRemoteUrls.has(cloudRec.remoteUrl)
-                );
-                mergedData = [...localData, ...newCloudRecordings];
-            } catch (e) {
-                console.error('Failed to sync cloud recordings:', e);
-            }
-        }
-
-        mergedData.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setRecordings(mergedData);
+        // Cette fonction est maintenant un alias pour rafraîchir manuellement si besoin
+        const data = await getRecordings();
+        setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
     }
 
     // Grouper les recordings : parents (sans parentId) avec leurs enfants
@@ -263,6 +268,17 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                             {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
                             <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                            
+                            {/* Indicateur de synchro : seulement si connecté */}
+                            {session?.user && (
+                                <View style={{ marginLeft: 6 }}>
+                                    {item.status === 'synced' ? (
+                                        <Cloud size={14} color="#10B981" opacity={0.6} /> 
+                                    ) : (
+                                        <CloudOff size={14} color="#78716C" opacity={0.4} />
+                                    )}
+                                </View>
+                            )}
                         </View>
                         {renderMetaLine(item)}
                         {/* Ligne 3 : Tags isolés en bas */}

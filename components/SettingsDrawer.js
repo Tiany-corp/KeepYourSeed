@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator } from 'react-native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
-import { clearRecordings } from '../services/storage';
+import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
-import { Settings, X, Trash2, LogOut, LogIn } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -13,7 +13,17 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
     const overlayOpacity = useRef(new Animated.Value(0)).current;
     const [isRendered, setIsRendered] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [wifiOnly, setWifiOnly] = useState(false);
     const { showAlert } = useAlert();
+
+    // Load Wi‑Fi‑only preference on mount
+    useEffect(() => {
+        (async () => {
+            const pref = await getWifiOnlyPreference();
+            setWifiOnly(pref);
+        })();
+    }, []);
 
     useEffect(() => {
         if (visible) {
@@ -45,6 +55,34 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
             ]).start(() => setIsRendered(false));
         }
     }, [visible]);
+
+    const handleSync = async () => {
+        if (!session?.user?.id) return;
+        
+        setIsSyncing(true);
+        try {
+            const { syncAll } = require('../services/sync');
+            const result = await syncAll(session.user.id);
+            if (result.success) {
+                if (result.pushed > 0 || result.pulled > 0) {
+                    let msg = '';
+                    if (result.pushed > 0) msg += `${result.pushed} envoyée(s). `;
+                    if (result.pulled > 0) msg += `${result.pulled} récupérée(s).`;
+                    showAlert('Succès', msg || 'Synchronisation terminée !', 'success');
+                    if (onDataCleared) onDataCleared(); // Rafraîchir l'historique
+                } else {
+                    showAlert('Info', 'Tout est déjà à jour !', 'success');
+                }
+            } else {
+                showAlert('Erreur', 'La synchronisation a échoué.', 'error');
+            }
+        } catch (e) {
+            console.error('Sync failed:', e);
+            showAlert('Erreur', 'Un problème est survenu lors de la synchronisation.', 'error');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const handleLogout = async () => {
         try {
@@ -143,10 +181,33 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Menu items — seulement si connecté */}
                 {session?.user ? (
                     <View style={styles.menuContainer}>
-                        <TouchableOpacity style={styles.menuItem} onPress={handleEmptyBucket}>
-                            <Trash2 size={20} color="#ef4444" style={styles.menuIcon} />
-                            <Text style={styles.menuItemTextDanger}>Vider le cloud</Text>
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handleSync}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? (
+                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
+                            ) : (
+                                <CloudUpload size={20} color="#78350F" style={styles.menuIcon} />
+                            )}
+                            <Text style={styles.menuItemText}>
+                                {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
+                            </Text>
                         </TouchableOpacity>
+
+                        {/* Wi‑Fi‑only toggle */}
+                        <View style={styles.menuItem}>
+                            <Switch
+                                value={wifiOnly}
+                                onValueChange={async (value) => {
+                                    setWifiOnly(value);
+                                    await setWifiOnlyPreference(value);
+                                    showAlert('Info', value ? 'Synchronisation Wi‑Fi uniquement activée' : 'Synchronisation Wi‑Fi uniquement désactivée', 'info');
+                                }}
+                            />
+                            <Text style={styles.menuItemText}>Wi‑Fi uniquement (uploads autorisés en 4G)</Text>
+                        </View>
 
                         <View style={styles.separator} />
 

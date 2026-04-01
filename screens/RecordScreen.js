@@ -122,25 +122,8 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
         // Mettre à jour la streak dynamiquement après un nouvel enregistrement
         getCurrentStreak().then(setStreakCount);
 
-        if (session?.user) {
-            setIsUploading(true);
-            try {
-                const publicUrl = await uploadRecordingToCloud(recordingId, uri, session.user.id);
-                if (publicUrl) {
-                    await saveRecordingToDatabase(session.user.id, title, publicUrl, recDuration, type, deliverDate, tags, newRecording.parentId);
-                    showAlert("Succès", type === 'message' ? "Message envoyé à ton futur toi !" : newRecording.parentId ? "Pensée connectée et synchronisée !" : "Note enregistrée et synchronisée !", "success");
-                } else {
-                    showAlert("Attention", "Sauvegardée localement, mais l'upload a échoué.", "warning");
-                }
-            } catch (error) {
-                console.error("Upload failed", error);
-                showAlert("Erreur", "L'upload a échoué, mais sauvegardée localement.", "error");
-            } finally {
-                setIsUploading(false);
-            }
-        } else {
-            showAlert("Sauvegardé", "Note enregistrée localement.", "success");
-        }
+        // --- LOCAL FIRST : Plus de synchro auto --- 
+        showAlert("Sauvegardé", "Note enregistrée localement. Pense à synchroniser ton cloud plus tard.", "success");
 
         setPendingRecording(null);
     };
