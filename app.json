@@ -44,6 +44,12 @@
     },
     "plugins": [
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow KeepYourSeed to access your microphone."
+        }
+      ],
+      [
         "expo-av",
         {
           "microphonePermission": "Allow KeepYourSeed to access your microphone."

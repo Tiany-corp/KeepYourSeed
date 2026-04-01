@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { Audio } from 'expo-av';
+import React, { createContext, useContext, useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { createAudioPlayer } from 'expo-audio';
 import { getAudioSource } from '../services/storage';
 
 // --- Contexte global du lecteur audio ---
 const AudioPlayerContext = createContext(null);
+// --- Contexte isolé pour la progression (évite les re-rendus massifs de la liste) ---
+const AudioPlayerProgressContext = createContext(0);
 
 /**
- * Hook pour accéder au lecteur audio global depuis n'importe quel composant.
- * Retourne : { currentTrack, isPlaying, position, duration, play, pause, toggle, stop }
+ * Hook pour accéder au contrôleur du lecteur (play, pause, currentTrack, etc).
  */
 export const useAudioPlayer = () => {
     const ctx = useContext(AudioPlayerContext);
@@ -16,155 +17,121 @@ export const useAudioPlayer = () => {
 };
 
 /**
- * Provider global du lecteur audio. À placer au plus haut niveau de l'app (App.js).
- * Gère un seul audio à la fois, persistant entre les changements d'écran.
+ * Hook spécial pour la barre de progression (mis à jour fréquemment).
  */
+export const useAudioProgress = () => {
+    return useContext(AudioPlayerProgressContext);
+};
+
 export function AudioPlayerProvider({ children }) {
-    const [currentTrack, setCurrentTrack] = useState(null); // Le recording en cours
+    // Le lecteur persistant unique (Native)
+    const player = useMemo(() => createAudioPlayer(null), []);
+    
+    // Suivi de l'état "Métier" (quel morceau, est-ce en pause ?)
+    const [currentTrack, setCurrentTrack] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
+
+    // Synchronisation simple de l'état isPlaying depuis l'objet player
     const [isPlaying, setIsPlaying] = useState(false);
-    const [position, setPosition] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [modalVisible, setModalVisible] = useState(false); // Contrôle la modale fullscreen
-    const soundRef = useRef(null);
+    const [position, setPosition] = useState(0);
 
     const openModal = useCallback(() => setModalVisible(true), []);
     const closeModal = useCallback(() => setModalVisible(false), []);
 
-    // Nettoyage quand le provider se démonte
+    // Nettoyage impératif lors de la destruction du provider
     useEffect(() => {
         return () => {
-            if (soundRef.current) {
-                soundRef.current.unloadAsync();
-                soundRef.current = null;
-            }
+            player.release();
         };
-    }, []);
+    }, [player]);
 
-    // --- Décharger le son actuel ---
-    const unloadSound = useCallback(async () => {
-        if (soundRef.current) {
-            try {
-                await soundRef.current.stopAsync();
-                await soundRef.current.unloadAsync();
-            } catch (e) { /* son déjà déchargé */ }
-            soundRef.current = null;
-        }
-        setIsPlaying(false);
-        setPosition(0);
-        setDuration(0);
-    }, []);
+    // Écoute des changements d'état du player natif
+    useEffect(() => {
+        const sub1 = player.addListener('play', () => setIsPlaying(true));
+        const sub2 = player.addListener('pause', () => setIsPlaying(false));
+        const sub3 = player.addListener('playbackStateChange', ({ state }) => {
+            if (state === 'ready') setDuration(player.duration || 0);
+            if (state === 'ended') {
+                setIsPlaying(false);
+                setPosition(0);
+            }
+        });
+
+        // Mise à jour de la position pour le ProgressContext
+        // expo-audio notifie régulièrement la position
+        const sub4 = player.addListener('timeUpdate', ({ currentTime }) => {
+            setPosition(currentTime);
+        });
+
+        return () => {
+            sub1.remove();
+            sub2.remove();
+            sub3.remove();
+            sub4.remove();
+        };
+    }, [player]);
 
     // --- Jouer un enregistrement ---
     const play = useCallback(async (recording) => {
-        // Si c'est le même track et qu'il est chargé, reprendre la lecture
-        if (recording && currentTrack?.id === recording.id && soundRef.current) {
-            const status = await soundRef.current.getStatusAsync();
-            if (status.isLoaded && !status.isPlaying) {
-                await soundRef.current.playAsync();
-                setIsPlaying(true);
-                return;
-            }
-        }
+        if (!recording) return;
 
-        // Sinon, charger un nouveau track
-        await unloadSound();
+        // Si c'est déjà le même morceau, on toggle juste la lecture
+        if (currentTrack?.id === recording.id) {
+            player.play();
+            return;
+        }
 
         const source = await getAudioSource(recording);
-        if (!source) {
-            console.error('Impossible de charger l\'audio:', recording?.title);
-            return false;
-        }
+        if (!source) return;
 
         try {
-            const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
-            soundRef.current = sound;
+            // ZAPPING INSTANTANÉ : on remplace la source et on lance
+            player.replace(source);
             setCurrentTrack(recording);
-            setIsPlaying(true);
-
-            // Écouter les mises à jour de lecture
-            sound.setOnPlaybackStatusUpdate((status) => {
-                if (status.isLoaded) {
-                    setPosition(status.positionMillis || 0);
-                    setDuration(status.durationMillis || 0);
-                }
-                if (status.didJustFinish) {
-                    setIsPlaying(false);
-                    setPosition(0);
-                    soundRef.current?.unloadAsync();
-                    soundRef.current = null;
-                }
-            });
-            return true;
+            player.play();
         } catch (e) {
-            console.error('Erreur de lecture:', e);
-            setIsPlaying(false);
-            return false;
+            console.error('Erreur expo-audio play:', e);
         }
-    }, [currentTrack, unloadSound]);
+    }, [currentTrack, player]);
 
-    // --- Pause ---
-    const pause = useCallback(async () => {
-        if (soundRef.current) {
-            const status = await soundRef.current.getStatusAsync();
-            if (status.isLoaded && status.isPlaying) {
-                await soundRef.current.pauseAsync();
-                setIsPlaying(false);
-            }
-        }
-    }, []);
+    const pause = useCallback(() => {
+        player.pause();
+    }, [player]);
 
-    // --- Toggle play/pause ---
     const toggle = useCallback(async (recording) => {
-        // Si un recording est passé et que c'est un DIFFÉRENT track → jouer le nouveau
+        // Switch vers un nouvel audio
         if (recording && recording.id !== currentTrack?.id) {
             return play(recording);
         }
 
-        // Sinon, toggle le track actuel
-        if (soundRef.current) {
-            const status = await soundRef.current.getStatusAsync();
-            if (status.isLoaded && status.isPlaying) {
-                await pause();
-                return;
+        // Toggle l'audio actuel
+        if (player.playing) {
+            pause();
+        } else {
+            // Si fini, remettre au début
+            if (position >= duration && duration > 0) {
+                player.seekTo(0);
             }
-            if (status.isLoaded && !status.isPlaying) {
-                await soundRef.current.playAsync();
-                setIsPlaying(true);
-                return;
-            }
+            player.play();
         }
+    }, [currentTrack, player, play, pause, position, duration]);
 
-        // Si le son a fini (soundRef null) → relancer le même track ou le recording passé
-        const trackToPlay = recording || currentTrack;
-        if (trackToPlay) {
-            return play(trackToPlay);
-        }
-    }, [currentTrack, play, pause]);
-
-    // --- Stop complet ---
-    const stop = useCallback(async () => {
-        await unloadSound();
+    const stop = useCallback(() => {
+        player.pause();
+        player.replace(null);
         setCurrentTrack(null);
         setModalVisible(false);
-    }, [unloadSound]);
+    }, [player]);
 
-    // --- Seek vers une position (ms) ---
-    const seekTo = useCallback(async (positionMillis) => {
-        if (!soundRef.current) return;
-        const status = await soundRef.current.getStatusAsync();
-        if (!status.isLoaded) return;
-
-        const clamped = Math.max(0, Math.min(positionMillis, status.durationMillis || 0));
-        await soundRef.current.setPositionAsync(clamped);
-        setPosition(clamped);
-    }, []);
+    const seekTo = useCallback((positionMillis) => {
+        player.seekTo(positionMillis);
+    }, [player]);
 
     const value = {
         currentTrack,
         isPlaying,
-        position,
         duration,
-        soundRef,
         modalVisible,
         play,
         pause,
@@ -177,7 +144,9 @@ export function AudioPlayerProvider({ children }) {
 
     return (
         <AudioPlayerContext.Provider value={value}>
-            {children}
+            <AudioPlayerProgressContext.Provider value={position}>
+                {children}
+            </AudioPlayerProgressContext.Provider>
         </AudioPlayerContext.Provider>
     );
 }

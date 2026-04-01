@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback, memo } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal } from 'react-native';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
@@ -11,6 +11,8 @@ import TitleModal from '../components/TitleModal';
 import { AVAILABLE_TAGS } from '../components/TitleModal';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
+import { useNavigation } from '@react-navigation/native';
+import { AppContext } from '../contexts/AppContext';
 
 function getTagInfo(tagId) {
     const found = AVAILABLE_TAGS.find(t => t.id === tagId);
@@ -23,7 +25,108 @@ function getTagInfo(tagId) {
     return null;
 }
 
-export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
+const formatDate = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return `${date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} • ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+};
+
+// Composant pur mémorisé responsable de la performance de la FlatList
+// Il ne sera re-rendu QUE si ses props (isItemPlaying, etc) changent.
+const RecordingItem = memo(({ item, isItemPlaying, audioPlayerIsPlaying, childrenRecords, onTogglePlay, onOptions, sessionUser, activeChildId }) => {
+    const renderTags = (tags) => {
+        if (!tags || tags.length === 0) return null;
+        return (
+            <View style={styles.tagsRow}>
+                {tags.map(tagId => {
+                    const tag = getTagInfo(tagId);
+                    if (!tag) return null;
+                    return (
+                        <View key={tagId} style={styles.tagPill}>
+                            <Text style={styles.tagPillText}>{tag.emoji} {tag.label}</Text>
+                        </View>
+                    );
+                })}
+            </View>
+        );
+    };
+
+    return (
+        <>
+            <View style={styles.itemContainer}>
+                <TouchableOpacity style={styles.item} onPress={() => onTogglePlay(item)}>
+                    <View style={[styles.playButtonIcon, isItemPlaying && styles.playButtonIconActive]}>
+                        {isItemPlaying && audioPlayerIsPlaying ? (
+                            <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
+                        ) : (
+                            <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
+                        )}
+                    </View>
+                    <View style={styles.itemInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                            {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
+                            <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                            
+                            {/* Indicateur de synchro */}
+                            {sessionUser && (
+                                <View style={{ marginLeft: 6 }}>
+                                    {item.status === 'synced' ? (
+                                        <Cloud size={14} color="#10B981" opacity={0.6} /> 
+                                    ) : (
+                                        <CloudOff size={14} color="#78716C" opacity={0.4} />
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                        <View style={styles.metaLineContainer}>
+                            <Text style={styles.itemDate} numberOfLines={1}>{formatDate(item.date)}</Text>
+                            <View style={{ flex: 1 }} />
+                            <Text style={styles.itemDuration}>{formatDuration(item.duration)}</Text>
+                        </View>
+                        {item.tags && item.tags.length > 0 && renderTags(item.tags)}
+                    </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.optionsButton}
+                    onPress={() => onOptions(item)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <MoreVertical size={20} color="#78716C" strokeWidth={2} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Enfants connectés */}
+            {childrenRecords && childrenRecords.length > 0 && (
+                <View style={styles.childrenRow}>
+                    {childrenRecords.map(child => {
+                        const isChildPlaying = child.id === activeChildId;
+                        return (
+                            <TouchableOpacity
+                                key={child.id}
+                                style={[styles.childSquare, isChildPlaying && styles.childSquareActive]}
+                                onPress={() => onTogglePlay(child)}
+                                activeOpacity={0.7}
+                            >
+                                <Logo size={18} color={isChildPlaying ? '#FFFFFF' : '#78350F'} variant="outline" />
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            )}
+        </>
+    );
+});
+
+export default function HistoryScreen() {
+    const { session, setDrawerOpen } = useContext(AppContext);
+    const navigation = useNavigation();
     const [recordings, setRecordings] = useState([]);
     const [dailyMemory, setDailyMemory] = useState(null);
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
@@ -100,23 +203,30 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
     }
 
-    // Grouper les recordings : parents (sans parentId) avec leurs enfants
-    const parentRecordings = recordings.filter(r => !r.parentId);
-    const childrenByParent = {};
-    recordings.filter(r => r.parentId).forEach(child => {
-        if (!childrenByParent[child.parentId]) childrenByParent[child.parentId] = [];
-        childrenByParent[child.parentId].push(child);
-    });
+    // Grouper les recordings avec useMemo pour éviter la recréation des références
+    const { parentRecordings, childrenByParent } = useMemo(() => {
+        const parents = recordings.filter(r => !r.parentId);
+        const childrenMap = {};
+        recordings.filter(r => r.parentId).forEach(child => {
+            if (!childrenMap[child.parentId]) childrenMap[child.parentId] = [];
+            childrenMap[child.parentId].push(child);
+        });
+        return { parentRecordings: parents, childrenByParent: childrenMap };
+    }, [recordings]);
 
     // Extraction des tags uniques
-    const uniqueTagIds = [...new Set(recordings.flatMap(r => r.tags || []))];
-    const availableTags = uniqueTagIds.map(getTagInfo).filter(Boolean);
+    const availableTags = useMemo(() => {
+        const uniqueTagIds = [...new Set(recordings.flatMap(r => r.tags || []))];
+        return uniqueTagIds.map(getTagInfo).filter(Boolean);
+    }, [recordings]);
 
     // Filtrage dynamique
-    const filteredParentRecordings = parentRecordings.filter(r => {
-        if (!selectedFilterTag) return true; // pas de filtre
-        return r.tags?.includes(selectedFilterTag);
-    });
+    const filteredParentRecordings = useMemo(() => {
+        return parentRecordings.filter(r => {
+            if (!selectedFilterTag) return true; // pas de filtre
+            return r.tags?.includes(selectedFilterTag);
+        });
+    }, [parentRecordings, selectedFilterTag]);
 
     const handlePin = async (item) => {
         await setPinnedThought(item);
@@ -237,114 +347,27 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
         }
     };
 
-    const formatDuration = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    };
+    // Callbacks stables pour RecordingItem
+    const handleTogglePlay = useCallback((item) => {
+        audioPlayer.toggle(item);
+    }, [audioPlayer]);
 
-    const formatDate = (isoString) => {
-        const date = new Date(isoString);
-        const dayOptions = { day: 'numeric', month: 'long', year: 'numeric' };
-        const timeOptions = { hour: '2-digit', minute: '2-digit' };
+    const handleOptions = useCallback((item) => {
+        setSelectedOptionsItem(item);
+    }, []);
 
-        const dayStr = date.toLocaleDateString('fr-FR', dayOptions);
-        const timeStr = date.toLocaleTimeString('fr-FR', timeOptions);
-
-        return `${dayStr} • ${timeStr}`;
-    }
-
-    const renderTags = (tags) => {
-        if (!tags || tags.length === 0) return null;
-        return (
-            <View style={styles.tagsRow}>
-                {tags.map(tagId => {
-                    const tag = getTagInfo(tagId);
-                    if (!tag) return null;
-                    return (
-                        <View key={tagId} style={styles.tagPill}>
-                            <Text style={styles.tagPillText}>{tag.emoji} {tag.label}</Text>
-                        </View>
-                    );
-                })}
-            </View>
-        );
-    };
-
-    // Formater la deuxième ligne : Date • Durée
-    const renderMetaLine = (item) => {
-        return (
-            <View style={styles.metaLineContainer}>
-                <Text style={styles.itemDate} numberOfLines={1}>{formatDate(item.date)}</Text>
-                <View style={{ flex: 1 }} />
-                <Text style={styles.itemDuration}>{formatDuration(item.duration)}</Text>
-            </View>
-        );
-    };
-
-    // Vérifie si CE recording est en train de jouer dans le player global
-    const isItemPlaying = (item) => audioPlayer.currentTrack?.id === item.id;
-
-    const renderItem = ({ item }) => (
-        <>
-            <View style={styles.itemContainer}>
-                <TouchableOpacity style={styles.item} onPress={() => audioPlayer.toggle(item)}>
-                    <View style={[styles.playButtonIcon, isItemPlaying(item) && styles.playButtonIconActive]}>
-                        {isItemPlaying(item) && audioPlayer.isPlaying ? (
-                            <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
-                        ) : (
-                            <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
-                        )}
-                    </View>
-                    <View style={styles.itemInfo}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                            {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
-                            <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
-                            
-                            {/* Indicateur de synchro : seulement si connecté */}
-                            {session?.user && (
-                                <View style={{ marginLeft: 6 }}>
-                                    {item.status === 'synced' ? (
-                                        <Cloud size={14} color="#10B981" opacity={0.6} /> 
-                                    ) : (
-                                        <CloudOff size={14} color="#78716C" opacity={0.4} />
-                                    )}
-                                </View>
-                            )}
-                        </View>
-                        {renderMetaLine(item)}
-                        {/* Ligne 3 : Tags isolés en bas */}
-                        {item.tags && item.tags.length > 0 && renderTags(item.tags)}
-                    </View>
-                </TouchableOpacity>
-
-                {/* Menu Options (Kebab Menu) */}
-                <TouchableOpacity
-                    style={styles.optionsButton}
-                    onPress={() => setSelectedOptionsItem(item)}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                    <MoreVertical size={20} color="#78716C" strokeWidth={2} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Enfants connectés */}
-            {childrenByParent[item.id] && childrenByParent[item.id].length > 0 && (
-                <View style={styles.childrenRow}>
-                    {childrenByParent[item.id].map(child => (
-                        <TouchableOpacity
-                            key={child.id}
-                            style={[styles.childSquare, isItemPlaying(child) && styles.childSquareActive]}
-                            onPress={() => audioPlayer.toggle(child)}
-                            activeOpacity={0.7}
-                        >
-                            <Logo size={18} color={isItemPlaying(child) ? '#FFFFFF' : '#78350F'} variant="outline" />
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            )}
-        </>
-    );
+    const renderItem = useCallback(({ item }) => (
+        <RecordingItem 
+            item={item} 
+            isItemPlaying={audioPlayer.currentTrack?.id === item.id} 
+            audioPlayerIsPlaying={audioPlayer.isPlaying}
+            childrenRecords={childrenByParent[item.id]} 
+            onTogglePlay={handleTogglePlay} 
+            onOptions={handleOptions} 
+            sessionUser={session?.user}
+            activeChildId={audioPlayer.currentTrack?.id}
+        />
+    ), [audioPlayer.currentTrack?.id, audioPlayer.isPlaying, childrenByParent, handleTogglePlay, handleOptions, session?.user]);
 
     const renderListHeader = () => {
         const hasFilters = availableTags.length > 0;
@@ -362,8 +385,8 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                                 <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
                                 <Text style={styles.itemDate}>{formatDate(dailyMemory.date)}</Text>
                             </View>
-                            <View style={[styles.playButtonIcon, isItemPlaying(dailyMemory) && styles.playButtonIconActive]}>
-                                {isItemPlaying(dailyMemory) && audioPlayer.isPlaying ? (
+                            <View style={[styles.playButtonIcon, (audioPlayer.currentTrack?.id === dailyMemory.id) && styles.playButtonIconActive]}>
+                                {(audioPlayer.currentTrack?.id === dailyMemory.id) && audioPlayer.isPlaying ? (
                                     <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
                                 ) : (
                                     <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
@@ -386,11 +409,11 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
     return (
         <SafeAreaView style={styles.container}>
             <AppHeader
-                onOpenSettings={onOpenSettings}
+                onOpenSettings={() => setDrawerOpen(true)}
                 title="Historique"
                 showLogo={false}
                 rightContent={
-                    <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                         <ArrowLeft size={16} color="#78350F" strokeWidth={2} style={{ marginRight: 4 }} />
                         <Text style={styles.backButtonText}>Retour</Text>
                     </TouchableOpacity>
@@ -404,6 +427,10 @@ export default function HistoryScreen({ onGoBack, session, onOpenSettings }) {
                 keyExtractor={item => item.id}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={<Text style={styles.emptyText}>Aucun enregistrement.</Text>}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={Platform.OS === 'android'}
             />
 
             {/* Modale d'options (...) */}

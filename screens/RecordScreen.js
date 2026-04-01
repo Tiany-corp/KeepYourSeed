@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { AppContext } from '../contexts/AppContext';
 import useAudioRecorder from '../hooks/useAudioRecorder';
 import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getCurrentStreak, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
@@ -14,7 +16,10 @@ import TitleModal from '../components/TitleModal';
 import Footer from '../components/Footer';
 import PinnedThought from '../components/PinnedThought';
 
-export default function RecordScreen({ session, onGoToHistory, onOpenSettings }) {
+export default function RecordScreen() {
+    const { session, setDrawerOpen } = useContext(AppContext);
+    const navigation = useNavigation();
+    
     const { isRecording, duration, startRecording, stopRecording, formatDuration } = useAudioRecorder();
     const [dailyMemory, setDailyMemory] = useState(null);
     const [isMemoryLoading, setIsMemoryLoading] = useState(true);
@@ -138,7 +143,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
             await setSeenDailyMemoryId(session?.user?.id, dailyMemory.id);
             setHasUnseenMemory(false);
         }
-        onGoToHistory();
+        navigation.navigate('History');
     };
 
     // Format de la date (ex: "5 mars", sans l'année pour alléger)
@@ -171,7 +176,7 @@ export default function RecordScreen({ session, onGoToHistory, onOpenSettings })
                 title={CustomHeaderTitle}
                 showLogo={false}
                 rightContent={HistoryButton}
-                onOpenSettings={onOpenSettings}
+                onOpenSettings={() => setDrawerOpen(true)}
             />
 
             <View style={styles.mainContent}>

@@ -1,75 +1,90 @@
-import { useState, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAudioRecorder as useExpoAudioRecorder, AudioModule } from 'expo-audio';
 import { Platform } from 'react-native';
 import { saveAudioBlobWeb } from '../services/storage';
 
+/**
+ * Hook d'enregistrement audio utilisant la nouvelle librairie expo-audio (SDK 54+).
+ * Garantit une latence minimale et une architecture découplée.
+ */
 export default function useAudioRecorder() {
+    // Le recorder interne de expo-audio
+    const recorder = useExpoAudioRecorder();
+    
+    // État local pour le pont de compatibilité avec l'ancienne UI
     const [isRecording, setIsRecording] = useState(false);
     const [duration, setDuration] = useState(0);
-    const recordingRef = useRef(null);
-    const intervalRef = useRef(null);
+    const timerRef = useRef(null);
 
-    const startRecording = async () => {
+    // Synchronisation de la durée (chaque seconde pour l'affichage)
+    useEffect(() => {
+        if (isRecording) {
+            timerRef.current = setInterval(() => {
+                setDuration(prev => prev + 1);
+            }, 1000);
+        } else {
+            if (timerRef.current) clearInterval(timerRef.current);
+        }
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [isRecording]);
+
+    const startRecording = useCallback(async () => {
         try {
-            const { granted } = await Audio.requestPermissionsAsync();
-            if (!granted) {
+            const hasPermission = await AudioModule.requestRecordingPermissionsAsync();
+            if (!hasPermission.granted) {
                 alert("Permission d'accès au microphone refusée.");
                 return;
             }
 
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-            });
-
-            const { recording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.HIGH_QUALITY
-            );
-
-            recordingRef.current = recording;
+            // Préparation et lancement via expo-audio
+            await recorder.prepareToRecordAsync();
+            await recorder.recordAsync();
+            
             setIsRecording(true);
             setDuration(0);
-
-            intervalRef.current = setInterval(() => {
-                setDuration(prev => prev + 1);
-            }, 1000);
         } catch (error) {
-            console.error('Erreur lors du démarrage de l\'enregistrement', error);
+            console.error('Erreur expo-audio start:', error);
         }
-    };
+    }, [recorder]);
 
-    const stopRecording = async () => {
+    const stopRecording = useCallback(async () => {
         try {
-            clearInterval(intervalRef.current);
+            // OPTIMISME : On arrête l'UI immédiatement pour supprimer la sensation de latence
             setIsRecording(false);
+            const recordedDuration = duration; // On capture la durée finale
 
-            if (!recordingRef.current) return null;
+            // Arrêt matériel (peut prendre 100-200ms sur native)
+            await recorder.stopAsync();
+            const uri = recorder.uri; // URI du fichier temporaire
 
-            await recordingRef.current.stopAndUnloadAsync();
-            const blobUri = recordingRef.current.getURI(); // URI temporaire (blob:// sur web, file:// sur mobile)
-            recordingRef.current = null;
+            if (!uri) return null;
 
-            // Sur le Web : on sauvegarde le vrai Blob binaire dans IndexedDB pour la persistance
+            // Gestion spécifique au Web (Sauvegarde IndexedDB persistante)
             if (Platform.OS === 'web') {
-                try {
-                    const response = await fetch(blobUri);
-                    const blob = await response.blob();
-                    const audioId = `audio_${Date.now()}`; // Identifiant unique pour ce Blob
-                    await saveAudioBlobWeb(audioId, blob);
-                    // On retourne une URI personnalisée qui fait référence à l'ID dans IndexedDB
-                    return `indexeddb://${audioId}`;
-                } catch (e) {
-                    console.error('Impossible de sauvegarder le blob audio dans IndexedDB:', e);
-                    return blobUri; // Fallback : retourner l'URI temporaire
-                }
+                // On lance la sauvegarde en background sans "await" pour ne pas bloquer l'UI
+                const audioId = `audio_${Date.now()}`;
+                const saveToIndexedDB = async (blobUri, id) => {
+                    try {
+                        const response = await fetch(blobUri);
+                        const blob = await response.blob();
+                        await saveAudioBlobWeb(id, blob);
+                    } catch (e) {
+                        console.error('Échec sauvegarde background Web:', e);
+                    }
+                };
+                saveToIndexedDB(uri, audioId);
+                return `indexeddb://${audioId}`;
             }
 
-            return blobUri; // Sur mobile : l'URI file:// locale est déjà suffisante
+            return uri;
         } catch (error) {
-            console.error('Erreur lors de l\'arrêt de l\'enregistrement', error);
+            console.error('Erreur expo-audio stop:', error);
+            setIsRecording(false);
             return null;
         }
-    };
+    }, [recorder, duration]);
 
     const formatDuration = (seconds) => {
         const mins = Math.floor(seconds / 60);

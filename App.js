@@ -1,7 +1,8 @@
-
-import React, { Component, useState, useEffect } from 'react';
+import React, { Component, useState, useEffect, createContext, useContext } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, Text, Platform } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { supabase } from './services/supabase';
 import { AudioPlayerProvider } from './contexts/AudioPlayerContext';
 import { AlertProvider } from './contexts/AlertContext';
@@ -10,6 +11,9 @@ import HistoryScreen from './screens/HistoryScreen';
 import AuthScreen from './screens/AuthScreen';
 import SettingsDrawer from './components/SettingsDrawer';
 import AudioPlayer from './components/AudioPlayer';
+import { AppContext } from './contexts/AppContext';
+
+const Stack = createNativeStackNavigator();
 
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends Component {
@@ -42,7 +46,6 @@ class ErrorBoundary extends Component {
 
 function AppContent() {
   const [session, setSession] = useState(null);
-  const [currentScreen, setCurrentScreen] = useState('record');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -64,30 +67,31 @@ function AppContent() {
     };
   }, []);
 
-  // Quand l'utilisateur se connecte, retourner automatiquement sur record
-  useEffect(() => {
-    if (session && currentScreen === 'auth') {
-      setCurrentScreen('record');
-    }
-  }, [session]);
-
   return (
-    <View style={styles.container}>
-      <View style={{ flex: 1 }}>
-        {currentScreen === 'auth' ? (
-          <AuthScreen onGoBack={() => setCurrentScreen('record')} />
-        ) : currentScreen === 'record' ? (
-          <RecordScreen session={session} onGoToHistory={() => setCurrentScreen('history')} onOpenSettings={() => setDrawerOpen(true)} />
-        ) : (
-          <HistoryScreen key={refreshKey} onGoBack={() => setCurrentScreen('record')} session={session} onOpenSettings={() => setDrawerOpen(true)} />
-        )}
-      </View>
+    <AppContext.Provider value={{ session, setDrawerOpen, setRefreshKey }}>
+      <NavigationContainer>
+        <Stack.Navigator 
+          initialRouteName={session ? "Record" : "Auth"}
+          screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+        >
+          {session ? (
+            <>
+              <Stack.Screen name="Record" component={RecordScreen} />
+              <Stack.Screen name="History">
+                {(props) => <HistoryScreen {...props} key={refreshKey} />}
+              </Stack.Screen>
+            </>
+          ) : (
+            <Stack.Screen name="Auth" component={AuthScreen} />
+          )}
+        </Stack.Navigator>
 
-      {/* Mini player bar global — persiste entre les écrans */}
-      <AudioPlayer />
-      <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} onGoToAuth={() => setCurrentScreen('auth')} />
-      <StatusBar style="auto" />
-    </View>
+        {/* Mini player bar global — persiste entre les écrans */}
+        <AudioPlayer />
+        <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} />
+        <StatusBar style="auto" />
+      </NavigationContainer>
+    </AppContext.Provider>
   );
 }
 
@@ -96,7 +100,9 @@ export default function App() {
     <ErrorBoundary>
       <AlertProvider>
         <AudioPlayerProvider>
-          <AppContent />
+          <View style={styles.container}>
+            <AppContent />
+          </View>
         </AudioPlayerProvider>
       </AlertProvider>
     </ErrorBoundary>

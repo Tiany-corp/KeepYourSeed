@@ -9,7 +9,7 @@ import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
 
-export default function SettingsDrawer({ visible, onClose, session, onDataCleared, onGoToAuth }) {
+export default function SettingsDrawer({ visible, onClose, session, onDataCleared }) {
     const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
     const overlayOpacity = useRef(new Animated.Value(0)).current;
     const [isRendered, setIsRendered] = useState(false);

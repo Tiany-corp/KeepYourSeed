@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { Play, Pause, X } from 'lucide-react-native';
 import { getRelativeDate, formatTime } from '../utils/date';
-import { useAudioPlayer } from '../contexts/AudioPlayerContext';
+import { useAudioPlayer, useAudioProgress } from '../contexts/AudioPlayerContext';
 
 /**
  * Lecteur audio global (mini bar + modale).
@@ -10,7 +10,8 @@ import { useAudioPlayer } from '../contexts/AudioPlayerContext';
  * À placer dans App.js au-dessus de tous les écrans.
  */
 export default function AudioPlayer() {
-    const { currentTrack, isPlaying, position, duration, toggle, stop, seekTo, modalVisible, openModal, closeModal } = useAudioPlayer();
+    const { currentTrack, isPlaying, duration, toggle, stop, seekTo, modalVisible, openModal, closeModal } = useAudioPlayer();
+    const position = useAudioProgress();
     const [miniProgressWidth, setMiniProgressWidth] = useState(0);
     const [modalProgressWidth, setModalProgressWidth] = useState(0);
 
