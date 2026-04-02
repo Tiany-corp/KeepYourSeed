@@ -106,3 +106,31 @@ Un *custom hook* (`useMemoryPlayer` par exemple) retourne généralement un **no
 **Retenir pour la suite :**
 - **Préférer l'aplatissement (Props Drilling sélectif)** : Même si l'écriture est plus longue `<AudioPlayer isPlaying={player.isPlaying} position={player.position} />`, cette syntaxe est infiniment plus sûre et optimale. React sait comparer des booléens (`isPlaying`) et des entiers (`position`), mais échoue sur les nouveaux objets générés à la volée.
 - **Isoler les dépendances** : Les fonctions internes utiles dans un hook doivent être stabilisées (via `useCallback` intérieur). Et le composant utilisant ce hook, au lieu de dépendre du hook entier, doit dépendre de ses propriétés stables une à une (ex: utiliser `[player.toggle]` plutôt que `[player]`).
+
+---
+
+## Hygiène du Code & Maintien de la Fluidité
+
+**Problème rencontré :**
+L'application a subi une phase de ralentissement critique (lags au clic, scroll saccadé, latence audio) due à une accumulation de re-rendus inutiles et à l'utilisation d'une bibliothèque audio (`expo-av`) dont l'architecture synchrone bloquait le thread principal.
+
+**Solutions et bonnes pratiques appliquées :**
+
+1. **Ne jamais surcharger les Contextes Globaux** : 
+   - **L'erreur** : Tout mettre dans un seul `AppContext`. Chaque changement de valeur (même minime) re-déclenche le rendu de TOUS les composants consommateurs.
+   - **La bonne pratique** : Segmenter les contextes par domaine fonctionnel. Si une valeur change souvent (ex: progression audio), elle doit avoir son propre contexte isolé (`AudioPlayerProgressContext`) pour ne pas impacter le reste de l'interface.
+
+2. **Migration vers les APIs Natives Modernes** : 
+   - Sous SDK 54, `expo-av` est obsolète. Sa gestion des ressources matérielles est bloquante.
+   - **La solution** : Utiliser `expo-audio` pour un "zapping" instantané et un arrêt d'enregistrement asynchrone (optimiste). Toujours privilégier les nouvelles bibliothèques modulaires d'Expo qui séparent le contrôle de l'UI du matériel.
+
+3. **Mémorisation Sélective (React.memo & useMemo)** :
+   - Pour les listes (`FlatList`) avec beaucoup d'items, l'utilisation de `React.memo` sur les composants de lignes (`RecordingItem`) est indispensable dès que l'état global de l'application (comme la lecture audio) change fréquemment. Sans cela, un simple compteur qui défile bloque le scroll du fait de la pression sur le CPU.
+
+4. **Surveillance des Ressources Lourdes** :
+   - Préférer les icônes vectorielles (`lucide-react-native`) aux images bitmap pour l'interface de base.
+   - Pour les futures images (profil, miniatures), toujours prévoir une étape de compression/optimisation avant l'affichage pour éviter de saturer la mémoire vive de l'appareil.
+
+**Retenir pour la suite :**
+La fluidité n'est pas un bonus, c'est une exigence structurelle. Chaque nouvelle fonctionnalité doit être pensée sous l'angle : *"Est-ce que cet état va forcer un re-rendu inutile ailleurs ?"*. Si la réponse est oui, il faut isoler l'état ou mémoriser le composant.
+
