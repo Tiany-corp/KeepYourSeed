@@ -75,9 +75,9 @@ export default function AudioPlayer() {
                             </Pressable>
                         </View>
 
-                        {/* Temps restant */}
+                        {/* Temps écoulé / total */}
                         <Text style={styles.miniPlayerTime}>
-                            {formatTime(duration - position)}
+                            {formatTime(position)} / {formatTime(duration)}
                         </Text>
 
                         {/* Fermer (stoppe l'audio) */}
