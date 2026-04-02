@@ -48,23 +48,21 @@ export function AudioPlayerProvider({ children }) {
 
     // Écoute des changements d'état du player natif
     useEffect(() => {
-        // En SDK 54 expo-audio, les événements d'AudioPlayer sont limités.
-        // On utilise playbackStatusUpdate
         const sub = player.addListener('playbackStatusUpdate', (status) => {
             if (!status) return;
             
-            // Met à jour l'état de lecture vrai/faux
-            setIsPlaying(status.playing);
+            // Éviler le clignotement : ne pas écraser isPlaying par 'false' 
+            // si la piste est en train de charger ou de bufferiser lors d'un zapping
+            if (status.isLoaded === false) {
+                // On préserve l'état optimiste, donc on ne fait rien
+            } else {
+                setIsPlaying(status.playing);
+            }
             
-            // Met à jour la durée (quand elle est disponible)
             if (status.isLoaded && status.duration) {
                 setDuration(status.duration);
             }
-            
-            // Met à jour la position courante
             setPosition(status.currentTime || 0);
-            
-            // Fin de la lecture (didJustFinish)
             if (status.didJustFinish) {
                 setIsPlaying(false);
                 setPosition(0);
@@ -80,26 +78,33 @@ export function AudioPlayerProvider({ children }) {
     const play = useCallback(async (recording) => {
         if (!recording) return;
 
-        // Si c'est déjà le même morceau, on relance la lecture
+        // Optimistic UI : On pré-active l'icône immédiatement
+        setIsPlaying(true);
+        setCurrentTrack(recording);
+
         if (currentTrack?.id === recording.id) {
             player.play();
             return;
         }
 
         const source = await getAudioSource(recording);
-        if (!source) return;
+        if (!source) {
+            setIsPlaying(false);
+            return;
+        }
 
         try {
-            // ZAPPING INSTANTANÉ : on remplace la source et on lance
+            // ZAPPING INSTANTANÉ
             player.replace(source);
-            setCurrentTrack(recording);
             player.play();
         } catch (e) {
+            setIsPlaying(false);
             console.error('Erreur expo-audio play:', e);
         }
     }, [currentTrack, player]);
 
     const pause = useCallback(() => {
+        setIsPlaying(false);
         player.pause();
     }, [player]);
 
