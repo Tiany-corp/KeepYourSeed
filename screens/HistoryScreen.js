@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext, useMemo, useCallback, memo } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal } from 'react-native';
+import Animated, { useSharedValue, withRepeat, withSequence, withTiming, useAnimatedStyle, Easing } from 'react-native-reanimated';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
@@ -124,10 +125,48 @@ const RecordingItem = memo(({ item, isItemPlaying, audioPlayerIsPlaying, childre
     );
 });
 
+// Squelette de chargement avec animation fluide (Pulse)
+const HistorySkeleton = () => {
+    const opacity = useSharedValue(0.3);
+
+    useEffect(() => {
+        opacity.value = withRepeat(
+            withSequence(
+                withTiming(0.7, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+                withTiming(0.3, { duration: 800, easing: Easing.inOut(Easing.ease) })
+            ),
+            -1,
+            true
+        );
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
+
+    return (
+        <View style={styles.itemContainer}>
+            <Animated.View style={[styles.item, styles.skeletonItem, animatedStyle]}>
+                <View style={styles.skeletonPlayIcon} />
+                <View style={[styles.itemInfo, { gap: 8 }]}>
+                    <View style={styles.skeletonTitle} />
+                    <View style={styles.skeletonDate} />
+                    <View style={styles.tagsRow}>
+                        <View style={styles.skeletonTag} />
+                        <View style={styles.skeletonTag} />
+                    </View>
+                </View>
+            </Animated.View>
+            <View style={{ width: 40 }} />
+        </View>
+    );
+};
+
 export default function HistoryScreen() {
     const { session, setDrawerOpen } = useContext(AppContext);
     const navigation = useNavigation();
     const [recordings, setRecordings] = useState([]);
+    const [isLoading, setIsLoading] = useState(true); // État de chargement initial
     const [dailyMemory, setDailyMemory] = useState(null);
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
     const [editingRecording, setEditingRecording] = useState(null);
@@ -142,6 +181,12 @@ export default function HistoryScreen() {
             // 1. Charger le local immédiatement pour la réactivité
             const localData = await getRecordings();
             setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+            
+            // Simuler un léger délai pour que l'animation du squelette soit visible 
+            // (retirer le setTimeout en prod si la DB est instantanée)
+            setTimeout(() => {
+                setIsLoading(false);
+            }, 400);
 
             // 2. Lancer la synchronisation initiale
             if (session?.user) {
@@ -420,18 +465,27 @@ export default function HistoryScreen() {
                 }
             />
 
-            <FlatList
-                data={filteredParentRecordings}
-                ListHeaderComponent={renderListHeader}
-                renderItem={renderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={<Text style={styles.emptyText}>Aucun enregistrement.</Text>}
-                initialNumToRender={10}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                removeClippedSubviews={Platform.OS === 'android'}
-            />
+            {isLoading ? (
+                <View style={styles.listContent}>
+                    {renderListHeader()}
+                    {[...Array(6)].map((_, index) => (
+                        <HistorySkeleton key={index} />
+                    ))}
+                </View>
+            ) : (
+                <FlatList
+                    data={filteredParentRecordings}
+                    ListHeaderComponent={renderListHeader}
+                    renderItem={renderItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    ListEmptyComponent={<Text style={styles.emptyText}>Aucun enregistrement.</Text>}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                />
+            )}
 
             {/* Modale d'options (...) */}
             <Modal
@@ -658,6 +712,36 @@ const styles = StyleSheet.create({
     itemInfo: {
         flex: 1,
         justifyContent: 'center',
+    },
+    // Styles pour les Skeletons
+    skeletonItem: {
+        borderColor: '#E8E0D4',
+        shadowOpacity: 0,
+    },
+    skeletonPlayIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#E8E0D4',
+        marginRight: 12,
+    },
+    skeletonTitle: {
+        height: 16,
+        width: '60%',
+        backgroundColor: '#E8E0D4',
+        borderRadius: 8,
+    },
+    skeletonDate: {
+        height: 12,
+        width: '40%',
+        backgroundColor: '#E8E0D4',
+        borderRadius: 6,
+    },
+    skeletonTag: {
+        height: 18,
+        width: 50,
+        backgroundColor: '#E8E0D4',
+        borderRadius: 9,
     },
     itemTitle: {
         fontSize: 16,

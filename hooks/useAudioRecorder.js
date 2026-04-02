@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useAudioRecorder as useExpoAudioRecorder, AudioModule } from 'expo-audio';
+import { useAudioRecorder as useExpoAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
 import { Platform } from 'react-native';
 import { saveAudioBlobWeb } from '../services/storage';
 
@@ -8,8 +8,8 @@ import { saveAudioBlobWeb } from '../services/storage';
  * Garantit une latence minimale et une architecture découplée.
  */
 export default function useAudioRecorder() {
-    // Le recorder interne de expo-audio
-    const recorder = useExpoAudioRecorder();
+    // Le recorder interne de expo-audio (on passe une preset pour éviter le crash "undefined extension" sur Web)
+    const recorder = useExpoAudioRecorder(RecordingPresets.HIGH_QUALITY);
     
     // État local pour le pont de compatibilité avec l'ancienne UI
     const [isRecording, setIsRecording] = useState(false);
