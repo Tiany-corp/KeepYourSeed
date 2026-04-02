@@ -35,6 +35,9 @@ export function AudioPlayerProvider({ children }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [position, setPosition] = useState(0);
+    
+    // Ref pour contrer la latence du bridge (Optimistic UI ultra robuste)
+    const intentionalPlay = useRef(false);
 
     const openModal = useCallback(() => setModalVisible(true), []);
     const closeModal = useCallback(() => setModalVisible(false), []);
@@ -51,10 +54,10 @@ export function AudioPlayerProvider({ children }) {
         const sub = player.addListener('playbackStatusUpdate', (status) => {
             if (!status) return;
             
-            // Éviler le clignotement : ne pas écraser isPlaying par 'false' 
-            // si la piste est en train de charger ou de bufferiser lors d'un zapping
-            if (status.isLoaded === false) {
-                // On préserve l'état optimiste, donc on ne fait rien
+            // Si on a l'intention de jouer, on force l'icône sur Pause (isPlaying = true)
+            // pour masquer les événements "playing: false" que le natif émet quand il vide son buffer
+            if (intentionalPlay.current) {
+                setIsPlaying(true);
             } else {
                 setIsPlaying(status.playing);
             }
@@ -63,7 +66,9 @@ export function AudioPlayerProvider({ children }) {
                 setDuration(status.duration);
             }
             setPosition(status.currentTime || 0);
+            
             if (status.didJustFinish) {
+                intentionalPlay.current = false;
                 setIsPlaying(false);
                 setPosition(0);
             }
@@ -78,7 +83,8 @@ export function AudioPlayerProvider({ children }) {
     const play = useCallback(async (recording) => {
         if (!recording) return;
 
-        // Optimistic UI : On pré-active l'icône immédiatement
+        // Optimistic UI : On fixe l'intention
+        intentionalPlay.current = true;
         setIsPlaying(true);
         setCurrentTrack(recording);
 
@@ -89,6 +95,7 @@ export function AudioPlayerProvider({ children }) {
 
         const source = await getAudioSource(recording);
         if (!source) {
+            intentionalPlay.current = false;
             setIsPlaying(false);
             return;
         }
@@ -98,12 +105,14 @@ export function AudioPlayerProvider({ children }) {
             player.replace(source);
             player.play();
         } catch (e) {
+            intentionalPlay.current = false;
             setIsPlaying(false);
             console.error('Erreur expo-audio play:', e);
         }
     }, [currentTrack, player]);
 
     const pause = useCallback(() => {
+        intentionalPlay.current = false;
         setIsPlaying(false);
         player.pause();
     }, [player]);
