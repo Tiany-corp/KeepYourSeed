@@ -48,27 +48,31 @@ export function AudioPlayerProvider({ children }) {
 
     // Écoute des changements d'état du player natif
     useEffect(() => {
-        const sub1 = player.addListener('play', () => setIsPlaying(true));
-        const sub2 = player.addListener('pause', () => setIsPlaying(false));
-        const sub3 = player.addListener('playbackStateChange', ({ state }) => {
-            if (state === 'ready') setDuration(player.duration || 0);
-            if (state === 'ended') {
+        // En SDK 54 expo-audio, les événements d'AudioPlayer sont limités.
+        // On utilise playbackStatusUpdate
+        const sub = player.addListener('playbackStatusUpdate', (status) => {
+            if (!status) return;
+            
+            // Met à jour l'état de lecture vrai/faux
+            setIsPlaying(status.playing);
+            
+            // Met à jour la durée (quand elle est disponible)
+            if (status.isLoaded && status.duration) {
+                setDuration(status.duration);
+            }
+            
+            // Met à jour la position courante
+            setPosition(status.currentTime || 0);
+            
+            // Fin de la lecture (didJustFinish)
+            if (status.didJustFinish) {
                 setIsPlaying(false);
                 setPosition(0);
             }
         });
 
-        // Mise à jour de la position pour le ProgressContext
-        // expo-audio notifie régulièrement la position
-        const sub4 = player.addListener('timeUpdate', ({ currentTime }) => {
-            setPosition(currentTime);
-        });
-
         return () => {
-            sub1.remove();
-            sub2.remove();
-            sub3.remove();
-            sub4.remove();
+            sub.remove();
         };
     }, [player]);
 
@@ -76,7 +80,7 @@ export function AudioPlayerProvider({ children }) {
     const play = useCallback(async (recording) => {
         if (!recording) return;
 
-        // Si c'est déjà le même morceau, on toggle juste la lecture
+        // Si c'est déjà le même morceau, on relance la lecture
         if (currentTrack?.id === recording.id) {
             player.play();
             return;
