@@ -114,11 +114,11 @@ const styles = StyleSheet.create({
     item: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        padding: 16,
+        backgroundColor: '#F5F0E8',
+        padding: 12,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#F5F0E8',
+        borderColor: '#D4A574',
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     tagPill: {
         paddingHorizontal: 8,
         paddingVertical: 2,
-        backgroundColor: '#F5F0E8',
+        backgroundColor: '#FAF7F2',
         borderRadius: 10,
         borderWidth: 0.5,
         borderColor: '#D4A574',
@@ -189,14 +189,15 @@ const styles = StyleSheet.create({
     },
     childrenRow: {
         flexDirection: 'row',
-        paddingLeft: 70, // Align with the start of item title
+        paddingLeft: 64, // Justifié avec le nouveau padding de 12
         paddingBottom: 8,
         gap: 8,
+        marginTop: -4,
     },
     childSquare: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
+        width: 38,
+        height: 38,
+        borderRadius: 10,
         backgroundColor: '#F5F0E8',
         alignItems: 'center',
         justifyContent: 'center',

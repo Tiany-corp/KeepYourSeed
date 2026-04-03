@@ -52,11 +52,11 @@ const styles = StyleSheet.create({
     item: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        padding: 16,
+        backgroundColor: '#F5F0E8',
+        padding: 12,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#F5F0E8',
+        borderColor: '#D4A574',
         flex: 1,
     },
     itemInfo: {
