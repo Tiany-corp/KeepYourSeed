@@ -62,10 +62,11 @@ export function AudioPlayerProvider({ children }) {
                 setIsPlaying(status.playing);
             }
             
+            // Met à jour la durée (quand elle est disponible) : expo-audio renvoie des SECONDES, on repasse en MS
             if (status.isLoaded && status.duration) {
-                setDuration(status.duration);
+                setDuration(Math.floor(status.duration * 1000));
             }
-            setPosition(status.currentTime || 0);
+            setPosition(Math.floor((status.currentTime || 0) * 1000));
             
             if (status.didJustFinish) {
                 intentionalPlay.current = false;
@@ -143,7 +144,8 @@ export function AudioPlayerProvider({ children }) {
     }, [player]);
 
     const seekTo = useCallback((positionMillis) => {
-        player.seekTo(positionMillis);
+        // expo-audio s'attend à recevoir des secondes
+        player.seekTo(positionMillis / 1000);
     }, [player]);
 
     const value = {
