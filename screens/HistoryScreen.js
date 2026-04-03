@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
-import { ArrowLeft, Pencil, MoreVertical, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
 import TitleModal from '../components/TitleModal';
