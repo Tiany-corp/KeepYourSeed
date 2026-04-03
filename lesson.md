@@ -138,7 +138,7 @@ La fluidité n'est pas un bonus, c'est une exigence structurelle. Chaque nouvell
 
 ## 🔜 Prochaines Optimisations Prévues (À faire plus tard)
 
-1. **Fluidité de la Barre de Progression (Interpolation)** :
-   - **Enjeu** : Actuellement, l'affichage de la barre d'écoute fait des "sauts" de 500ms (mis à jour par le Bridge JS). 
-   - **Solution** : Utiliser `react-native-reanimated` sur l'**UI Thread** pour lisser la progression. On anime la valeur visuelle entre deux points de synchronisation native pour obtenir un défilement à 60 FPS sans impact sur la batterie.
+1. **Fluidité de la Barre de Progression (Interpolation) [FAIT]** :
+   - **Enjeu** : L'affichage natif fait des "sauts" ( Bridge JS). 
+   - **Solution** : Implémenté via `react-native-reanimated`. La SharedValue `animatedPosition` est synchronisée avec `withTiming` pour un défilement fluide à 60 FPS, offrant une expérience premium.
 

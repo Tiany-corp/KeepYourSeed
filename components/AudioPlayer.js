@@ -1,19 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { Play, Pause, X } from 'lucide-react-native';
+import Animated, { 
+    useSharedValue, 
+    useAnimatedStyle, 
+    withTiming, 
+    Easing 
+} from 'react-native-reanimated';
 import { getRelativeDate, formatTime } from '../utils/date';
 import { useAudioPlayer, useAudioProgress } from '../contexts/AudioPlayerContext';
 
-/**
- * Lecteur audio global (mini bar + modale).
- * Lit son état depuis AudioPlayerContext → persiste entre les écrans.
- * À placer dans App.js au-dessus de tous les écrans.
- */
 export default function AudioPlayer() {
     const { currentTrack, isPlaying, duration, toggle, stop, seekTo, modalVisible, openModal, closeModal } = useAudioPlayer();
     const position = useAudioProgress();
     const [miniProgressWidth, setMiniProgressWidth] = useState(0);
     const [modalProgressWidth, setModalProgressWidth] = useState(0);
+
+    // Progression fluide via Reanimated
+    const animatedPosition = useSharedValue(0);
+
+    useEffect(() => {
+        if (!isPlaying || position === 0) {
+            animatedPosition.value = position;
+            return;
+        }
+
+        const diff = Math.abs(position - animatedPosition.value);
+        if (diff > 1000) {
+            // Saut important (Seek ou changement de piste)
+            animatedPosition.value = position;
+        } else {
+            // Interpolation linéaire pour fluidifier le mouvement entre deux status updates
+            animatedPosition.value = withTiming(position, { 
+                duration: 600, // Légèrement supérieur à l'intervalle de mise à jour pour la fluidité
+                easing: Easing.linear 
+            });
+        }
+    }, [position, isPlaying]);
+
+    const animatedProgressStyle = useAnimatedStyle(() => {
+        const pct = duration > 0 ? (animatedPosition.value / duration) * 100 : 0;
+        return {
+            width: `${Math.min(100, Math.max(0, pct))}%`,
+        };
+    });
 
     // Pas de track → rien à afficher
     if (!currentTrack) return null;
@@ -62,14 +92,10 @@ export default function AudioPlayer() {
                                 onLayout={(e) => setMiniProgressWidth(e.nativeEvent.layout.width)}
                                 onPress={(e) => handleSeek(e.nativeEvent.locationX, miniProgressWidth)}
                             >
-                                <View
+                                <Animated.View
                                     style={[
                                         styles.miniProgressBarFill,
-                                        {
-                                            width: duration > 0
-                                                ? `${(position / duration) * 100}%`
-                                                : '0%',
-                                        }
+                                        animatedProgressStyle
                                     ]}
                                 />
                             </Pressable>
@@ -145,14 +171,10 @@ export default function AudioPlayer() {
                                 onLayout={(e) => setModalProgressWidth(e.nativeEvent.layout.width)}
                                 onPress={(e) => handleSeek(e.nativeEvent.locationX, modalProgressWidth)}
                             >
-                                <View
+                                <Animated.View
                                     style={[
                                         styles.modalProgressBarFill,
-                                        {
-                                            width: duration > 0
-                                                ? `${(position / duration) * 100}%`
-                                                : '0%',
-                                        }
+                                        animatedProgressStyle
                                     ]}
                                 />
                             </Pressable>
