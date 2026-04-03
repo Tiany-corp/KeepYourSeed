@@ -38,11 +38,7 @@ export default function HistoryScreen() {
             const localData = await getRecordings();
             setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
             
-            // Simuler un léger délai pour que l'animation du squelette soit visible 
-            // (retirer le setTimeout en prod si la DB est instantanée)
-            setTimeout(() => {
-                setIsLoading(false);
-            }, 400);
+            setIsLoading(false);
 
             // 2. Lancer la synchronisation initiale
             if (session?.user) {

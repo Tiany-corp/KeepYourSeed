@@ -108,7 +108,6 @@ const styles = StyleSheet.create({
     itemContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
         marginVertical: 4,
     },
     item: {
@@ -189,7 +188,7 @@ const styles = StyleSheet.create({
     },
     childrenRow: {
         flexDirection: 'row',
-        paddingLeft: 64, // Justifié avec le nouveau padding de 12
+        paddingLeft: 52, // Align with the start of item title (matches original)
         paddingBottom: 8,
         gap: 8,
         marginTop: -4,
