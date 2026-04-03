@@ -79,3 +79,22 @@ export function formatTime(ms) {
     const sec = totalSec % 60;
     return `${min}:${sec.toString().padStart(2, '0')}`;
 }
+
+/**
+ * Formate des secondes en "M:SS".
+ */
+export function formatSecondsDuration(seconds) {
+    if (!seconds) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+/**
+ * Formate une date ISO en "J MMMM YYYY • HH:mm".
+ */
+export function formatDateWithTime(isoString) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return `${date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} • ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+}

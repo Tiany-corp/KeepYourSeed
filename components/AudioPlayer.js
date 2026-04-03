@@ -77,7 +77,7 @@ export default function AudioPlayer() {
 
                         {/* Temps écoulé / total */}
                         <Text style={styles.miniPlayerTime}>
-                            {formatTime(position)} / {formatTime(duration)}
+                            {formatTime(duration)}
                         </Text>
 
                         {/* Fermer (stoppe l'audio) */}

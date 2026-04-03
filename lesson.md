@@ -134,3 +134,11 @@ L'application a subi une phase de ralentissement critique (lags au clic, scroll 
 **Retenir pour la suite :**
 La fluidité n'est pas un bonus, c'est une exigence structurelle. Chaque nouvelle fonctionnalité doit être pensée sous l'angle : *"Est-ce que cet état va forcer un re-rendu inutile ailleurs ?"*. Si la réponse est oui, il faut isoler l'état ou mémoriser le composant.
 
+---
+
+## 🔜 Prochaines Optimisations Prévues (À faire plus tard)
+
+1. **Fluidité de la Barre de Progression (Interpolation)** :
+   - **Enjeu** : Actuellement, l'affichage de la barre d'écoute fait des "sauts" de 500ms (mis à jour par le Bridge JS). 
+   - **Solution** : Utiliser `react-native-reanimated` sur l'**UI Thread** pour lisser la progression. On anime la valeur visuelle entre deux points de synchronisation native pour obtenir un défilement à 60 FPS sans impact sur la batterie.
+
