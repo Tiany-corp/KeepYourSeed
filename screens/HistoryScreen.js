@@ -63,7 +63,7 @@ export default function HistoryScreen() {
                 setDailyMemory(memory);
                 if (memory) {
                     const seenId = await getSeenDailyMemoryId(session.user.id);
-                    setIsDailyMemorySeen(false);
+                    setIsDailyMemorySeen(seenId === memory.id);
                 }
             });
 
