@@ -19,8 +19,8 @@ export const useAudioPlayer = () => {
 /**
  * Hook spécial pour la barre de progression (mis à jour fréquemment).
  */
-export const useAudioProgress = () => {
-    return useContext(AudioPlayerProgressContext);
+export const useAudioProgress = () => { // Il sert à renvoyer 
+    return useContext(AudioPlayerProgressContext); //
 };
 
 export function AudioPlayerProvider({ children }) {

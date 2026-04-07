@@ -1,33 +1,69 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Play, Pause } from 'lucide-react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withRepeat,
+    withTiming,
+} from 'react-native-reanimated';
 import Logo from '../Logo';
 import { formatDateWithTime } from '../../utils/date';
 
 /**
  * Carte spéciale pour le "souvenir du jour" affichée en haut de l'historique.
+ * Glow orange pulsant tant que le souvenir n'a pas été ouvert.
  */
-const DailyMemoryCard = ({ dailyMemory, isPlaying, onTogglePlay }) => {
+const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay }) => {
+    const pulse = useSharedValue(0);
+
+    useEffect(() => {
+        if (!isOpened) {
+            pulse.value = 0;
+            pulse.value = withRepeat(
+                withTiming(1, { duration: 1200 }),
+                -1,
+                true
+            );
+        } else {
+            pulse.value = withTiming(0, { duration: 300 });
+        }
+    }, [isOpened]);
+
+    // Couche de glow : on anime uniquement l'opacity (fiable sur toutes les plateformes)
+    const glowStyle = useAnimatedStyle(() => ({
+        opacity: pulse.value,
+    }));
+
     if (!dailyMemory) return null;
 
     return (
         <View style={styles.dailyMemorySection}>
             <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir ⏳</Text>
-            <TouchableOpacity 
-                style={styles.dailyMemoryCard} 
-                onPress={onTogglePlay}
-            >
-                <Logo size={28} color="#D97706" variant="outline" style={styles.dailyMemoryLogo} />
-                <View style={styles.itemInfo}>
-                    <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
-                    <Text style={styles.itemDate}>{formatDateWithTime(dailyMemory.date)}</Text>
-                </View>
-                <View style={[styles.playButtonIcon, isPlaying && styles.playButtonIconActive]}>
-                    {isPlaying ? (
-                        <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
-                    ) : (
-                        <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
+            <TouchableOpacity onPress={onTogglePlay} activeOpacity={0.9}>
+                <View style={styles.cardWrapper}>
+                    {/* Couche de glow derrière la carte — visible uniquement si non ouvert */}
+                    {!isOpened && (
+                        <Animated.View style={[styles.glowLayer, glowStyle]} />
                     )}
+                    {/* Carte elle-même */}
+                    <View style={[
+                        styles.dailyMemoryCard,
+                        !isOpened && styles.dailyMemoryCardUnseen
+                    ]}>
+                        <Logo size={28} color="#D97706" variant="outline" style={styles.dailyMemoryLogo} />
+                        <View style={styles.itemInfo}>
+                            <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
+                            <Text style={styles.itemDate}>{formatDateWithTime(dailyMemory.date)}</Text>
+                        </View>
+                        <View style={[styles.playButtonIcon, isPlaying && styles.playButtonIconActive]}>
+                            {isPlaying ? (
+                                <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
+                            ) : (
+                                <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
+                            )}
+                        </View>
+                    </View>
                 </View>
             </TouchableOpacity>
         </View>
@@ -46,6 +82,23 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
         marginBottom: 8,
     },
+    cardWrapper: {
+        position: 'relative',
+    },
+    glowLayer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: 16,
+        backgroundColor: '#F5EADB', // Même couleur que la carte pour bloquer la transparence et projeter l'ombre
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 16,
+        elevation: 8,
+    },
     dailyMemoryCard: {
         backgroundColor: '#F5EADB',
         padding: 16,
@@ -59,6 +112,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 8,
         elevation: 2,
+    },
+    dailyMemoryCardUnseen: {
+        borderColor: '#F59E0B',
+        borderWidth: 1.5,
     },
     dailyMemoryLogo: {
         marginRight: 16,
@@ -84,7 +141,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#78350F',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 0, // No margin needed in this layout
+        marginRight: 0,
     },
     playButtonIconActive: {
         backgroundColor: '#B91C1C',

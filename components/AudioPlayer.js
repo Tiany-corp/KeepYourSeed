@@ -15,17 +15,27 @@ export default function AudioPlayer() {
     const position = useAudioProgress();
     const [miniProgressWidth, setMiniProgressWidth] = useState(0);
     const [modalProgressWidth, setModalProgressWidth] = useState(0);
+// -----------------------------------
+
+// Défi créer une barre de progression avec react native ranimated pour ma barre de progression
+
+        // Plan ?? à quoi sert react native reanimated => faire des animations fluides I guess ? => oui
+        // Objectif : mettre à jour toute les milliseconde la position au lieu de la mettre à jour toute les 10 milliseconde
+        // Je stocke la position du curseur à 0 
+            //Si l'audio est activé je démarre la position qui change à +1
+            // Augmenter la position à +1 tant que l'audio est en train de lire ?
+
 
     // Progression fluide via Reanimated
-    const animatedPosition = useSharedValue(0);
+    const animatedPosition = useSharedValue(0); // J'instancie mon objet dans le même état que useSharedValue
 
     useEffect(() => {
-        if (!isPlaying || position === 0) {
+        if (!isPlaying || position === 0) { // Si je ne suis pas en train de jouer et que la position est égale à 0 => je met la valeur de animated position à 0.
             animatedPosition.value = position;
             return;
         }
 
-        const diff = Math.abs(position - animatedPosition.value);
+        const diff = Math.abs(position - animatedPosition.value); // Je créer une variable diff qui stocke le return de la méthode Math.abs qui prend en entrée la soustraction entre la variable position et la valeur de la position partagée. Cette valeure d'entrée est un chiffre.
         if (diff > 1000) {
             // Saut important (Seek ou changement de piste)
             animatedPosition.value = position;
@@ -44,6 +54,9 @@ export default function AudioPlayer() {
             width: `${Math.min(100, Math.max(0, pct))}%`,
         };
     });
+
+    // Je sauvegarde la position du curseur dans une variable qui stockeras la position sous forme de seconde ? => oui je pense
+// --------------------------
 
     // Pas de track → rien à afficher
     if (!currentTrack) return null;

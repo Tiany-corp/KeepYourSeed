@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal } from 'react-native';
-import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording } from '../services/storage';
+import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
@@ -22,8 +22,10 @@ export default function HistoryScreen() {
     const { session, setDrawerOpen } = useContext(AppContext);
     const navigation = useNavigation();
     const [recordings, setRecordings] = useState([]);
-    const [isLoading, setIsLoading] = useState(true); // État de chargement initial
+    const [isLoading, setIsLoading] = useState(true);
     const [dailyMemory, setDailyMemory] = useState(null);
+    const [isDailyMemorySeen, setIsDailyMemorySeen] = useState(true); // Vu par défaut (évite le clignotement au chargement)
+    // ...
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
     const [editingRecording, setEditingRecording] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -37,7 +39,7 @@ export default function HistoryScreen() {
             // 1. Charger le local immédiatement pour la réactivité
             const localData = await getRecordings();
             setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
-            
+
             setIsLoading(false);
 
             // 2. Lancer la synchronisation initiale
@@ -55,10 +57,16 @@ export default function HistoryScreen() {
         };
 
         initializeRecordings();
-        
+
         if (session?.user) {
-            getDailyMemory(session.user.id).then(setDailyMemory);
-            
+            getDailyMemory(session.user.id).then(async (memory) => {
+                setDailyMemory(memory);
+                if (memory) {
+                    const seenId = await getSeenDailyMemoryId(session.user.id);
+                    setIsDailyMemorySeen(false);
+                }
+            });
+
             // Écoute réseau "one-shot" pour déclencher le sync au passage en Wi-Fi
             const NetInfo = require('@react-native-community/netinfo');
             let hasSyncedInWifi = false;
@@ -76,10 +84,10 @@ export default function HistoryScreen() {
                             });
                         }
                     });
-                    
+
                     // Désabonnement sécurisé (gère le cas où l'événement est appelé de manière synchrone via Babel)
                     if (typeof unsubscribe === 'function') {
-                        unsubscribe(); 
+                        unsubscribe();
                     } else {
                         setTimeout(() => {
                             if (typeof unsubscribe === 'function') unsubscribe();
@@ -254,13 +262,13 @@ export default function HistoryScreen() {
     }, []);
 
     const renderItem = useCallback(({ item }) => (
-        <RecordingItem 
-            item={item} 
-            isItemPlaying={audioPlayer.currentTrack?.id === item.id} 
+        <RecordingItem
+            item={item}
+            isItemPlaying={audioPlayer.currentTrack?.id === item.id}
             audioPlayerIsPlaying={audioPlayer.isPlaying}
-            childrenRecords={childrenByParent[item.id]} 
-            onTogglePlay={handleTogglePlay} 
-            onOptions={handleOptions} 
+            childrenRecords={childrenByParent[item.id]}
+            onTogglePlay={handleTogglePlay}
+            onOptions={handleOptions}
             sessionUser={session?.user}
             activeChildId={audioPlayer.currentTrack?.id}
         />
@@ -275,8 +283,16 @@ export default function HistoryScreen() {
                 {/* Pensée Souvenir */}
                 <DailyMemoryCard
                     dailyMemory={dailyMemory}
+                    isOpened={isDailyMemorySeen}
                     isPlaying={(audioPlayer.currentTrack?.id === dailyMemory?.id) && audioPlayer.isPlaying}
-                    onTogglePlay={() => { audioPlayer.play(dailyMemory); audioPlayer.openModal(); }}
+                    onTogglePlay={async () => {
+                        if (!isDailyMemorySeen && session?.user) {
+                            setIsDailyMemorySeen(true);
+                            await setSeenDailyMemoryId(session.user.id, dailyMemory.id);
+                        }
+                        audioPlayer.play(dailyMemory);
+                        audioPlayer.openModal();
+                    }}
                 />
 
                 {/* Barre de filtres (Tags) */}
@@ -313,6 +329,7 @@ export default function HistoryScreen() {
             ) : (
                 <FlatList
                     data={filteredParentRecordings}
+                    extraData={[dailyMemory, isDailyMemorySeen]}
                     ListHeaderComponent={renderListHeader}
                     renderItem={renderItem}
                     keyExtractor={item => item.id}
