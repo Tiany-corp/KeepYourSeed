@@ -8,11 +8,11 @@ import { saveAudioBlobWeb } from '../services/storage';
  * Garantit une latence minimale et une architecture découplée.
  */
 export default function useAudioRecorder() {
-    // Le recorder interne de expo-audio (on adapte la preset pour économiser de l'espace)
+    // Le recorder interne de expo-audio
     const recorder = useExpoAudioRecorder(
         Platform.OS === 'web' ? {
-            isMeteringEnabled: true, // Le Web gère la compression par défaut en opus
-        } : RecordingPresets.LOW_QUALITY // Sur mobile, LOW_QUALITY est parfait pour la voix
+            isMeteringEnabled: true,
+        } : RecordingPresets.HIGH_QUALITY
     );
     
     // État local pour le pont de compatibilité avec l'ancienne UI
@@ -42,9 +42,9 @@ export default function useAudioRecorder() {
                 return;
             }
 
-            // Préparation et lancement via expo-audio
+            // Lancement via expo-audio (API: prepareToRecordAsync() puis .record())
             await recorder.prepareToRecordAsync();
-            await recorder.recordAsync();
+            recorder.record();
             
             setIsRecording(true);
             setDuration(0);
@@ -60,7 +60,7 @@ export default function useAudioRecorder() {
             const recordedDuration = duration; // On capture la durée finale
 
             // Arrêt matériel (peut prendre 100-200ms sur native)
-            await recorder.stopAsync();
+            await recorder.stop();
             const uri = recorder.uri; // URI du fichier temporaire
 
             if (!uri) return null;
