@@ -146,8 +146,11 @@ export const fetchCloudRecordings = async (userId) => {
             remoteUrl: row.audio_url,         // L'URL du bucket audios
             status: 'synced',                 // Déjà synchronisé par définition
             date: row.created_at,             // Date de création Supabase
+            updatedAt: row.updated_at || row.created_at, // Last-Write-Wins reference
             duration: row.duration_seconds || 0,
             title: row.title || 'Sans titre',
+            type: row.type || 'note',
+            deliverDate: row.deliver_date || null,
             tags: row.tags || [],
         }));
 
@@ -177,6 +180,7 @@ export const updateRecordingMetadataInDatabase = async ({
             type: type || 'note',
             tags: Array.isArray(tags) ? tags : [],
             deliver_date: type === 'message' && deliverDate ? deliverDate : null,
+            updated_at: new Date().toISOString(), // Important pour le LWW
         };
 
         let query = supabase.from('recordings').update(updates).eq('user_id', userId);

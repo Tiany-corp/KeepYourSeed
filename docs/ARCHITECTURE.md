@@ -1,158 +1,73 @@
-# 🏗️ Architecture Technique
+# 🏗️ Architecture Technique (Keep Your Seed)
 
-Ce document détaille les choix techniques pour **Keep Your Seed**.
+Ce document détaille les choix techniques, les flux de données et les règles d'hygiène de code du projet.
 
-## 🛠️ Stack Technologique
+## 🛠️ Stack Technologique (Moderne SDK 54+)
 - **Framework** : React Native (via Expo)
-- **Langage** : JavaScript
-- **Audio** : `expo-av` (Enregistrement & Lecture)
-- **Système de Fichiers** : `expo-file-system` (Stockage local des vocaux sur mobile)
-- **Stockage Local** : Adaptateur Universel (`AsyncStorage` sur Mobile, `idb-keyval` / IndexedDB sur Web)
-- **Cloud & Backend** : Supabase (Stockage des fichiers `.m4a` et base de données des métadonnées)
-
-## � Structure des Dossiers
-```
-/assets         # Images, Fontes
-/components     # Composants réutilisables (AudioPlayer, RecordButton, TitleModal, AppHeader...)
-/contexts       # Contextes React globaux (AudioPlayerContext)
-/hooks          # Custom hooks (useAudioRecorder, useRevealAnimation)
-/screens        # Écrans (RecordScreen, HistoryScreen, AuthScreen)
-/services       # Logique métier (storage.js, cloud.js, supabase.js)
-/utils          # Helpers (formatTime, dateHelpers)
-/docs           # Documentation (ARCHITECTURE.md, FEATURES.md, STYLE_GUIDE.md)
-App.js          # Point d'entrée + routing conditionnel
-```
+- **Audio Engine** : `expo-audio` (Enregistrement & Lecture Haute Performance)
+  - *Note : Remplacement définitif de `expo-av` pour déporter le traitement sur le thread natif.*
+- **UI & Animations** : `react-native-reanimated` (Moteur 60 FPS / UI Thread)
+- **Styling** : Vanilla CSS + NativeWind (Système de Design Cohérent)
+- **Flux de Données** : Local-First (Persistance via `AsyncStorage` / IndexedDB)
+- **Cloud** : Supabase (Buckets Audio + PostgreSQL DB)
 
 ---
 
-## 🔀 Workflow Conditionné
+## ⚡ Stratégie de Performance (Segmented State)
 
-### Arbre de décision principal (`App.js`)
+Afin de garantir une interface fluide sans micro-saccades, l'état de l'application est segmenté :
 
-```
-App (AlertProvider → AudioPlayerProvider)
-│
-├── currentScreen === 'auth' → AuthScreen
-│   ├── LoginScreen (+ bouton "Continuer sans compte")
-│   └── SignUpScreen (+ bouton "Continuer sans compte")
-│   └── Si connexion réussie → auto-redirect vers 'record'
-│
-├── currentScreen === 'record' → RecordScreen
-├── currentScreen === 'history' → HistoryScreen
-│
-├── 🎵 AudioPlayer (global, toujours visible si un track est actif)
-├── ⚙️ SettingsDrawer (overlay)
-│   ├── Connecté → avatar, email, "Vider le cloud", "Se déconnecter"
-│   └── Invité → "Se connecter" / "Créer un compte" → navigue vers AuthScreen
-└── 🔔 AlertContext (modales cross-platform : info/success/warning/error)
-```
+### 1. `AppContext` (Bas de fréquence)
+Gère uniquement les états globaux stables :
+- Session utilisateur (Supabase)
+- Thème et Drawer de réglages
+- Notifications Alertes
 
-> **Note** : L'app est accessible sans compte (mode invité).
-> Les fonctionnalités cloud sont conditionnées par `session?.user`.
-
-### 📱 RecordScreen
-
-```
-RecordScreen
-├── AppHeader (Menu + Logo + Clock→History)
-│
-├── Zone 1 (haut)
-│   ├── !isRecording && session.user → MemoryCard (pensée du jour)
-│   │   ├── isMemoryLoading → Skeleton
-│   │   ├── dailyMemory existe → Carte avec animation reveal
-│   │   │   └── onReveal → audioPlayer.play() + openModal()
-│   │   └── dailyMemory null → "Pas encore de souvenir"
-│   └── isRecording || !session → (espace vide)
-│
-├── Zone 2 (centre)
-│   ├── isUploading → ActivityIndicator
-│   └── RecordButton
-│       ├── !isRecording → 🎙️ "Capturer une pensée" (start)
-│       └── isRecording → ⏹️ "Arrêter" (stop)
-│           └── onStop → TitleModal s'ouvre
-│               ├── "Enregistrer" → saveRecording + upload si connecté
-│               └── "Passer" → saveRecording avec titre par défaut
-│
-└── Footer
-```
-
-### 📜 HistoryScreen
-
-```
-HistoryScreen
-├── AppHeader (title="Historique", bouton Retour)
-│
-└── FlatList (recordings)
-    ├── vide → "Aucun enregistrement."
-    └── Chaque item :
-        ├── Tap → audioPlayer.toggle(item)
-        │   ├── Même track en cours → pause
-        │   ├── Autre track → charge + play
-        │   └── Après fin → replay depuis le début
-        │
-        └── Bouton Cloud
-            ├── !session.user → showAlert("Connexion requise")
-            ├── status 'synced' → ☁️ vert (désactivé)
-            ├── status 'error' → ☁️ rouge
-            ├── uploadingId → spinner
-            └── status 'pending' → ☁️ brun → tap = upload
-```
-
-### 🎵 AudioPlayer Global
-
-Le lecteur audio vit dans `AudioPlayerContext` et persiste entre les écrans.
-
-```
-AudioPlayer
-├── !currentTrack → invisible
-└── currentTrack existe
-    ├── !modalVisible → Mini Player Bar (position: absolute, bottom)
-    │   ├── Tap bar → ouvre la modale fullscreen
-    │   ├── Tap play → toggle play/pause
-    │   └── Tap X → stop (arrête tout)
-    └── modalVisible → Modale fullscreen
-        ├── Tap backdrop sombre → ferme la modale → mini player
-        ├── Tap play → toggle play/pause/replay
-        └── Tap X → stop (arrête + ferme)
-```
+### 2. `AudioPlayerContext` & `ProgressContext` (Isolement)
+- **`AudioPlayerContext`** : Contrôle métier (Play/Pause, Track en cours).
+- **`AudioPlayerProgressContext`** : **Isolé**. Gère uniquement la position de lecture (ms). Cela permet de mettre à jour les barres de progression 60 fois par seconde sans re-render les composants lourds (écrans entiers ou listes).
 
 ---
 
-## �📦 Flux de Données (Audio Flow)
+## 🔄 Flux de Synchronisation (Local-First 2.0)
 
-1.  **Enregistrement** :
-    - L'utilisateur appuie sur REC (`hooks/useAudioRecorder.js`).
-    - L'audio est capturé en qualité haute.
-    - Format cible : `.m4a` (AAC) pour un bon ratio qualité/poids.
+L'application privilégie toujours les données locales pour une réactivité instantanée.
 
-2.  **Nommage** :
-    - À l'arrêt, `TitleModal` s'ouvre pour que l'utilisateur nomme sa pensée.
-    - Titre par défaut : "Note HH:MM" (heure de l'enregistrement).
+### Cycle d'un enregistrement :
+1. **Capture** : `useAudioRecorder` enregistre en local (`file://` ou `indexeddb://`).
+2. **Persistance** : Les métadonnées sont stockées via `storage.js`.
+3. **Synchronisation** :
+   - **Initial Sync** : Au lancement de `HistoryScreen`, `syncAll` répare les écarts entre local et cloud.
+   - **Sync Wi-Fi (One-Shot)** : Détecteur intelligent (NetInfo) qui lance l'upload dès qu'un réseau haut débit est détecté pour préserver la data mobile.
 
-3.  **Sauvegarde (Mobile & Web)** :
-    - Le fichier est d'abord sauvegardé localement.
-    - Sur Mobile : Gardé dans le cache local (URI `file://`).
-    - Sur Web : Le Blob est extrait et sauvegardé dans **IndexedDB** (`indexeddb://`).
-    - Les métadonnées (`{ id, title, localUri, remoteUrl, status, duration }`) via l'Adaptateur Universel (`services/storage.js`).
+---
 
-4.  **Synchronisation Cloud (Supabase)** :
-    - Si connecté, le fichier est uploadé vers le Bucket Supabase `audios`.
-    - Les métadonnées sont insérées dans la table `user_recordings`.
-    - Le `remoteUrl` est renseigné avec le chemin bucket (ex: `userId/timestamp.m4a`).
+## ✨ Système d'Animations Visuelles
 
-5.  **Lecture** (`AudioPlayerContext`) :
-    - `getAudioSource()` choisit la meilleure source :
-      1. Local d'abord (`indexeddb://` → blob URL, ou `file://` direct)
-      2. Cloud ensuite (génère une URL signée temporaire via Supabase)
-    - `expo-av` lit l'audio via `Audio.Sound.createAsync()`.
+### Glow & Aura (DailyMemoryCard)
+Pour notifier l'utilisateur d'un nouveau souvenir sans alourdir le DOM React :
+- **Architecture de calques** : Un `glowLayer` est placé en `zIndex: -1` derrière la carte.
+- **Performance** : Seule l'opacité est animée via Reanimated, évitant les recalculs de layout (Shadows/Padding).
 
-6.  **Données de démo (Web uniquement)** :
-    - Si l'historique est vide sur Web → injecte un enregistrement démo depuis Supabase (`public/WelcomeInKYS.mp3`).
-    - L'audio est téléchargé en arrière-plan et caché en IndexedDB pour les lectures suivantes.
+---
 
-## 🌐 Stratégie Cloud
-- **Backend** : Supabase.
-- Fichiers audios envoyés dans le bucket `audios`.
-- Métadonnées envoyées dans la BDD PostgreSQL de Supabase.
-- URLs signées temporaires (1h) pour la lecture sécurisée.
-- Pensée du jour : fonction RPC `get_random_recording()` + cache local journalier.
+## 🛡️ Hygiène du Code (Règles Antigravity)
+
+1. **Mémorisation Stricte** :
+   - Tout composant de liste (`RecordingItem`) doit être enveloppé dans `React.memo`.
+2. **ExtraData Pattern** :
+   - Les `FlatList` utilisent la prop `extraData` pour écouter les changements d'état globaux (ex: "Vu" du souvenir quotidien) sans reconstruire tous les composants enfants.
+3. **Optimisation Médias** :
+   - Compression systématique des audios via `LOW_QUALITY` ou `HIGH_QUALITY` optimisé pour la voix humaine (bitrate réduit).
+
+---
+
+## 📂 Structure du Projet
+```text
+/components/history  # Logique spécifique à l'historique (Card, Items)
+/contexts            # Architecture de contextes segmentés
+/hooks               # Hooks natifs (Audio, Animations)
+/services            # Bridge Storage <-> Supabase
+/utils               # Formatage et aides métier
+App.js               # Orchestrateur de navigation & Providers
+```

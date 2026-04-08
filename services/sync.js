@@ -35,7 +35,9 @@ export const syncAll = async (userId, isManual = false) => {
         // 1. PUSH : Autorisé si (Wifi) OR (4G ET !wifiOnly) OR (Manual)
         const canPush = isManual || isWifi || !wifiOnly;
         if (canPush) {
-            pushedCount = await pushLocalRecordings(userId);
+            const pushedCreations = await pushLocalRecordings(userId);
+            const pushedUpdates = await pushLocalUpdates(userId);
+            pushedCount = pushedCreations + pushedUpdates;
         } else {
             console.log('Push sauté (Wi-Fi requis)');
         }
@@ -62,11 +64,11 @@ export const syncAll = async (userId, isManual = false) => {
 };
 
 /**
- * Envoie les enregistrements marqués 'pending' vers Supabase.
+ * Envoie les nouveaux enregistrements ('pending') vers Supabase.
  */
 const pushLocalRecordings = async (userId) => {
     const localRecordings = await getRecordings();
-    const toSync = localRecordings.filter(r => r.status !== 'synced');
+    const toSync = localRecordings.filter(r => r.status === 'pending');
     let count = 0;
 
     for (const rec of toSync) {
@@ -81,8 +83,40 @@ const pushLocalRecordings = async (userId) => {
                 count++;
             }
         } catch (err) {
-            console.error(`Erreur push "${rec.title}":`, err);
+            console.error(`Erreur push creation "${rec.title}":`, err);
             await updateRecording(rec.id, { status: 'error' });
+        }
+    }
+    return count;
+};
+
+/**
+ * Envoie les mises à jour locales ('pending_update') vers Supabase.
+ */
+const pushLocalUpdates = async (userId) => {
+    const localRecordings = await getRecordings();
+    const toUpdate = localRecordings.filter(r => r.status === 'pending_update');
+    let count = 0;
+    
+    // On importe updateRecordingMetadataInDatabase dynamiquement pour éviter les dépendances circulaires
+    const { updateRecordingMetadataInDatabase } = require('./cloud');
+
+    for (const rec of toUpdate) {
+        try {
+            const ok = await updateRecordingMetadataInDatabase({
+                userId,
+                recording: rec,
+                title: rec.title,
+                type: rec.type,
+                deliverDate: rec.deliverDate,
+                tags: rec.tags,
+            });
+            if (ok) {
+                await updateRecording(rec.id, { status: 'synced' });
+                count++;
+            }
+        } catch (err) {
+            console.error(`Erreur push update "${rec.title}":`, err);
         }
     }
     return count;
@@ -107,11 +141,29 @@ const pullCloudRecordings = async (userId) => {
         );
         
         let newItems = [];
+        let updatedItems = [];
         for (const cloudRec of cloudRecordings) {
             const alreadyByUrl = cloudRec.remoteUrl && localByRemote.has(cloudRec.remoteUrl);
             const alreadyByHash = cloudRec.hash && localByHash.has(cloudRec.hash);
+            
             if (alreadyByUrl || alreadyByHash) {
-                // Duplicate – skip
+                // LWW (Last-Write-Wins) en cas de doublon
+                const localRec = alreadyByUrl ? localByRemote.get(cloudRec.remoteUrl) : localByHash.get(cloudRec.hash);
+                
+                const localTime = new Date(localRec.updatedAt || localRec.date || 0).getTime();
+                const cloudTime = new Date(cloudRec.updatedAt || cloudRec.date || 0).getTime();
+                
+                if (cloudTime > localTime && localRec.status !== 'pending_update') {
+                    // Serveur plus récent et pas de modification locale en attente => Mise à jour du local
+                    updatedItems.push({
+                        ...localRec,
+                        title: cloudRec.title,
+                        type: cloudRec.type,
+                        deliverDate: cloudRec.deliverDate,
+                        tags: cloudRec.tags,
+                        updatedAt: cloudRec.updatedAt
+                    });
+                }
                 continue;
             }
             // New recording from cloud
@@ -123,13 +175,21 @@ const pullCloudRecordings = async (userId) => {
             });
         }
 
-        if (newItems.length > 0) {
+        if (newItems.length > 0 || updatedItems.length > 0) {
             const { STORAGE_KEY } = require('./storage');
             const { set } = require('idb-keyval');
             const { Platform } = require('react-native');
             const AsyncStorage = require('@react-native-async-storage/async-storage').default;
             
-            const merged = [...newItems, ...localRecordings];
+            // Mise à jour des éléments existants
+            let merged = localRecordings.map(local => {
+                const update = updatedItems.find(u => u.id === local.id);
+                return update ? update : local;
+            });
+            
+            // Ajout des nouveaux
+            merged = [...newItems, ...merged];
+            
             // Tri par date décroissante
             merged.sort((a, b) => new Date(b.date) - new Date(a.date));
             
@@ -142,8 +202,10 @@ const pullCloudRecordings = async (userId) => {
             }
             
             // Lancer le téléchargement des audios manquants en arrière-plan
-            cacheSupabaseAudioLocally(merged);
-            return newItems.length;
+            if (newItems.length > 0) {
+                cacheSupabaseAudioLocally(merged);
+            }
+            return newItems.length + updatedItems.length;
         }
         
         // Même si pas de nouveaux items, on vérifie si certains audios distants ne sont pas encore cachés

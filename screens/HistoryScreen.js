@@ -159,29 +159,33 @@ export default function HistoryScreen() {
     const handleEditConfirm = async (title, type = 'note', deliverDate = null, tags = []) => {
         if (!editingRecording) return;
 
-        const updates = { title, type, deliverDate, tags };
+        const updates = { 
+            title, 
+            type, 
+            deliverDate, 
+            tags,
+            status: 'pending_update',
+            updatedAt: new Date().toISOString()
+        };
 
         try {
+            // 1. Sauvegarde instantanée en mode Local-First
             await updateRecording(editingRecording.id, updates);
             applyRecordingUpdateInState(editingRecording.id, updates);
+            
+            showAlert('Succès', 'Enregistrement modifié.', 'success');
 
-            if (session?.user && (editingRecording.dbId || editingRecording.remoteUrl)) {
-                const ok = await updateRecordingMetadataInDatabase({
-                    userId: session.user.id,
-                    recording: editingRecording,
-                    title,
-                    type,
-                    deliverDate,
-                    tags,
-                });
-                if (!ok) {
-                    showAlert('Attention', "Modification locale enregistree, mais la mise a jour cloud a echoue.", 'warning');
-                } else {
-                    showAlert('Succes', 'Enregistrement modifie.', 'success');
-                }
-            } else {
-                showAlert('Succes', 'Enregistrement modifie localement.', 'success');
+            // 2. Synchro silencieuse en arrière-plan (si on est connecté)
+            if (session?.user) {
+                syncAll(session.user.id).then(result => {
+                    if (result.success && (result.pushed > 0 || result.pulled > 0)) {
+                        getRecordings().then(data => {
+                            setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+                        });
+                    }
+                }).catch(err => console.log('Silent sync failed after edit', err));
             }
+
         } catch (e) {
             console.error('Edit failed:', e);
             showAlert('Erreur', "Impossible de modifier l'enregistrement.", 'error');
@@ -465,5 +469,54 @@ const styles = StyleSheet.create({
         marginLeft: 6,
         borderWidth: 1,
         borderColor: '#E8D5BF',
+    },
+    optionsOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    optionsMenuContainer: {
+        backgroundColor: '#FAF7F2',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    },
+    optionsMenuHeader: {
+        marginBottom: 16,
+        alignItems: 'center',
+    },
+    optionsMenuTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#292524',
+    },
+    optionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        gap: 12,
+    },
+    optionText: {
+        fontSize: 16,
+        color: '#292524',
+        fontWeight: '500',
+    },
+    optionDivider: {
+        height: 1,
+        backgroundColor: '#E8D5BF',
+        marginVertical: 4,
+    },
+    optionCancelBtn: {
+        marginTop: 16,
+        paddingVertical: 16,
+        backgroundColor: '#F5F0E8',
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    optionCancelText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#78716C',
     },
 });

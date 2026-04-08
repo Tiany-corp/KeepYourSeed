@@ -108,12 +108,14 @@ export default function RecordScreen() {
 
         const { uri, duration: recDuration, id: recordingId } = pendingRecording;
 
+        const timestamp = new Date().toISOString();
         const newRecording = {
             id: recordingId,
             localUri: uri,
             remoteUrl: null,
             status: 'pending',
-            date: new Date().toISOString(),
+            date: timestamp,
+            updatedAt: timestamp,
             duration: recDuration,
             title: title,
             type: type,
