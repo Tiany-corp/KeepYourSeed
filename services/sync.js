@@ -3,10 +3,12 @@ import { uploadRecordingToCloud, saveRecordingToDatabase, fetchCloudRecordings }
 import { supabase } from './supabase';
 
 /**
- * Synchronisation complète : Push (Local -> Cloud) + Pull (Cloud -> Local)
- * @param {string} userId - UUID de l'utilisateur
- * @returns {Promise<{success: boolean, pushed: number, pulled: number}>}
+ * Verrou pour empêcher les exécutions concurrentes de syncAll.
+ * Sans ce verrou, deux appels simultanés peuvent uploader le même
+ * enregistrement deux fois avec des timestamps différents → doublons.
  */
+let _isSyncing = false;
+
 /**
  * Synchronisation complète : Push (Local -> Cloud) + Pull (Cloud -> Local)
  * @param {string} userId - UUID de l'utilisateur
@@ -16,6 +18,13 @@ import { supabase } from './supabase';
 export const syncAll = async (userId, isManual = false) => {
     try {
         if (!userId) return { success: false, pushed: 0, pulled: 0 };
+
+        // Verrou anti-doublons : si un sync est déjà en cours, on skip
+        if (_isSyncing) {
+            console.log('syncAll ignoré : synchronisation déjà en cours');
+            return { success: false, pushed: 0, pulled: 0, status: 'already-syncing' };
+        }
+        _isSyncing = true;
 
         const NetInfo = require('@react-native-community/netinfo');
         const { getWifiOnlyPreference } = require('./storage');
@@ -51,6 +60,7 @@ export const syncAll = async (userId, isManual = false) => {
             console.log('Pull sauté (Wi-Fi requis pour téléchargement)');
         }
 
+        _isSyncing = false;
         return { 
             success: true, 
             pushed: pushedCount, 
@@ -60,6 +70,8 @@ export const syncAll = async (userId, isManual = false) => {
     } catch (error) {
         console.error('Erreur syncAll:', error);
         return { success: false, pushed: 0, pulled: 0, error: error.message };
+    } finally {
+        _isSyncing = false;
     }
 };
 
