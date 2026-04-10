@@ -136,6 +136,29 @@ La fluidité n'est pas un bonus, c'est une exigence structurelle. Chaque nouvell
 
 ---
 
+## Pièges du Native Bridge avec \`expo-audio\` SDK 54 (Crash silencieux)
+
+**Problème rencontré :**
+Le bouton "fermer la modale" du lecteur audio ne fonctionnait plus sur l'APK Android (l'audio s'arrêtait mais la modale restait figée à l'écran), alors qu'il fonctionnait très bien sur le web ou lorsqu'on cliquait sur la zone d'ombre à l'extérieur. De plus, des erreurs massives apparaissaient dans les logs de développement (`Exception in HostFunction`).
+
+**Cause racine :**
+1. **L'erreur native** : L'API d'expo-audio (SDK 54) est très récente. L'instruction \`player.replace(null)\` était utilisée pour vider le lecteur audio. Sur le web, le DOM le tolérait, mais sur le Native Bridge (Android), cette méthode n'accepte pas \`null\` (elle attend obligatoirement une source valide) et faisait exploser la fonction JavaScript silencieusement.
+2. **L'ordre des états** : La modification des états React (\`setModalVisible(false)\`) était située *après* l'appel natif défaillant (\`player.replace(null)\`). Quand le natif crashait, l'exécution s'arrêtait et l'instruction de cacher la modale n'était jamais atteinte !
+3. **Le "Stuck Modal" d'Android** : Une tentative de réparation (\`if (!currentTrack) return null;\`) détruisait brutalement le composant \`<Modal>\` dans l'arbre React alors qu'il était réputé encore visible par le système Android, causant un *glitch* très connu où la modale native reste physiquement bloquée au premier plan.
+
+**La Solution Apportée :**
+1. **Suppression de la rustine** destructrice pour les Modals. On laisse le composant persister et on gère uniquement sa propriété \`visible={false}\`.
+2. **Nettoyage de l'API** : Suppression de l'appel brutal \`player.replace(null)\` en faveur d'un simple \`player.pause()\`.
+3. **L'ordre de l'Optimistic UI** : On modifie **toujours** l'Interface Utilisateur (les React States) *avant* d'envoyer des commandes instables vers le Kernel (matériel).
+4. **Sécurité maximale** : Ajout d'un bloc \`try / catch\` autour des sollicitations matérielles (manipulation de modules natifs).
+
+**Retenir pour la suite :**
+- **Cacher les symptômes ne règle rien** : Résoudre un "problème de clic" sans écouter les "erreurs bizarres" des logs fait perdre du temps.
+- **Méfiance systémique envers le Bridge** : Le JavaScript de React Native doit survivre (via des \`try/catch\`) à toute excentricité d'iOS ou Android.
+- **Isoler l'UI** : L'UI doit réagir localement malgré les erreurs en tâche de fond.
+
+---
+
 ## 🔜 Prochaines Optimisations Prévues (À faire plus tard)
 
 1. **Fluidité de la Barre de Progression (Interpolation) [FAIT]** :

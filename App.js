@@ -46,6 +46,7 @@ class ErrorBoundary extends Component {
 
 function AppContent() {
   const [session, setSession] = useState(null);
+  const [guestMode, setGuestMode] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -58,6 +59,8 @@ function AppContent() {
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      // Si l'utilisateur se connecte, quitter le mode invité
+      if (session) setGuestMode(false);
     });
 
     authSubscription = data?.subscription;
@@ -67,14 +70,16 @@ function AppContent() {
     };
   }, []);
 
+  const isAuthenticated = session || guestMode;
+
   return (
-    <AppContext.Provider value={{ session, setDrawerOpen, setRefreshKey }}>
+    <AppContext.Provider value={{ session, guestMode, setGuestMode, setDrawerOpen, setRefreshKey }}>
       <NavigationContainer>
         <Stack.Navigator 
-          initialRouteName={session ? "Record" : "Auth"}
+          initialRouteName={isAuthenticated ? "Record" : "Auth"}
           screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
         >
-          {session ? (
+          {isAuthenticated ? (
             <>
               <Stack.Screen name="Record" component={RecordScreen} />
               <Stack.Screen name="History">
@@ -82,7 +87,9 @@ function AppContent() {
               </Stack.Screen>
             </>
           ) : (
-            <Stack.Screen name="Auth" component={AuthScreen} />
+            <Stack.Screen name="Auth">
+              {(props) => <AuthScreen {...props} onGoBack={() => setGuestMode(true)} />}
+            </Stack.Screen>
           )}
         </Stack.Navigator>
 

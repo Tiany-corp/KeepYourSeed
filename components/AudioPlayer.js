@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { Play, Pause, X } from 'lucide-react-native';
-import Animated, { 
-    useSharedValue, 
-    useAnimatedStyle, 
-    withTiming, 
-    Easing 
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    Easing
 } from 'react-native-reanimated';
 import { getRelativeDate, formatTime } from '../utils/date';
 import { useAudioPlayer, useAudioProgress } from '../contexts/AudioPlayerContext';
@@ -15,15 +15,15 @@ export default function AudioPlayer() {
     const position = useAudioProgress();
     const [miniProgressWidth, setMiniProgressWidth] = useState(0);
     const [modalProgressWidth, setModalProgressWidth] = useState(0);
-// -----------------------------------
+    // -----------------------------------
 
-// Défi créer une barre de progression avec react native ranimated pour ma barre de progression
+    // Défi créer une barre de progression avec react native ranimated pour ma barre de progression
 
-        // Plan ?? à quoi sert react native reanimated => faire des animations fluides I guess ? => oui
-        // Objectif : mettre à jour toute les milliseconde la position au lieu de la mettre à jour toute les 10 milliseconde
-        // Je stocke la position du curseur à 0 
-            //Si l'audio est activé je démarre la position qui change à +1
-            // Augmenter la position à +1 tant que l'audio est en train de lire ?
+    // Plan ?? à quoi sert react native reanimated => faire des animations fluides I guess ? => oui
+    // Objectif : mettre à jour toute les milliseconde la position au lieu de la mettre à jour toute les 10 milliseconde
+    // Je stocke la position du curseur à 0 
+    //Si l'audio est activé je démarre la position qui change à +1
+    // Augmenter la position à +1 tant que l'audio est en train de lire ?
 
 
     // Progression fluide via Reanimated
@@ -41,9 +41,9 @@ export default function AudioPlayer() {
             animatedPosition.value = position;
         } else {
             // Interpolation linéaire pour fluidifier le mouvement entre deux status updates
-            animatedPosition.value = withTiming(position, { 
+            animatedPosition.value = withTiming(position, {
                 duration: 600, // Légèrement supérieur à l'intervalle de mise à jour pour la fluidité
-                easing: Easing.linear 
+                easing: Easing.linear
             });
         }
     }, [position, isPlaying]);
@@ -56,10 +56,7 @@ export default function AudioPlayer() {
     });
 
     // Je sauvegarde la position du curseur dans une variable qui stockeras la position sous forme de seconde ? => oui je pense
-// --------------------------
-
-    // Pas de track → rien à afficher
-    if (!currentTrack) return null;
+    // --------------------------
 
     const dismissToMiniPlayer = () => closeModal();
 
@@ -76,12 +73,8 @@ export default function AudioPlayer() {
     return (
         <>
             {/* ═══ MINI PLAYER BAR (toujours visible quand un track est actif) ═══ */}
-            {!modalVisible && (
-                <TouchableOpacity
-                    onPress={openModal}
-                    activeOpacity={0.9}
-                    style={styles.miniPlayerContainer}
-                >
+            {(!modalVisible && currentTrack) && (
+                <View style={styles.miniPlayerContainer}>
                     <View style={styles.miniPlayerRow}>
                         {/* Play/Pause mini */}
                         <TouchableOpacity
@@ -95,8 +88,12 @@ export default function AudioPlayer() {
                             )}
                         </TouchableOpacity>
 
-                        {/* Info + progress */}
-                        <View style={styles.miniPlayerInfo}>
+                        {/* Info + progress — tap pour ouvrir la modale */}
+                        <TouchableOpacity
+                            onPress={openModal}
+                            activeOpacity={0.7}
+                            style={styles.miniPlayerInfo}
+                        >
                             <Text style={styles.miniPlayerTitle} numberOfLines={1}>
                                 {currentTrack.title || 'Sans titre'}
                             </Text>
@@ -112,7 +109,7 @@ export default function AudioPlayer() {
                                     ]}
                                 />
                             </Pressable>
-                        </View>
+                        </TouchableOpacity>
 
                         {/* Temps écoulé / total */}
                         <Text style={styles.miniPlayerTime}>
@@ -120,16 +117,16 @@ export default function AudioPlayer() {
                         </Text>
 
                         {/* Fermer (stoppe l'audio) */}
-                        <TouchableOpacity onPress={closePlayer} style={styles.closeIconButton}>
+                        <TouchableOpacity onPress={closePlayer} style={styles.closeIconButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                             <X size={16} color="#78716C" strokeWidth={1.5} />
                         </TouchableOpacity>
                     </View>
-                </TouchableOpacity>
+                </View>
             )}
 
             {/* ═══ MODAL AUDIO PLAYER ═══ */}
             <Modal
-                visible={modalVisible}
+                visible={modalVisible && !!currentTrack}
                 transparent
                 animationType="fade"
                 onRequestClose={dismissToMiniPlayer}
@@ -153,29 +150,31 @@ export default function AudioPlayer() {
                         </TouchableOpacity>
 
                         {/* Contenu centré */}
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalDateText}>
-                                {getRelativeDate(currentTrack.date)}
-                            </Text>
+                        {currentTrack && (
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalDateText}>
+                                    {getRelativeDate(currentTrack.date)}
+                                </Text>
 
-                            <Text style={styles.modalTitleText} numberOfLines={2}>
-                                {currentTrack.title || 'Sans titre'}
-                            </Text>
+                                <Text style={styles.modalTitleText} numberOfLines={2}>
+                                    {currentTrack.title || 'Sans titre'}
+                                </Text>
 
-                            <TouchableOpacity
-                                onPress={() => toggle()}
-                                style={[
-                                    styles.modalPlayButton,
-                                    { backgroundColor: isPlaying ? '#B91C1C' : '#78350F' }
-                                ]}
-                            >
-                                {isPlaying ? (
-                                    <Pause size={32} color="#FFFFFF" strokeWidth={1.5} />
-                                ) : (
-                                    <Play size={32} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 4 }} />
-                                )}
-                            </TouchableOpacity>
-                        </View>
+                                <TouchableOpacity
+                                    onPress={() => toggle()}
+                                    style={[
+                                        styles.modalPlayButton,
+                                        { backgroundColor: isPlaying ? '#B91C1C' : '#78350F' }
+                                    ]}
+                                >
+                                    {isPlaying ? (
+                                        <Pause size={32} color="#FFFFFF" strokeWidth={1.5} />
+                                    ) : (
+                                        <Play size={32} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 4 }} />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         {/* Barre de progression + temps */}
                         <View style={styles.progressContainer}>

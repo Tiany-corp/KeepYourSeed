@@ -137,10 +137,14 @@ export function AudioPlayerProvider({ children }) {
     }, [currentTrack, player, play, pause, position, duration]);
 
     const stop = useCallback(() => {
-        player.pause();
-        player.replace(null);
+        // Mettre à jour les états JS *avant* la commande native au cas où elle throw (Android)
         setCurrentTrack(null);
         setModalVisible(false);
+        try {
+            player.pause();
+        } catch (error) {
+            console.log('stop() player error (ignored):', error);
+        }
     }, [player]);
 
     const seekTo = useCallback((positionMillis) => {

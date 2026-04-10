@@ -9,17 +9,17 @@ import { formatDateWithTime, formatSecondsDuration } from '../../utils/date';
  * Composant pur mémorisé responsable de la performance de la FlatList.
  * Il ne sera re-rendu QUE si ses props (isItemPlaying, etc) changent.
  */
-const RecordingItem = memo(({ 
-    item, 
-    isItemPlaying, 
-    audioPlayerIsPlaying, 
-    childrenRecords, 
-    onTogglePlay, 
-    onOptions, 
-    sessionUser, 
-    activeChildId 
+const RecordingItem = memo(({
+    item,
+    isItemPlaying,
+    audioPlayerIsPlaying,
+    childrenRecords,
+    onTogglePlay,
+    onOptions,
+    sessionUser,
+    activeChildId
 }) => {
-    
+
     const renderTags = (tags) => {
         if (!tags || tags.length === 0) return null;
         return (
@@ -52,12 +52,12 @@ const RecordingItem = memo(({
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                             {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
                             <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
-                            
+
                             {/* Indicateur de synchro */}
                             {sessionUser && (
                                 <View style={{ marginLeft: 6 }}>
                                     {item.status === 'synced' ? (
-                                        <Cloud size={14} color="#10B981" opacity={0.6} /> 
+                                        <Cloud size={14} color="#10B981" opacity={0.6} />
                                     ) : (
                                         <CloudOff size={14} color="#78716C" opacity={0.4} />
                                     )}
