@@ -22,19 +22,24 @@ export default function HistoryScreen() {
     const { session, setDrawerOpen } = useContext(AppContext);
     const navigation = useNavigation();
     const [recordings, setRecordings] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // Pagination
+    const PAGE_SIZE = 20;
+    const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
     const [dailyMemory, setDailyMemory] = useState(null);
     const [isDailyMemorySeen, setIsDailyMemorySeen] = useState(true); // Vu par défaut (évite le clignotement au chargement)
     // ...
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [editingRecording, setEditingRecording] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedOptionsItem, setSelectedOptionsItem] = useState(null);
 
     const audioPlayer = useAudioPlayer();
-    const { 
-        currentTrack, 
-        isPlaying: audioPlayerIsPlaying, 
+    const {
+        currentTrack,
+        isPlaying: audioPlayerIsPlaying,
         loadingTrackId,
         toggle: toggleAudio
     } = audioPlayer;
@@ -46,6 +51,7 @@ export default function HistoryScreen() {
             const localData = await getRecordings();
             setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
             setIsLoading(false);
+            setIsInitialLoad(false);
         };
 
         initializeRecordings();
@@ -108,6 +114,16 @@ export default function HistoryScreen() {
         });
     }, [parentRecordings, selectedFilterTag]);
 
+    // Données paginées pour la FlatList (Lazy Loading)
+    const paginatedRecordings = useMemo(() => {
+        return filteredParentRecordings.slice(0, visibleLimit);
+    }, [filteredParentRecordings, visibleLimit]);
+
+    // Réinitialiser la pagination si le filtre change
+    useEffect(() => {
+        setVisibleLimit(PAGE_SIZE);
+    }, [selectedFilterTag]);
+
     const handlePin = async (item) => {
         await setPinnedThought(item);
         showAlert('Épinglée', `"${item.title}" est maintenant sur ton accueil.`, 'success');
@@ -134,10 +150,10 @@ export default function HistoryScreen() {
     const handleEditConfirm = async (title, type = 'note', deliverDate = null, tags = []) => {
         if (!editingRecording) return;
 
-        const updates = { 
-            title, 
-            type, 
-            deliverDate, 
+        const updates = {
+            title,
+            type,
+            deliverDate,
             tags,
             status: 'pending_update',
             updatedAt: new Date().toISOString()
@@ -147,7 +163,7 @@ export default function HistoryScreen() {
             // 1. Sauvegarde instantanée en mode Local-First
             await updateRecording(editingRecording.id, updates);
             applyRecordingUpdateInState(editingRecording.id, updates);
-            
+
             showAlert('Succès', 'Enregistrement modifié.', 'success');
 
             // 2. Push silencieux en arrière-plan (pas de pull, pas de cooldown)
@@ -237,7 +253,7 @@ export default function HistoryScreen() {
     const renderItem = useCallback(({ item }) => {
         const isItemPlaying = currentTrack?.id === item.id;
         const isLoading = loadingTrackId === item.id;
-        
+
         return (
             <RecordingItem
                 item={item}
@@ -308,17 +324,23 @@ export default function HistoryScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={filteredParentRecordings}
+                    data={paginatedRecordings}
                     extraData={[dailyMemory, isDailyMemorySeen]}
                     ListHeaderComponent={renderListHeader}
                     renderItem={renderItem}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={<Text style={styles.emptyText}>Aucun enregistrement.</Text>}
+                    ListEmptyComponent={isInitialLoad ? null : <Text style={styles.emptyText}>Aucun enregistrement.</Text>}
                     initialNumToRender={10}
                     maxToRenderPerBatch={10}
                     windowSize={5}
                     removeClippedSubviews={Platform.OS === 'android'}
+                    onEndReached={() => {
+                        if (visibleLimit < filteredParentRecordings.length) {
+                            setVisibleLimit(prev => prev + PAGE_SIZE);
+                        }
+                    }}
+                    onEndReachedThreshold={0.5}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}

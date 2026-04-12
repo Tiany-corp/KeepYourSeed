@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Play, Pause } from 'lucide-react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import AnimatedPlayButton from '../AnimatedPlayButton';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withRepeat,
     withTiming,
+    withSpring,
 } from 'react-native-reanimated';
 import Logo from '../Logo';
 import { formatDateWithTime } from '../../utils/date';
@@ -16,6 +17,19 @@ import { formatDateWithTime } from '../../utils/date';
  */
 const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay, isLoading }) => {
     const pulse = useSharedValue(0);
+    const scale = useSharedValue(1);
+
+    const animatedScaleStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }]
+    }));
+
+    const handlePressIn = () => {
+        scale.value = withSpring(0.98, { damping: 40, stiffness: 400, mass: 0.5, overshootClamping: true });
+    };
+
+    const handlePressOut = () => {
+        scale.value = withSpring(1, { damping: 40, stiffness: 400, mass: 0.5, overshootClamping: true });
+    };
 
     useEffect(() => {
         if (!isOpened) {
@@ -38,9 +52,14 @@ const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay, isLoa
     if (!dailyMemory) return null;
 
     return (
-        <View style={styles.dailyMemorySection}>
+        <Animated.View style={[styles.dailyMemorySection, animatedScaleStyle]}>
             <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir ⏳</Text>
-            <TouchableOpacity onPress={onTogglePlay} activeOpacity={0.9}>
+            <Pressable
+                onPress={onTogglePlay}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                style={styles.pressable}
+            >
                 <View style={styles.cardWrapper}>
                     {/* Couche de glow derrière la carte — visible uniquement si non ouvert */}
                     {!isOpened && (
@@ -57,24 +76,27 @@ const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay, isLoa
                             <Text style={styles.itemDate}>{formatDateWithTime(dailyMemory.date)}</Text>
                         </View>
                         <View style={[styles.playButtonIcon, (isPlaying || isLoading) && styles.playButtonIconActive]}>
-                            {isLoading ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : isPlaying ? (
-                                <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
-                            ) : (
-                                <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
-                            )}
+                            <AnimatedPlayButton 
+                                key={dailyMemory.id}
+                                isPlaying={isPlaying || isLoading} 
+                                size={18} 
+                                color="#FFFFFF" 
+                                strokeWidth={1.5} 
+                            />
                         </View>
                     </View>
                 </View>
-            </TouchableOpacity>
-        </View>
+            </Pressable>
+        </Animated.View>
     );
 };
 
 const styles = StyleSheet.create({
     dailyMemorySection: {
         marginBottom: 13,
+    },
+    pressable: {
+        borderRadius: 16,
     },
     dailyMemoryHeaderTitle: {
         fontSize: 14,

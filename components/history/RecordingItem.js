@@ -1,7 +1,13 @@
-import React, { memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Play, Pause, Pin, MoreVertical, Cloud, CloudOff } from 'lucide-react-native';
+import React, { memo, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withSpring
+} from 'react-native-reanimated';
+import { Pin, MoreVertical, Cloud, CloudOff } from 'lucide-react-native';
 import Logo from '../Logo';
+import AnimatedPlayButton from '../AnimatedPlayButton';
 import { getTagInfo } from '../../utils/tags';
 import { formatDateWithTime, formatSecondsDuration } from '../../utils/date';
 
@@ -38,18 +44,42 @@ const RecordingItem = memo(({
         );
     };
 
+    const scale = useSharedValue(1);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }]
+    }));
+
+    // Force la réinitialisation instantanée si l'instance du composant est recyclée pour un autre item
+    useEffect(() => {
+        scale.value = 1;
+    }, [item.id]);
+
+    const handlePressIn = () => {
+        scale.value = withSpring(0.98, { damping: 40, stiffness: 400, mass: 0.5, overshootClamping: true });
+    };
+
+    const handlePressOut = () => {
+        scale.value = withSpring(1, { damping: 40, stiffness: 400, mass: 0.5, overshootClamping: true });
+    };
+
     return (
         <>
-            <View style={styles.itemContainer}>
-                <TouchableOpacity style={styles.item} onPress={() => onTogglePlay(item)}>
+            <Animated.View style={[styles.itemContainer, animatedStyle]}>
+                <Pressable
+                    style={styles.item}
+                    onPress={() => onTogglePlay(item)}
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
+                >
                     <View style={[styles.playButtonIcon, (isItemPlaying || isLoading) && styles.playButtonIconActive]}>
-                        {isLoading ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : isItemPlaying && audioPlayerIsPlaying ? (
-                            <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
-                        ) : (
-                            <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />
-                        )}
+                        <AnimatedPlayButton 
+                            key={item.id}
+                            isPlaying={isItemPlaying && audioPlayerIsPlaying} 
+                            size={18} 
+                            color="#FFFFFF" 
+                            strokeWidth={1.5} 
+                        />
                     </View>
                     <View style={styles.itemInfo}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
@@ -74,16 +104,18 @@ const RecordingItem = memo(({
                         </View>
                         {item.tags && item.tags.length > 0 && renderTags(item.tags)}
                     </View>
-                </TouchableOpacity>
+                </Pressable>
 
-                <TouchableOpacity
+                <Pressable
                     style={styles.optionsButton}
                     onPress={() => onOptions(item)}
+                    onPressIn={handlePressIn}
+                    onPressOut={handlePressOut}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
                     <MoreVertical size={20} color="#78716C" strokeWidth={2} />
-                </TouchableOpacity>
-            </View>
+                </Pressable>
+            </Animated.View>
 
             {/* Enfants connectés */}
             {childrenRecords && childrenRecords.length > 0 && (
@@ -91,14 +123,15 @@ const RecordingItem = memo(({
                     {childrenRecords.map(child => {
                         const isChildPlaying = child.id === activeChildId;
                         return (
-                            <TouchableOpacity
+                            <Pressable
                                 key={child.id}
                                 style={[styles.childSquare, isChildPlaying && styles.childSquareActive]}
                                 onPress={() => onTogglePlay(child)}
-                                activeOpacity={0.7}
+                                onPressIn={handlePressIn}
+                                onPressOut={handlePressOut}
                             >
                                 <Logo size={18} color={isChildPlaying ? '#FFFFFF' : '#78350F'} variant="outline" />
-                            </TouchableOpacity>
+                            </Pressable>
                         );
                     })}
                 </View>

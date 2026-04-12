@@ -103,7 +103,7 @@ function AppContent() {
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName={isAuthenticated ? "Record" : "Auth"}
-          screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+          screenOptions={{ headerShown: false, animation: 'none' }}
         >
           {isAuthenticated ? (
             <>

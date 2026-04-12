@@ -5,10 +5,16 @@ import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withTiming,
-    Easing
+    Easing,
+    SlideInDown,
+    FadeOutDown,
+    FadeInUp,
+    FadeOutUp,
+    FadeInDown
 } from 'react-native-reanimated';
 import { getRelativeDate, formatTime } from '../utils/date';
 import { useAudioPlayer, useAudioProgress } from '../contexts/AudioPlayerContext';
+import AnimatedPlayButton from './AnimatedPlayButton';
 
 export default function AudioPlayer() {
     const { currentTrack, isPlaying, duration, toggle, stop, seekTo, modalVisible, openModal, closeModal } = useAudioPlayer();
@@ -74,18 +80,18 @@ export default function AudioPlayer() {
         <>
             {/* ═══ MINI PLAYER BAR (toujours visible quand un track est actif) ═══ */}
             {(!modalVisible && currentTrack) && (
-                <View style={styles.miniPlayerContainer}>
+                <Animated.View
+                    entering={SlideInDown.duration(300).easing(Easing.out(Easing.ease))}
+                    exiting={FadeOutDown.duration(200)}
+                    style={styles.miniPlayerContainer}
+                >
                     <View style={styles.miniPlayerRow}>
                         {/* Play/Pause mini */}
                         <TouchableOpacity
                             onPress={() => toggle()}
                             style={styles.miniPlayButton}
                         >
-                            {isPlaying ? (
-                                <Pause size={16} color="#FFFFFF" strokeWidth={1.5} />
-                            ) : (
-                                <Play size={16} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 2 }} />
-                            )}
+                            <AnimatedPlayButton isPlaying={isPlaying} size={16} color="#FFFFFF" strokeWidth={1.5} />
                         </TouchableOpacity>
 
                         {/* Info + progress — tap pour ouvrir la modale */}
@@ -94,9 +100,15 @@ export default function AudioPlayer() {
                             activeOpacity={0.7}
                             style={styles.miniPlayerInfo}
                         >
-                            <Text style={styles.miniPlayerTitle} numberOfLines={1}>
+                            <Animated.Text
+                                key={currentTrack.id}
+                                entering={FadeInDown.duration(300)}
+                                exiting={FadeOutUp.duration(300)}
+                                style={styles.miniPlayerTitle}
+                                numberOfLines={1}
+                            >
                                 {currentTrack.title || 'Sans titre'}
-                            </Text>
+                            </Animated.Text>
                             <Pressable
                                 style={styles.miniProgressBarTrack}
                                 onLayout={(e) => setMiniProgressWidth(e.nativeEvent.layout.width)}
@@ -121,7 +133,7 @@ export default function AudioPlayer() {
                             <X size={16} color="#78716C" strokeWidth={1.5} />
                         </TouchableOpacity>
                     </View>
-                </View>
+                </Animated.View>
             )}
 
             {/* ═══ MODAL AUDIO PLAYER ═══ */}
@@ -152,13 +164,24 @@ export default function AudioPlayer() {
                         {/* Contenu centré */}
                         {currentTrack && (
                             <View style={styles.modalContent}>
-                                <Text style={styles.modalDateText}>
+                                <Animated.Text
+                                    key={`date-${currentTrack.id}`}
+                                    entering={FadeInUp.duration(300)}
+                                    exiting={FadeOutUp.duration(300)}
+                                    style={styles.modalDateText}
+                                >
                                     {getRelativeDate(currentTrack.date)}
-                                </Text>
+                                </Animated.Text>
 
-                                <Text style={styles.modalTitleText} numberOfLines={2}>
+                                <Animated.Text
+                                    key={`title-${currentTrack.id}`}
+                                    entering={FadeInUp.duration(300).delay(50)}
+                                    exiting={FadeOutUp.duration(300)}
+                                    style={styles.modalTitleText}
+                                    numberOfLines={2}
+                                >
                                     {currentTrack.title || 'Sans titre'}
-                                </Text>
+                                </Animated.Text>
 
                                 <TouchableOpacity
                                     onPress={() => toggle()}
@@ -167,11 +190,7 @@ export default function AudioPlayer() {
                                         { backgroundColor: isPlaying ? '#B91C1C' : '#78350F' }
                                     ]}
                                 >
-                                    {isPlaying ? (
-                                        <Pause size={32} color="#FFFFFF" strokeWidth={1.5} />
-                                    ) : (
-                                        <Play size={32} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 4 }} />
-                                    )}
+                                    <AnimatedPlayButton isPlaying={isPlaying} size={32} color="#FFFFFF" strokeWidth={1.5} />
                                 </TouchableOpacity>
                             </View>
                         )}
