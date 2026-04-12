@@ -55,7 +55,7 @@ export const uploadRecordingToCloud = async (recordingId, localUri, userId = 'pu
  * Génère une URL signée temporaire pour lire un fichier audio depuis le bucket.
  * @param {string} storagePath - Chemin dans le bucket (ex: "userId/timestamp.m4a")
  * @param {number} expiresIn - Durée de validité en secondes (défaut: 1 heure)
- * @returns {Promise<string|null>} - URL signée temporaire ou null
+ * @returns {Promise<{url: string|null, error: string|null}>} - URL signée et erreur éventuelle
  */
 export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
     try {
@@ -64,13 +64,17 @@ export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
             .createSignedUrl(storagePath, expiresIn);
 
         if (error) {
+            // Si le fichier est physiquement absent du bucket
+            if (error.message && error.message.includes('Object not found')) {
+                return { url: null, error: 'NOT_FOUND' };
+            }
             console.error('Signed URL Error:', error.message);
-            return null;
+            return { url: null, error: error.message };
         }
-        return data.signedUrl;
+        return { url: data.signedUrl, error: null };
     } catch (e) {
         console.error('Failed to get signed URL:', e);
-        return null;
+        return { url: null, error: e.message || 'Unknown error' };
     }
 };
 

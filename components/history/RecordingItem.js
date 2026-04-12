@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Play, Pause, Pin, MoreVertical, Cloud, CloudOff } from 'lucide-react-native';
 import Logo from '../Logo';
 import { getTagInfo } from '../../utils/tags';
@@ -17,7 +17,8 @@ const RecordingItem = memo(({
     onTogglePlay,
     onOptions,
     sessionUser,
-    activeChildId
+    activeChildId,
+    isLoading
 }) => {
 
     const renderTags = (tags) => {
@@ -41,8 +42,10 @@ const RecordingItem = memo(({
         <>
             <View style={styles.itemContainer}>
                 <TouchableOpacity style={styles.item} onPress={() => onTogglePlay(item)}>
-                    <View style={[styles.playButtonIcon, isItemPlaying && styles.playButtonIconActive]}>
-                        {isItemPlaying && audioPlayerIsPlaying ? (
+                    <View style={[styles.playButtonIcon, (isItemPlaying || isLoading) && styles.playButtonIconActive]}>
+                        {isLoading ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : isItemPlaying && audioPlayerIsPlaying ? (
                             <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
                         ) : (
                             <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Play, Pause } from 'lucide-react-native';
 import Animated, {
     useSharedValue,
@@ -14,7 +14,7 @@ import { formatDateWithTime } from '../../utils/date';
  * Carte spéciale pour le "souvenir du jour" affichée en haut de l'historique.
  * Glow orange pulsant tant que le souvenir n'a pas été ouvert.
  */
-const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay }) => {
+const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay, isLoading }) => {
     const pulse = useSharedValue(0);
 
     useEffect(() => {
@@ -56,8 +56,10 @@ const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay }) => 
                             <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
                             <Text style={styles.itemDate}>{formatDateWithTime(dailyMemory.date)}</Text>
                         </View>
-                        <View style={[styles.playButtonIcon, isPlaying && styles.playButtonIconActive]}>
-                            {isPlaying ? (
+                        <View style={[styles.playButtonIcon, (isPlaying || isLoading) && styles.playButtonIconActive]}>
+                            {isLoading ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : isPlaying ? (
                                 <Pause size={18} color="#FFFFFF" strokeWidth={1.5} />
                             ) : (
                                 <Play size={18} color="#FFFFFF" strokeWidth={1.5} style={{ marginLeft: 3 }} />

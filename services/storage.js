@@ -86,7 +86,21 @@ const cacheSupabaseAudioLocally = async (recordings) => {
         const { getSignedAudioUrl } = require('./cloud');
         for (const rec of recordings) {
             if (!rec.remoteUrl || rec.localUri) continue;
-            const signedUrl = await getSignedAudioUrl(rec.remoteUrl);
+            
+            const { url: signedUrl, error } = await getSignedAudioUrl(rec.remoteUrl);
+            
+            if (error === 'NOT_FOUND') {
+                console.warn(`Fichier cloud manquant pour "${rec.title}" – Tentative de réparation.`);
+                // Si on a quand même un localUri (qui aurait pu être râté par la condition au dessus), on garde,
+                // sinon on nettoie le remoteUrl car il est mort.
+                if (rec.localUri) {
+                    await updateRecording(rec.id, { remoteUrl: null, status: 'pending' });
+                } else {
+                    await updateRecording(rec.id, { remoteUrl: null });
+                }
+                continue;
+            }
+            
             if (!signedUrl) continue;
 
             if (Platform.OS === 'web') {
@@ -113,28 +127,34 @@ const cacheSupabaseAudioLocally = async (recordings) => {
 
 export { cacheSupabaseAudioLocally };
 
+/**
+ * LOCAL FIRST : Résout la source audio UNIQUEMENT depuis le stockage local.
+ * Ne contacte JAMAIS le cloud pendant la lecture.
+ * Les fichiers cloud sont téléchargés en amont par cacheSupabaseAudioLocally (via le pull).
+ * Si le fichier n'est pas encore en local → null (indisponible, sera dispo après le prochain sync).
+ */
 export const getAudioSource = async (recording) => {
-    if (recording.localUri) {
-        if (Platform.OS === 'web' && recording.localUri.startsWith('indexeddb://')) {
-            const audioId = recording.localUri.replace('indexeddb://', '');
-            const blobUrl = await universalStorage.getAudioBlobUrl(audioId);
-            if (blobUrl) return { uri: blobUrl };
-        } else if (Platform.OS !== 'web') {
-            const fileInfo = await FileSystem.getInfoAsync(recording.localUri);
-            if (fileInfo.exists) return { uri: recording.localUri };
-        } else {
-            return { uri: recording.localUri };
-        }
+    if (!recording.localUri) {
+        console.log(`Audio "${recording.title}" pas encore disponible en local.`);
+        return null;
     }
-    if (recording.remoteUrl) {
-        if (recording.remoteUrl.startsWith('http')) {
-            return { uri: recording.remoteUrl };
-        }
-        const { getSignedAudioUrl } = require('./cloud');
-        const signedUrl = await getSignedAudioUrl(recording.remoteUrl);
-        if (signedUrl) return { uri: signedUrl };
+
+    if (Platform.OS === 'web' && recording.localUri.startsWith('indexeddb://')) {
+        const audioId = recording.localUri.replace('indexeddb://', '');
+        const blobUrl = await universalStorage.getAudioBlobUrl(audioId);
+        if (blobUrl) return { uri: blobUrl };
+        console.warn(`Blob introuvable pour "${recording.title}" (indexeddb key manquante)`);
+        return null;
     }
-    return null;
+    
+    if (Platform.OS !== 'web') {
+        const fileInfo = await FileSystem.getInfoAsync(recording.localUri);
+        if (fileInfo.exists) return { uri: recording.localUri };
+        console.warn(`Fichier local introuvable pour "${recording.title}" : ${recording.localUri}`);
+        return null;
+    }
+
+    return { uri: recording.localUri };
 };
 
 export const saveRecording = async (newRecording) => {

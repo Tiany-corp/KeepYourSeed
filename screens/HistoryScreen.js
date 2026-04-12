@@ -1,8 +1,8 @@
 import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal, RefreshControl } from 'react-native';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
-import { syncAll } from '../services/sync';
+import { syncAll, pushOnly } from '../services/sync';
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
@@ -32,28 +32,20 @@ export default function HistoryScreen() {
     const [selectedOptionsItem, setSelectedOptionsItem] = useState(null);
 
     const audioPlayer = useAudioPlayer();
+    const { 
+        currentTrack, 
+        isPlaying: audioPlayerIsPlaying, 
+        loadingTrackId,
+        toggle: toggleAudio
+    } = audioPlayer;
     const { showAlert } = useAlert();
 
     useEffect(() => {
         const initializeRecordings = async () => {
-            // 1. Charger le local immédiatement pour la réactivité
+            // Charger le local immédiatement pour la réactivité
             const localData = await getRecordings();
             setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
-
             setIsLoading(false);
-
-            // 2. Lancer la synchronisation initiale
-            if (session?.user) {
-                try {
-                    const result = await syncAll(session.user.id);
-                    if (result.success && (result.pushed > 0 || result.pulled > 0)) {
-                        const updatedData = await getRecordings();
-                        setRecordings(updatedData.sort((a, b) => new Date(b.date) - new Date(a.date)));
-                    }
-                } catch (e) {
-                    console.error('Initial sync failed:', e);
-                }
-            }
         };
 
         initializeRecordings();
@@ -66,47 +58,30 @@ export default function HistoryScreen() {
                     setIsDailyMemorySeen(seenId === memory.id);
                 }
             });
-
-            // Écoute réseau "one-shot" pour déclencher le sync au passage en Wi-Fi
-            const NetInfo = require('@react-native-community/netinfo');
-            let hasSyncedInWifi = false;
-            let unsubscribe = null;
-
-            unsubscribe = NetInfo.addEventListener(state => {
-                const isWifi = state.type === 'wifi' || state.type === 'ethernet';
-                if (isWifi && state.isConnected && !hasSyncedInWifi) {
-                    console.log('Wi-Fi détecté – Déclenchement de la synchronisation one-shot');
-                    hasSyncedInWifi = true;
-                    syncAll(session.user.id).then(result => {
-                        if (result.success && (result.pushed > 0 || result.pulled > 0)) {
-                            getRecordings().then(data => {
-                                setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
-                            });
-                        }
-                    });
-
-                    // Désabonnement sécurisé (gère le cas où l'événement est appelé de manière synchrone via Babel)
-                    if (typeof unsubscribe === 'function') {
-                        unsubscribe();
-                    } else {
-                        setTimeout(() => {
-                            if (typeof unsubscribe === 'function') unsubscribe();
-                        }, 10);
-                    }
-                }
-            });
-
-            return () => {
-                if (typeof unsubscribe === 'function') unsubscribe();
-            };
         }
     }, [session]);
 
+    const [refreshing, setRefreshing] = useState(false);
+
     async function loadRecordings() {
-        // Cette fonction est maintenant un alias pour rafraîchir manuellement si besoin
         const data = await getRecordings();
         setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
     }
+
+    // Pull-to-refresh : sync manuelle (bypass cooldown) puis rechargement local
+    const handleRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            if (session?.user) {
+                await syncAll(session.user.id, true); // isManual = true
+            }
+            await loadRecordings();
+        } catch (e) {
+            console.error('Pull-to-refresh failed:', e);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [session]);
 
     // Grouper les recordings avec useMemo pour éviter la recréation des références
     const { parentRecordings, childrenByParent } = useMemo(() => {
@@ -175,15 +150,9 @@ export default function HistoryScreen() {
             
             showAlert('Succès', 'Enregistrement modifié.', 'success');
 
-            // 2. Synchro silencieuse en arrière-plan (si on est connecté)
+            // 2. Push silencieux en arrière-plan (pas de pull, pas de cooldown)
             if (session?.user) {
-                syncAll(session.user.id).then(result => {
-                    if (result.success && (result.pushed > 0 || result.pulled > 0)) {
-                        getRecordings().then(data => {
-                            setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
-                        });
-                    }
-                }).catch(err => console.log('Silent sync failed after edit', err));
+                pushOnly(session.user.id).catch(err => console.log('Silent push failed after edit', err));
             }
 
         } catch (e) {
@@ -200,7 +169,7 @@ export default function HistoryScreen() {
         try {
             await deleteRecording(itemToDelete.id);
 
-            if (audioPlayer.currentTrack?.id === itemToDelete.id) {
+            if (currentTrack?.id === itemToDelete.id) {
                 await audioPlayer.stop();
             }
 
@@ -258,25 +227,31 @@ export default function HistoryScreen() {
 
     // Callbacks stables pour RecordingItem
     const handleTogglePlay = useCallback((item) => {
-        audioPlayer.toggle(item);
-    }, [audioPlayer]);
+        toggleAudio(item);
+    }, [toggleAudio]);
 
     const handleOptions = useCallback((item) => {
         setSelectedOptionsItem(item);
     }, []);
 
-    const renderItem = useCallback(({ item }) => (
-        <RecordingItem
-            item={item}
-            isItemPlaying={audioPlayer.currentTrack?.id === item.id}
-            audioPlayerIsPlaying={audioPlayer.isPlaying}
-            childrenRecords={childrenByParent[item.id]}
-            onTogglePlay={handleTogglePlay}
-            onOptions={handleOptions}
-            sessionUser={session?.user}
-            activeChildId={audioPlayer.currentTrack?.id}
-        />
-    ), [audioPlayer.currentTrack?.id, audioPlayer.isPlaying, childrenByParent, handleTogglePlay, handleOptions, session?.user]);
+    const renderItem = useCallback(({ item }) => {
+        const isItemPlaying = currentTrack?.id === item.id;
+        const isLoading = loadingTrackId === item.id;
+        
+        return (
+            <RecordingItem
+                item={item}
+                isItemPlaying={isItemPlaying}
+                audioPlayerIsPlaying={audioPlayerIsPlaying}
+                childrenRecords={childrenByParent[item.id]}
+                onTogglePlay={handleTogglePlay}
+                onOptions={handleOptions}
+                sessionUser={session?.user}
+                activeChildId={currentTrack?.id}
+                isLoading={isLoading}
+            />
+        );
+    }, [currentTrack?.id, audioPlayerIsPlaying, loadingTrackId, childrenByParent, handleTogglePlay, handleOptions, session?.user]);
 
     const renderListHeader = () => {
         const hasFilters = availableTags.length > 0;
@@ -288,7 +263,7 @@ export default function HistoryScreen() {
                 <DailyMemoryCard
                     dailyMemory={dailyMemory}
                     isOpened={isDailyMemorySeen}
-                    isPlaying={(audioPlayer.currentTrack?.id === dailyMemory?.id) && audioPlayer.isPlaying}
+                    isPlaying={(currentTrack?.id === dailyMemory?.id) && audioPlayerIsPlaying}
                     onTogglePlay={async () => {
                         if (!isDailyMemorySeen && session?.user) {
                             setIsDailyMemorySeen(true);
@@ -297,6 +272,7 @@ export default function HistoryScreen() {
                         audioPlayer.play(dailyMemory);
                         audioPlayer.openModal();
                     }}
+                    isLoading={loadingTrackId === dailyMemory?.id}
                 />
 
                 {/* Barre de filtres (Tags) */}
@@ -343,6 +319,16 @@ export default function HistoryScreen() {
                     maxToRenderPerBatch={10}
                     windowSize={5}
                     removeClippedSubviews={Platform.OS === 'android'}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            colors={['#78350F']}
+                            tintColor="#78350F"
+                            title="Synchronisation..."
+                            titleColor="#78716C"
+                        />
+                    }
                 />
             )}
 

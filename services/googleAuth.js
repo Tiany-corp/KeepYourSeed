@@ -73,6 +73,11 @@ export async function signInWithGoogle() {
 
         if (error) throw error;
 
+        if (error) throw error;
+
+        console.log('🔗 [DEBUG] URL de connexion générée par Supabase :', data.url);
+
+
         // Fallback: listen for deep links in case WebBrowser doesn't return properly
         // (common issue on Xiaomi/MIUI and some Samsung browsers)
         let linkingResolved = false;

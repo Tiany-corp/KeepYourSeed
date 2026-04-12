@@ -10,9 +10,16 @@ import { supabase } from './supabase';
 let _isSyncing = false;
 
 /**
+ * Cooldown : timestamp du dernier sync réussi.
+ * Empêche les syncs automatiques trop rapprochés (< 5 min).
+ */
+let _lastSyncTime = 0;
+const SYNC_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
  * Synchronisation complète : Push (Local -> Cloud) + Pull (Cloud -> Local)
  * @param {string} userId - UUID de l'utilisateur
- * @param {boolean} isManual - Si true, bypass certaines restrictions
+ * @param {boolean} isManual - Si true, bypass le cooldown et certaines restrictions réseau
  * @returns {Promise<{success: boolean, pushed: number, pulled: number, status: string}>}
  */
 export const syncAll = async (userId, isManual = false) => {
@@ -24,6 +31,14 @@ export const syncAll = async (userId, isManual = false) => {
             console.log('syncAll ignoré : synchronisation déjà en cours');
             return { success: false, pushed: 0, pulled: 0, status: 'already-syncing' };
         }
+
+        // Cooldown : si le dernier sync date de moins de 5 min, on skip (sauf manual)
+        const now = Date.now();
+        if (!isManual && (now - _lastSyncTime) < SYNC_COOLDOWN_MS) {
+            console.log(`syncAll ignoré : cooldown actif (${Math.round((SYNC_COOLDOWN_MS - (now - _lastSyncTime)) / 1000)}s restantes)`);
+            return { success: false, pushed: 0, pulled: 0, status: 'cooldown' };
+        }
+
         _isSyncing = true;
 
         const NetInfo = require('@react-native-community/netinfo');
@@ -61,6 +76,7 @@ export const syncAll = async (userId, isManual = false) => {
         }
 
         _isSyncing = false;
+        _lastSyncTime = Date.now();
         return { 
             success: true, 
             pushed: pushedCount, 
@@ -70,6 +86,38 @@ export const syncAll = async (userId, isManual = false) => {
     } catch (error) {
         console.error('Erreur syncAll:', error);
         return { success: false, pushed: 0, pulled: 0, error: error.message };
+    } finally {
+        _isSyncing = false;
+    }
+};
+
+/**
+ * Push-only : envoie les enregistrements en attente sans faire de Pull.
+ * Utilisé après un nouvel enregistrement pour ne pas alourdir l'UX.
+ * Ignore le cooldown car c'est une action déclenchée par l'utilisateur.
+ * @param {string} userId
+ */
+export const pushOnly = async (userId) => {
+    try {
+        if (!userId || _isSyncing) return { success: false, pushed: 0 };
+        _isSyncing = true;
+
+        const NetInfo = require('@react-native-community/netinfo');
+        const { getWifiOnlyPreference } = require('./storage');
+        const netState = await NetInfo.fetch();
+        const isConnected = netState.isConnected;
+        const isWifi = netState.type === 'wifi' || netState.type === 'ethernet';
+        const wifiOnly = await getWifiOnlyPreference();
+
+        if (!isConnected || (wifiOnly && !isWifi)) {
+            return { success: false, pushed: 0, status: 'skipped' };
+        }
+
+        const pushed = await pushLocalRecordings(userId);
+        return { success: true, pushed };
+    } catch (error) {
+        console.error('Erreur pushOnly:', error);
+        return { success: false, pushed: 0 };
     } finally {
         _isSyncing = false;
     }

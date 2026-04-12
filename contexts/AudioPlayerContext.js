@@ -29,6 +29,7 @@ export function AudioPlayerProvider({ children }) {
     
     // Suivi de l'état "Métier" (quel morceau, est-ce en pause ?)
     const [currentTrack, setCurrentTrack] = useState(null);
+    const [loadingTrackId, setLoadingTrackId] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
 
     // Synchronisation simple de l'état isPlaying depuis l'objet player
@@ -84,6 +85,11 @@ export function AudioPlayerProvider({ children }) {
     const play = useCallback(async (recording) => {
         if (!recording) return;
 
+        // Si on change de morceau, on active l'état de chargement immédiatement
+        if (currentTrack?.id !== recording.id) {
+            setLoadingTrackId(recording.id);
+        }
+
         // Optimistic UI : On fixe l'intention
         intentionalPlay.current = true;
         setIsPlaying(true);
@@ -91,17 +97,19 @@ export function AudioPlayerProvider({ children }) {
 
         if (currentTrack?.id === recording.id) {
             player.play();
-            return;
-        }
-
-        const source = await getAudioSource(recording);
-        if (!source) {
-            intentionalPlay.current = false;
-            setIsPlaying(false);
+            setLoadingTrackId(null);
             return;
         }
 
         try {
+            const source = await getAudioSource(recording);
+            if (!source) {
+                intentionalPlay.current = false;
+                setIsPlaying(false);
+                setLoadingTrackId(null);
+                return;
+            }
+            
             // ZAPPING INSTANTANÉ
             player.replace(source);
             player.play();
@@ -109,6 +117,8 @@ export function AudioPlayerProvider({ children }) {
             intentionalPlay.current = false;
             setIsPlaying(false);
             console.error('Erreur expo-audio play:', e);
+        } finally {
+            setLoadingTrackId(null);
         }
     }, [currentTrack, player]);
 
@@ -152,8 +162,9 @@ export function AudioPlayerProvider({ children }) {
         player.seekTo(positionMillis / 1000);
     }, [player]);
 
-    const value = {
+    const value = useMemo(() => ({
         currentTrack,
+        loadingTrackId,
         isPlaying,
         duration,
         modalVisible,
@@ -164,7 +175,20 @@ export function AudioPlayerProvider({ children }) {
         seekTo,
         openModal,
         closeModal,
-    };
+    }), [
+        currentTrack, 
+        loadingTrackId, 
+        isPlaying, 
+        duration, 
+        modalVisible, 
+        play, 
+        pause, 
+        toggle, 
+        stop, 
+        seekTo, 
+        openModal, 
+        closeModal
+    ]);
 
     return (
         <AudioPlayerContext.Provider value={value}>
