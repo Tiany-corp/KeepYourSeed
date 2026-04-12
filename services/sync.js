@@ -43,7 +43,7 @@ export const syncAll = async (userId, isManual = false) => {
 
         const NetInfo = require('@react-native-community/netinfo');
         const { getWifiOnlyPreference } = require('./storage');
-        
+
         const netState = await NetInfo.fetch();
         const isWifi = netState.type === 'wifi' || netState.type === 'ethernet';
         const isConnected = netState.isConnected;
@@ -77,9 +77,9 @@ export const syncAll = async (userId, isManual = false) => {
 
         _isSyncing = false;
         _lastSyncTime = Date.now();
-        return { 
-            success: true, 
-            pushed: pushedCount, 
+        return {
+            success: true,
+            pushed: pushedCount,
             pulled: pulledCount,
             status: (!isWifi && wifiOnly && !isManual) ? 'wifi-required' : 'done'
         };
@@ -136,7 +136,7 @@ const pushLocalRecordings = async (userId) => {
             const remoteUrl = await uploadRecordingToCloud(rec.id, rec.localUri, userId);
             if (remoteUrl) {
                 await saveRecordingToDatabase(
-                    userId, rec.title, remoteUrl, rec.duration, 
+                    userId, rec.title, remoteUrl, rec.duration,
                     rec.type || 'note', rec.deliverDate, rec.tags || [], rec.parentId
                 );
                 await updateRecording(rec.id, { status: 'synced' });
@@ -157,7 +157,7 @@ const pushLocalUpdates = async (userId) => {
     const localRecordings = await getRecordings();
     const toUpdate = localRecordings.filter(r => r.status === 'pending_update');
     let count = 0;
-    
+
     // On importe updateRecordingMetadataInDatabase dynamiquement pour éviter les dépendances circulaires
     const { updateRecordingMetadataInDatabase } = require('./cloud');
 
@@ -190,43 +190,59 @@ const pullCloudRecordings = async (userId) => {
     try {
         const cloudRecordings = await fetchCloudRecordings(userId);
         const localRecordings = await getRecordings();
-        
-        // Maps for quick lookup
+
+        // Maps pour recherche rapide
+        const localByDbId = new Map(
+            localRecordings.filter(r => r.dbId).map(r => [r.dbId, r])
+        );
         const localByRemote = new Map(
             localRecordings.filter(r => r.remoteUrl).map(r => [r.remoteUrl, r])
         );
         const localByHash = new Map(
-            // Assume recordings may have a `hash` field (e.g., SHA256 of audio)
             localRecordings.filter(r => r.hash).map(r => [r.hash, r])
         );
         
         let newItems = [];
         let updatedItems = [];
+
         for (const cloudRec of cloudRecordings) {
-            const alreadyByUrl = cloudRec.remoteUrl && localByRemote.has(cloudRec.remoteUrl);
-            const alreadyByHash = cloudRec.hash && localByHash.has(cloudRec.hash);
+            // MATCHING STABLE : On cherche d'abord par ID de base de données (le plus fiable)
+            let localRec = localByDbId.get(cloudRec.dbId);
             
-            if (alreadyByUrl || alreadyByHash) {
-                // LWW (Last-Write-Wins) en cas de doublon
-                const localRec = alreadyByUrl ? localByRemote.get(cloudRec.remoteUrl) : localByHash.get(cloudRec.hash);
-                
+            // Fallback sur l'URL de stockage ou le Hash (pour les vieux records ou le 1er sync)
+            if (!localRec) {
+                if (cloudRec.remoteUrl && localByRemote.has(cloudRec.remoteUrl)) {
+                    localRec = localByRemote.get(cloudRec.remoteUrl);
+                } else if (cloudRec.hash && localByHash.has(cloudRec.hash)) {
+                    localRec = localByHash.get(cloudRec.hash);
+                }
+            }
+            
+            if (localRec) {
+                // RÉCONCILIATION : On met à jour l'existant au lieu de dupliquer
                 const localTime = new Date(localRec.updatedAt || localRec.date || 0).getTime();
                 const cloudTime = new Date(cloudRec.updatedAt || cloudRec.date || 0).getTime();
                 
-                if (cloudTime > localTime && localRec.status !== 'pending_update') {
-                    // Serveur plus récent et pas de modification locale en attente => Mise à jour du local
+                // Si la version cloud est plus récente OU si le local n'avait pas encore son dbId
+                const needsIdUpdate = !localRec.dbId && cloudRec.dbId;
+
+                if (needsIdUpdate || (cloudTime > localTime && localRec.status !== 'pending_update')) {
                     updatedItems.push({
                         ...localRec,
+                        dbId: cloudRec.dbId, // On attache l'ID database s'il manquait
                         title: cloudRec.title,
                         type: cloudRec.type,
                         deliverDate: cloudRec.deliverDate,
                         tags: cloudRec.tags,
-                        updatedAt: cloudRec.updatedAt
+                        updatedAt: cloudRec.updatedAt,
+                        // Si le cloud a une URL et que le local ne l'a plus (réparation après erreur 404), on la restaure
+                        remoteUrl: cloudRec.remoteUrl || localRec.remoteUrl 
                     });
                 }
                 continue;
             }
-            // New recording from cloud
+
+            // NOUVEL ÉLÉMENT : Réellement absent du téléphone
             newItems.push({
                 ...cloudRec,
                 id: `cloud_${cloudRec.dbId || Date.now()}_${Math.random().toString(36).substr(2,5)}`,
@@ -235,25 +251,32 @@ const pullCloudRecordings = async (userId) => {
             });
         }
 
-        if (newItems.length > 0 || updatedItems.length > 0) {
+        // --- SÉCURITÉ ANTI-DOUBLONS (AUTO-CLEANUP) ---
+        // On va filtrer localRecordings pour supprimer ceux qui pointent déjà vers un dbId traité
+        const handledDbIds = new Set();
+        updatedItems.forEach(u => handledDbIds.add(u.dbId));
+        newItems.forEach(n => handledDbIds.add(n.dbId));
+
+        const cleanedLocal = localRecordings.filter(loc => {
+            if (!loc.dbId) return true; // On garde les locaux purs (non encore sync)
+            if (handledDbIds.has(loc.dbId)) return false; // On dégage car déjà géré dans updatedItems
+            handledDbIds.add(loc.dbId); // On marque cet ID comme "vu" pour les suivants
+            return true;
+        });
+
+        if (newItems.length > 0 || updatedItems.length > 0 || cleanedLocal.length !== localRecordings.length) {
             const { STORAGE_KEY } = require('./storage');
             const { set } = require('idb-keyval');
             const { Platform } = require('react-native');
             const AsyncStorage = require('@react-native-async-storage/async-storage').default;
             
-            // Mise à jour des éléments existants
-            let merged = localRecordings.map(local => {
-                const update = updatedItems.find(u => u.id === local.id);
-                return update ? update : local;
-            });
-            
-            // Ajout des nouveaux
-            merged = [...newItems, ...merged];
+            // Fusion finale : Nouveaux + Mis à jour + Locaux restants
+            let merged = [...newItems, ...updatedItems, ...cleanedLocal];
             
             // Tri par date décroissante
             merged.sort((a, b) => new Date(b.date) - new Date(a.date));
             
-            // Sauvegarde directe pour éviter les boucles d'updateRecording
+            // Sauvegarde atomique (JSON direct pour éviter les boucles d'updateRecording)
             const stringValue = JSON.stringify(merged);
             if (Platform.OS === 'web') {
                 await set(STORAGE_KEY, stringValue);
@@ -261,13 +284,13 @@ const pullCloudRecordings = async (userId) => {
                 await AsyncStorage.setItem(STORAGE_KEY, stringValue);
             }
             
-            // Lancer le téléchargement des audios manquants en arrière-plan
-            if (newItems.length > 0) {
-                cacheSupabaseAudioLocally(merged);
-            }
+            // Lancer le cache audio en tâche de fond pour les nouveaux venus
+            cacheSupabaseAudioLocally(merged);
+            
+            console.log(`[Sync] Terminé: ${newItems.length} créés, ${updatedItems.length} mis à jour, ${localRecordings.length - cleanedLocal.length} doublons supprimés.`);
             return newItems.length + updatedItems.length;
         }
-        
+
         // Même si pas de nouveaux items, on vérifie si certains audios distants ne sont pas encore cachés
         cacheSupabaseAudioLocally(localRecordings);
         return 0;

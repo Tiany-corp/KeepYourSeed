@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { AppContext } from '../contexts/AppContext';
 import useAudioRecorder from '../hooks/useAudioRecorder';
 import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getCurrentStreak, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
@@ -73,10 +73,17 @@ export default function RecordScreen() {
         };
     }, [dailyMemory?.id, session?.user?.id]);
 
-    // Charger la pensée épinglée
-    useEffect(() => {
-        getPinnedThought().then(setPinnedThoughtState);
-    }, []);
+    // Re-charger la pensée épinglée et les infos clés à chaque retour sur l'écran
+    useFocusEffect(
+        useCallback(() => {
+            getPinnedThought().then(setPinnedThoughtState);
+            getCurrentStreak().then(setStreakCount);
+            
+            if (session?.user) {
+                getDailyMemory(session.user.id).then(setDailyMemory);
+            }
+        }, [session?.user])
+    );
 
     // --- ÉTAPE 1 : RecordButton a fini → on ouvre la modale ---
     const handleRecordingComplete = (uri, recordedDuration) => {

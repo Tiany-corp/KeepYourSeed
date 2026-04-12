@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal, RefreshControl } from 'react-native';
+import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll, pushOnly } from '../services/sync';
@@ -23,7 +24,7 @@ export default function HistoryScreen() {
     const navigation = useNavigation();
     const [recordings, setRecordings] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // Pagination
     const PAGE_SIZE = 20;
     const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
@@ -358,7 +359,7 @@ export default function HistoryScreen() {
             <Modal
                 visible={!!selectedOptionsItem}
                 transparent
-                animationType="fade"
+                animationType="none"
                 onRequestClose={() => setSelectedOptionsItem(null)}
             >
                 <TouchableOpacity
@@ -366,7 +367,16 @@ export default function HistoryScreen() {
                     activeOpacity={1}
                     onPress={() => setSelectedOptionsItem(null)}
                 >
-                    <TouchableOpacity activeOpacity={1} style={styles.optionsMenuContainer}>
+                    <Animated.View 
+                        entering={() => {
+                            'worklet';
+                            return {
+                                initialValues: { transform: [{ translateY: 300 }] },
+                                animations: { transform: [{ translateY: withTiming(0, { duration: 350 }) }] }
+                            };
+                        }}
+                        style={styles.optionsMenuContainer}
+                    >
                         <View style={styles.optionsMenuHeader}>
                             <Text style={styles.optionsMenuTitle} numberOfLines={1}>
                                 {selectedOptionsItem?.title || 'Enregistrement'}
@@ -407,7 +417,7 @@ export default function HistoryScreen() {
                         <TouchableOpacity style={styles.optionCancelBtn} onPress={() => setSelectedOptionsItem(null)}>
                             <Text style={styles.optionCancelText}>Annuler</Text>
                         </TouchableOpacity>
-                    </TouchableOpacity>
+                    </Animated.View>
                 </TouchableOpacity>
             </Modal>
 
