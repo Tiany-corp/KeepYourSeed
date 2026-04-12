@@ -8,6 +8,7 @@ import { AudioPlayerProvider } from './contexts/AudioPlayerContext';
 import { AlertProvider } from './contexts/AlertContext';
 import RecordScreen from './screens/RecordScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import TrashScreen from './screens/TrashScreen';
 import AuthScreen from './screens/AuthScreen';
 import SettingsDrawer from './components/SettingsDrawer';
 import AudioPlayer from './components/AudioPlayer';
@@ -111,6 +112,7 @@ function AppContent() {
               <Stack.Screen name="History">
                 {(props) => <HistoryScreen {...props} key={refreshKey} />}
               </Stack.Screen>
+              <Stack.Screen name="Trash" component={TrashScreen} />
             </>
           ) : (
             <Stack.Screen name="Auth">

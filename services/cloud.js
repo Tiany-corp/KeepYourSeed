@@ -135,6 +135,7 @@ export const fetchCloudRecordings = async (userId) => {
             .from('recordings')
             .select('*')
             .eq('user_id', userId)
+            .is('deleted_at', null)
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -156,6 +157,7 @@ export const fetchCloudRecordings = async (userId) => {
             type: row.type || 'note',
             deliverDate: row.deliver_date || null,
             tags: row.tags || [],
+            deletedAt: row.deleted_at || null,
         }));
 
     } catch (e) {
@@ -209,22 +211,19 @@ export const updateRecordingMetadataInDatabase = async ({
 };
 
 /**
- * Supprime un enregistrement cloud (fichier bucket + ligne DB).
+ * "Supprime" un enregistrement cloud (Soft Delete).
+ * Ne supprime pas le fichier du bucket pour permettre la restauration.
  */
 export const deleteRecordingFromCloud = async ({ userId, recording }) => {
     try {
         if (!userId || !recording) return false;
 
-        if (recording.remoteUrl && !recording.remoteUrl.startsWith('http')) {
-            const { error: removeError } = await supabase.storage
-                .from('audios')
-                .remove([recording.remoteUrl]);
-            if (removeError) {
-                console.error('Cloud file delete error:', removeError);
-            }
-        }
+        const updates = {
+            deleted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
 
-        let query = supabase.from('recordings').delete().eq('user_id', userId);
+        let query = supabase.from('recordings').update(updates).eq('user_id', userId);
         if (recording.dbId) {
             query = query.eq('id', recording.dbId);
         } else if (recording.remoteUrl) {
@@ -235,13 +234,119 @@ export const deleteRecordingFromCloud = async ({ userId, recording }) => {
 
         const { error } = await query;
         if (error) {
-            console.error('Cloud DB delete error:', error);
+            console.error('Cloud Soft Delete error:', error);
             return false;
         }
         return true;
     } catch (e) {
-        console.error('Failed to delete cloud recording:', e);
+        console.error('Failed to soft delete cloud recording:', e);
         return false;
+    }
+};
+
+/**
+ * Restaure un enregistrement depuis la corbeille.
+ */
+export const restoreRecordingFromCloud = async ({ userId, recording }) => {
+    try {
+        if (!userId || !recording) return false;
+
+        const updates = {
+            deleted_at: null,
+            updated_at: new Date().toISOString(),
+        };
+
+        let query = supabase.from('recordings').update(updates).eq('user_id', userId);
+        if (recording.dbId) {
+            query = query.eq('id', recording.dbId);
+        } else if (recording.remoteUrl) {
+            query = query.eq('audio_url', recording.remoteUrl);
+        }
+
+        const { error } = await query;
+        if (error) {
+            console.error('Cloud Restore error:', error);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to restore cloud recording:', e);
+        return false;
+    }
+};
+
+/**
+ * Supprime DEFINITIVEMENT un enregistrement (Ligne DB + Fichier Bucket).
+ */
+export const permanentlyDeleteFromCloud = async ({ userId, recording }) => {
+    try {
+        if (!userId || !recording) return false;
+
+        // 1. Suppression du fichier physique
+        if (recording.remoteUrl && !recording.remoteUrl.startsWith('http')) {
+            const { error: removeError } = await supabase.storage
+                .from('audios')
+                .remove([recording.remoteUrl]);
+            if (removeError) {
+                console.error('Permanent file delete error:', removeError);
+            }
+        }
+
+        // 2. Suppression de la ligne DB
+        let query = supabase.from('recordings').delete().eq('user_id', userId);
+        if (recording.dbId) {
+            query = query.eq('id', recording.dbId);
+        } else if (recording.remoteUrl) {
+            query = query.eq('audio_url', recording.remoteUrl);
+        }
+
+        const { error } = await query;
+        if (error) {
+            console.error('Permanent DB delete error:', error);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('Failed to permanently delete cloud recording:', e);
+        return false;
+    }
+};
+
+/**
+ * Récupère uniquement les enregistrements supprimés (Corbeille).
+ */
+export const fetchTrashRecordings = async (userId) => {
+    try {
+        const { data, error } = await supabase
+            .from('recordings')
+            .select('*')
+            .eq('user_id', userId)
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+
+        if (error) {
+            console.error('Supabase Trash Fetch Error:', error);
+            return [];
+        }
+
+        return (data || []).map(row => ({
+            id: `cloud_${row.id}`,
+            dbId: row.id,
+            localUri: null,
+            remoteUrl: row.audio_url,
+            status: 'synced',
+            date: row.created_at,
+            deletedAt: row.deleted_at,
+            updatedAt: row.updated_at || row.created_at,
+            duration: row.duration_seconds || 0,
+            title: row.title || 'Sans titre',
+            type: row.type || 'note',
+            deliverDate: row.deliver_date || null,
+            tags: row.tags || [],
+        }));
+    } catch (e) {
+        console.error('Failed to fetch trash:', e);
+        return [];
     }
 };
 

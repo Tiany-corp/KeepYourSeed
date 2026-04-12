@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
@@ -16,6 +17,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const [isSyncing, setIsSyncing] = useState(false);
     const [wifiOnly, setWifiOnly] = useState(false);
     const { showAlert } = useAlert();
+    const navigation = useNavigation();
 
     // Load Wi‑Fi‑only preference on mount
     useEffect(() => {
@@ -194,6 +196,11 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             <Text style={styles.menuItemText}>
                                 {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
                             </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.menuItem} onPress={() => { onClose(); navigation.navigate('Trash'); }}>
+                            <Trash2 size={20} color="#78350F" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Ma Corbeille</Text>
                         </TouchableOpacity>
 
                         {/* Wi‑Fi‑only toggle */}

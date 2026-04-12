@@ -92,9 +92,9 @@ export default function HistoryScreen() {
 
     // Grouper les recordings avec useMemo pour éviter la recréation des références
     const { parentRecordings, childrenByParent } = useMemo(() => {
-        const parents = recordings.filter(r => !r.parentId);
+        const parents = recordings.filter(r => !r.parentId && !r.deletedAt);
         const childrenMap = {};
-        recordings.filter(r => r.parentId).forEach(child => {
+        recordings.filter(r => r.parentId && !r.deletedAt).forEach(child => {
             if (!childrenMap[child.parentId]) childrenMap[child.parentId] = [];
             childrenMap[child.parentId].push(child);
         });

@@ -59,9 +59,7 @@ export const syncAll = async (userId, isManual = false) => {
         // 1. PUSH : Autorisé si (Wifi) OR (4G ET !wifiOnly) OR (Manual)
         const canPush = isManual || isWifi || !wifiOnly;
         if (canPush) {
-            const pushedCreations = await pushLocalRecordings(userId);
-            const pushedUpdates = await pushLocalUpdates(userId);
-            pushedCount = pushedCreations + pushedUpdates;
+            pushedCount = await pushLocalChanges(userId);
         } else {
             console.log('Push sauté (Wi-Fi requis)');
         }
@@ -113,7 +111,7 @@ export const pushOnly = async (userId) => {
             return { success: false, pushed: 0, status: 'skipped' };
         }
 
-        const pushed = await pushLocalRecordings(userId);
+        const pushed = await pushLocalChanges(userId);
         return { success: true, pushed };
     } catch (error) {
         console.error('Erreur pushOnly:', error);
@@ -124,59 +122,51 @@ export const pushOnly = async (userId) => {
 };
 
 /**
- * Envoie les nouveaux enregistrements ('pending') vers Supabase.
+ * Envoie les créations ('pending') et mises à jour ('pending_update') vers Supabase.
  */
-const pushLocalRecordings = async (userId) => {
+const pushLocalChanges = async (userId) => {
+    const { updateRecordingMetadataInDatabase, deleteRecordingFromCloud, uploadRecordingToCloud, saveRecordingToDatabase } = require('./cloud');
     const localRecordings = await getRecordings();
-    const toSync = localRecordings.filter(r => r.status === 'pending');
+    const toSync = localRecordings.filter(r => r.status === 'pending' || r.status === 'pending_update');
     let count = 0;
 
     for (const rec of toSync) {
         try {
-            const remoteUrl = await uploadRecordingToCloud(rec.id, rec.localUri, userId);
-            if (remoteUrl) {
-                await saveRecordingToDatabase(
-                    userId, rec.title, remoteUrl, rec.duration,
-                    rec.type || 'note', rec.deliverDate, rec.tags || [], rec.parentId
-                );
-                await updateRecording(rec.id, { status: 'synced' });
-                count++;
+            if (rec.status === 'pending') {
+                const remoteUrl = await uploadRecordingToCloud({ recordingId: rec.id, localUri: rec.localUri, userId });
+                if (remoteUrl) {
+                    const dbId = await saveRecordingToDatabase(
+                        userId, rec.title, remoteUrl, rec.duration,
+                        rec.type || 'note', rec.deliverDate, rec.tags || [], rec.parentId
+                    );
+                    if (dbId) {
+                        await updateRecording(rec.id, { status: 'synced', dbId });
+                        count++;
+                    }
+                }
+            } else if (rec.status === 'pending_update') {
+                let ok = false;
+                if (rec.deletedAt) {
+                    ok = await deleteRecordingFromCloud({ userId, recording: rec });
+                } else {
+                    ok = await updateRecordingMetadataInDatabase({
+                        userId,
+                        recording: rec,
+                        title: rec.title,
+                        type: rec.type,
+                        deliverDate: rec.deliverDate,
+                        tags: rec.tags
+                    });
+                }
+
+                if (ok) {
+                    await updateRecording(rec.id, { status: 'synced' });
+                    count++;
+                }
             }
         } catch (err) {
-            console.error(`Erreur push creation "${rec.title}":`, err);
+            console.error(`Erreur push change pour "${rec.title}":`, err);
             await updateRecording(rec.id, { status: 'error' });
-        }
-    }
-    return count;
-};
-
-/**
- * Envoie les mises à jour locales ('pending_update') vers Supabase.
- */
-const pushLocalUpdates = async (userId) => {
-    const localRecordings = await getRecordings();
-    const toUpdate = localRecordings.filter(r => r.status === 'pending_update');
-    let count = 0;
-
-    // On importe updateRecordingMetadataInDatabase dynamiquement pour éviter les dépendances circulaires
-    const { updateRecordingMetadataInDatabase } = require('./cloud');
-
-    for (const rec of toUpdate) {
-        try {
-            const ok = await updateRecordingMetadataInDatabase({
-                userId,
-                recording: rec,
-                title: rec.title,
-                type: rec.type,
-                deliverDate: rec.deliverDate,
-                tags: rec.tags,
-            });
-            if (ok) {
-                await updateRecording(rec.id, { status: 'synced' });
-                count++;
-            }
-        } catch (err) {
-            console.error(`Erreur push update "${rec.title}":`, err);
         }
     }
     return count;
@@ -216,6 +206,12 @@ const pullCloudRecordings = async (userId) => {
                 } else if (cloudRec.hash && localByHash.has(cloudRec.hash)) {
                     localRec = localByHash.get(cloudRec.hash);
                 }
+            }
+            
+            // SÉCURITÉ : Si l'élément est déjà supprimé localement, on l'ignore totalement
+            // On ne veut pas qu'il réapparaisse dans le "Main" si le cloud n'est pas encore au courant
+            if (localRec && localRec.deletedAt) {
+                continue;
             }
             
             if (localRec) {

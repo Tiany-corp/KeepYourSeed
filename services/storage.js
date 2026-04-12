@@ -188,10 +188,49 @@ export const updateRecording = async (id, updates) => {
     }
 };
 
+/**
+ * Marque un enregistrement comme supprimé (Soft Delete) localement.
+ * On garde le fichier physique pour permettre la restauration.
+ */
 export const deleteRecording = async (id) => {
     try {
         const recordings = await getRecordings();
+        const updatedRecordings = recordings.map(rec =>
+            rec.id === id ? { ...rec, deletedAt: new Date().toISOString(), status: 'pending_update' } : rec
+        );
+        await universalStorage.saveData(STORAGE_KEY, updatedRecordings);
+        return updatedRecordings;
+    } catch (e) {
+        console.error('Failed to soft delete recording', e);
+        return [];
+    }
+};
+
+/**
+ * Restaure un enregistrement supprimé localement.
+ */
+export const restoreRecording = async (id) => {
+    try {
+        const recordings = await getRecordings();
+        const updatedRecordings = recordings.map(rec =>
+            rec.id === id ? { ...rec, deletedAt: null, status: 'pending_update' } : rec
+        );
+        await universalStorage.saveData(STORAGE_KEY, updatedRecordings);
+        return updatedRecordings;
+    } catch (e) {
+        console.error('Failed to restore recording', e);
+        return [];
+    }
+};
+
+/**
+ * Supprime DEFINITIVEMENT un enregistrement (Fichier physique + Metadata).
+ */
+export const permanentlyDeleteRecording = async (id) => {
+    try {
+        const recordings = await getRecordings();
         const recToDelete = recordings.find(r => r.id === id);
+        
         if (recToDelete && recToDelete.localUri) {
             if (Platform.OS === 'web' && recToDelete.localUri.startsWith('indexeddb://')) {
                 const audioId = recToDelete.localUri.replace('indexeddb://', '');
@@ -202,11 +241,12 @@ export const deleteRecording = async (id) => {
                 } catch (e) { console.warn('File delete failed', e.message); }
             }
         }
+        
         const updatedRecordings = recordings.filter(rec => rec.id !== id);
         await universalStorage.saveData(STORAGE_KEY, updatedRecordings);
         return updatedRecordings;
     } catch (e) {
-        console.error('Failed to delete recording', e);
+        console.error('Failed to permanently delete recording', e);
         return [];
     }
 };

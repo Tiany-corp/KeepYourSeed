@@ -1,11 +1,11 @@
 import React, { memo, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withSpring
 } from 'react-native-reanimated';
-import { Pin, MoreVertical, Cloud, CloudOff } from 'lucide-react-native';
+import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2 } from 'lucide-react-native';
 import Logo from '../Logo';
 import AnimatedPlayButton from '../AnimatedPlayButton';
 import { getTagInfo } from '../../utils/tags';
@@ -24,7 +24,10 @@ const RecordingItem = memo(({
     onOptions,
     sessionUser,
     activeChildId,
-    isLoading
+    isLoading,
+    isTrashMode = false,
+    onRestore,
+    onDeletePermanent
 }) => {
 
     const renderTags = (tags) => {
@@ -86,8 +89,8 @@ const RecordingItem = memo(({
                             {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
                             <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
 
-                            {/* Indicateur de synchro */}
-                            {sessionUser && (
+                            {/* Indicateur de synchro (caché en mode corbeille pour plus de clarté) */}
+                            {sessionUser && !isTrashMode && (
                                 <View style={{ marginLeft: 6 }}>
                                     {item.status === 'synced' ? (
                                         <Cloud size={14} color="#10B981" opacity={0.6} />
@@ -106,15 +109,32 @@ const RecordingItem = memo(({
                     </View>
                 </Pressable>
 
-                <Pressable
-                    style={styles.optionsButton}
-                    onPress={() => onOptions(item)}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                    <MoreVertical size={20} color="#78716C" strokeWidth={2} />
-                </Pressable>
+                {!isTrashMode ? (
+                    <Pressable
+                        style={styles.optionsButton}
+                        onPress={() => onOptions(item)}
+                        onPressIn={handlePressIn}
+                        onPressOut={handlePressOut}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <MoreVertical size={20} color="#78716C" strokeWidth={2} />
+                    </Pressable>
+                ) : (
+                    <View style={styles.trashActions}>
+                        <TouchableOpacity 
+                            style={[styles.trashActionBtn, { backgroundColor: '#E7E5E4' }]} 
+                            onPress={() => onRestore(item)}
+                        >
+                            <RotateCcw size={18} color="#78350F" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.trashActionBtn, { backgroundColor: '#FEE2E2' }]} 
+                            onPress={() => onDeletePermanent(item)}
+                        >
+                            <Trash2 size={18} color="#B91C1C" />
+                        </TouchableOpacity>
+                    </View>
+                )}
             </Animated.View>
 
             {/* Enfants connectés */}
@@ -141,6 +161,17 @@ const RecordingItem = memo(({
 });
 
 const styles = StyleSheet.create({
+    trashActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    trashActionBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     itemContainer: {
         flexDirection: 'row',
         alignItems: 'center',
