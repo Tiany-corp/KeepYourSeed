@@ -1,4 +1,4 @@
-import { getRecordings, updateRecording, cacheSupabaseAudioLocally, deduplicateLocalStore } from './storage';
+import { getRecordings, updateRecording, cacheSupabaseAudioLocally, deduplicateLocalStore, saveRawRecordings } from './storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase, fetchCloudRecordings } from './cloud';
 import { supabase } from './supabase';
 
@@ -185,17 +185,7 @@ const pushLocalChanges = async (userId) => {
     }
 
     if (hasChanged) {
-        const { STORAGE_KEY } = require('./storage');
-        const { set } = require('idb-keyval');
-        const { Platform } = require('react-native');
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        
-        const stringValue = JSON.stringify(workingList);
-        if (Platform.OS === 'web') {
-            await set(STORAGE_KEY, stringValue);
-        } else {
-            await AsyncStorage.setItem(STORAGE_KEY, stringValue);
-        }
+        await saveRawRecordings(workingList);
     }
 
     return count;
@@ -318,11 +308,6 @@ const pullCloudRecordings = async (userId) => {
         });
 
         if (newItems.length > 0 || updatedItems.length > 0 || cleanedLocal.length !== localRecordings.length) {
-            const { STORAGE_KEY } = require('./storage');
-            const { set } = require('idb-keyval');
-            const { Platform } = require('react-native');
-            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-            
             // Fusion finale : Nouveaux + Mis à jour + Locaux restants
             let merged = [...newItems, ...updatedItems, ...cleanedLocal];
             
@@ -330,12 +315,7 @@ const pullCloudRecordings = async (userId) => {
             merged.sort((a, b) => new Date(b.date) - new Date(a.date));
             
             // Sauvegarde atomique (JSON direct pour éviter les boucles d'updateRecording)
-            const stringValue = JSON.stringify(merged);
-            if (Platform.OS === 'web') {
-                await set(STORAGE_KEY, stringValue);
-            } else {
-                await AsyncStorage.setItem(STORAGE_KEY, stringValue);
-            }
+            await saveRawRecordings(merged);
             
             // Lancer le cache audio en tâche de fond pour les nouveaux venus
             cacheSupabaseAudioLocally(merged);

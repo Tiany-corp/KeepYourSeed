@@ -188,6 +188,16 @@ export const updateRecording = async (id, updates) => {
     }
 };
 
+export const saveRawRecordings = async (recordings) => {
+    try {
+        await universalStorage.saveData(STORAGE_KEY, recordings);
+        return true;
+    } catch (e) {
+        console.error('Failed to save raw recordings', e);
+        return false;
+    }
+};
+
 /**
  * Marque un enregistrement comme supprimé (Soft Delete) localement.
  * On garde le fichier physique pour permettre la restauration.
