@@ -5,7 +5,7 @@ import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -81,6 +81,30 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         } catch (e) {
             console.error('Sync failed:', e);
             showAlert('Erreur', 'Un problème est survenu lors de la synchronisation.', 'error');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleForcePush = async () => {
+        if (!session?.user?.id) return;
+        setIsSyncing(true);
+        try {
+            const { forcePushAllLocalNotes } = require('../services/sync');
+            const result = await forcePushAllLocalNotes(session.user.id);
+            if (result.success) {
+                if (result.repaired > 0 || result.pushed > 0) {
+                    showAlert('Succès', `${result.repaired} notes réparées, ${result.pushed} envoyées.`, 'success');
+                    if (onDataCleared) onDataCleared();
+                } else {
+                    showAlert('Info', 'Aucune note locale bloquée n\'a été trouvée.', 'info');
+                }
+            } else {
+                showAlert('Erreur', 'Le forçage a échoué.', 'error');
+            }
+        } catch (e) {
+            console.error('Force push failed:', e);
+            showAlert('Erreur', 'Une erreur est survenue lors du forçage de l\'envoi.', 'error');
         } finally {
             setIsSyncing(false);
         }
@@ -195,6 +219,21 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             )}
                             <Text style={styles.menuItemText}>
                                 {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handleForcePush}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? (
+                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
+                            ) : (
+                                <Rocket size={20} color="#059669" style={styles.menuIcon} />
+                            )}
+                            <Text style={[styles.menuItemText, { color: '#059669' }]}>
+                                Forcer l'envoi des notes locales
                             </Text>
                         </TouchableOpacity>
 
