@@ -284,32 +284,37 @@ export const deduplicateLocalStore = async () => {
         const recordings = await universalStorage.getData(STORAGE_KEY) || [];
         if (recordings.length === 0) return [];
 
-        const uniqueMap = new Map();
+        const cleanedRecordings = [];
         const duplicatesIds = new Set();
 
-        recordings.forEach(rec => {
-            // Clé de duplication : dbId > remoteUrl > localUri
-            const key = rec.dbId || rec.remoteUrl || rec.localUri || rec.id;
-            
-            if (uniqueMap.has(key)) {
-                const existing = uniqueMap.get(key);
-                // Si la nouvelle version est plus complète (a un dbId que l'autre n'a pas), on remplace
+        for (const rec of recordings) {
+            // On cherche un doublon existant dans la liste nettoyée
+            const existingIdx = cleanedRecordings.findIndex(existing => {
+                if (rec.dbId && existing.dbId && rec.dbId === existing.dbId) return true;
+                if (rec.remoteUrl && existing.remoteUrl && rec.remoteUrl === existing.remoteUrl) return true;
+                // Fallback extrême pour les très vieux enregistrements sans ID: même titre et même durée
+                if (!rec.dbId && !existing.dbId && rec.title && existing.title && rec.title === existing.title && rec.duration === existing.duration) return true;
+                return false;
+            });
+
+            if (existingIdx !== -1) {
+                const existing = cleanedRecordings[existingIdx];
+                // Fusion: on conserve la version qui a le plus d'identifiants cloud (le dbId prime)
                 if (!existing.dbId && rec.dbId) {
-                    uniqueMap.set(key, rec);
+                    cleanedRecordings[existingIdx] = rec;
                     duplicatesIds.add(existing.id);
                 } else {
                     duplicatesIds.add(rec.id);
                 }
             } else {
-                uniqueMap.set(key, rec);
+                cleanedRecordings.push(rec);
             }
-        });
+        }
 
         if (duplicatesIds.size > 0) {
-            const cleaned = Array.from(uniqueMap.values());
-            await universalStorage.saveData(STORAGE_KEY, cleaned);
-            console.log(`[Storage] ${duplicatesIds.size} doublons supprimés localement.`);
-            return cleaned;
+            await universalStorage.saveData(STORAGE_KEY, cleanedRecordings);
+            console.log(`[Storage] ${duplicatesIds.size} doublons supprimés localement par fusion croisée.`);
+            return cleanedRecordings;
         }
         return recordings;
     } catch (e) {
