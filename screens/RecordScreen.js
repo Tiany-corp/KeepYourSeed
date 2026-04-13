@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { AppContext } from '../contexts/AppContext';
@@ -39,15 +39,21 @@ export default function RecordScreen() {
 
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
+    const isFetchingMemory = useRef(false);
 
     useEffect(() => {
-        if (session?.user) {
+        if (session?.user && !isFetchingMemory.current) {
+            isFetchingMemory.current = true;
             setIsMemoryLoading(true);
             getDailyMemory(session.user.id).then(memory => {
                 setDailyMemory(memory);
                 setIsMemoryLoading(false);
+                isFetchingMemory.current = false;
+            }).catch(() => {
+                setIsMemoryLoading(false);
+                isFetchingMemory.current = false;
             });
-        } else {
+        } else if (!session?.user) {
             setIsMemoryLoading(false);
         }
 
@@ -79,8 +85,14 @@ export default function RecordScreen() {
             getPinnedThought().then(setPinnedThoughtState);
             getCurrentStreak().then(setStreakCount);
             
-            if (session?.user) {
-                getDailyMemory(session.user.id).then(setDailyMemory);
+            if (session?.user && !isFetchingMemory.current) {
+                isFetchingMemory.current = true;
+                getDailyMemory(session.user.id).then(memory => {
+                    setDailyMemory(memory);
+                    isFetchingMemory.current = false;
+                }).catch(() => {
+                    isFetchingMemory.current = false;
+                });
             }
         }, [session?.user])
     );

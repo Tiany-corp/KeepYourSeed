@@ -14,6 +14,7 @@ import SettingsDrawer from './components/SettingsDrawer';
 import AudioPlayer from './components/AudioPlayer';
 import { AppContext } from './contexts/AppContext';
 import { syncAll } from './services/sync';
+import { deduplicateLocalStore } from './services/storage';
 
 const Stack = createNativeStackNavigator();
 
@@ -58,6 +59,9 @@ function AppContent() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
+
+    // Nettoyage des doublons locaux au démarrage
+    deduplicateLocalStore();
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);

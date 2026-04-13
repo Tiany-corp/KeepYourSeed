@@ -1,4 +1,4 @@
-import { getRecordings, updateRecording, cacheSupabaseAudioLocally } from './storage';
+import { getRecordings, updateRecording, cacheSupabaseAudioLocally, deduplicateLocalStore } from './storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase, fetchCloudRecordings } from './cloud';
 import { supabase } from './supabase';
 
@@ -123,25 +123,37 @@ export const pushOnly = async (userId) => {
 
 /**
  * Envoie les créations ('pending') et mises à jour ('pending_update') vers Supabase.
+ * Traitement en lot (Batch) pour éviter les sauvegardes répétées du gros tableau JSON.
  */
 const pushLocalChanges = async (userId) => {
     const { updateRecordingMetadataInDatabase, deleteRecordingFromCloud, uploadRecordingToCloud, saveRecordingToDatabase } = require('./cloud');
-    const localRecordings = await getRecordings();
+    let localRecordings = await getRecordings();
     const toSync = localRecordings.filter(r => r.status === 'pending' || r.status === 'pending_update');
+    
+    if (toSync.length === 0) return 0;
+    
     let count = 0;
+    let hasChanged = false;
+
+    // On travaille sur une copie fraîche pour éviter les effets de bord
+    const workingList = [...localRecordings];
 
     for (const rec of toSync) {
         try {
+            const idx = workingList.findIndex(r => r.id === rec.id);
+            if (idx === -1) continue;
+
             if (rec.status === 'pending') {
-                const remoteUrl = await uploadRecordingToCloud({ recordingId: rec.id, localUri: rec.localUri, userId });
+                const remoteUrl = await uploadRecordingToCloud(rec.id, rec.localUri, userId);
                 if (remoteUrl) {
                     const dbId = await saveRecordingToDatabase(
                         userId, rec.title, remoteUrl, rec.duration,
                         rec.type || 'note', rec.deliverDate, rec.tags || [], rec.parentId
                     );
                     if (dbId) {
-                        await updateRecording(rec.id, { status: 'synced', dbId });
+                        workingList[idx] = { ...workingList[idx], status: 'synced', dbId };
                         count++;
+                        hasChanged = true;
                     }
                 }
             } else if (rec.status === 'pending_update') {
@@ -160,15 +172,32 @@ const pushLocalChanges = async (userId) => {
                 }
 
                 if (ok) {
-                    await updateRecording(rec.id, { status: 'synced' });
+                    workingList[idx] = { ...workingList[idx], status: 'synced' };
                     count++;
+                    hasChanged = true;
                 }
             }
         } catch (err) {
             console.error(`Erreur push change pour "${rec.title}":`, err);
-            await updateRecording(rec.id, { status: 'error' });
+            // On ne modifie pas le status ici pour laisser une chance au prochain sycn, 
+            // ou on pourrait mettre 'error' mais sans sauvegarder le tableau complet à chaque fois.
         }
     }
+
+    if (hasChanged) {
+        const { STORAGE_KEY } = require('./storage');
+        const { set } = require('idb-keyval');
+        const { Platform } = require('react-native');
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        
+        const stringValue = JSON.stringify(workingList);
+        if (Platform.OS === 'web') {
+            await set(STORAGE_KEY, stringValue);
+        } else {
+            await AsyncStorage.setItem(STORAGE_KEY, stringValue);
+        }
+    }
+
     return count;
 };
 
@@ -191,6 +220,10 @@ const pullCloudRecordings = async (userId) => {
         const localByHash = new Map(
             localRecordings.filter(r => r.hash).map(r => [r.hash, r])
         );
+        // Fallback extrême pour les très vieux enregistrements sans ID/URL (ex: 16 mars)
+        const localByTitleAndDuration = new Map(
+            localRecordings.filter(r => !r.dbId && r.title && r.duration).map(r => [`${r.title}_${r.duration}`, r])
+        );
         
         let newItems = [];
         let updatedItems = [];
@@ -205,6 +238,13 @@ const pullCloudRecordings = async (userId) => {
                     localRec = localByRemote.get(cloudRec.remoteUrl);
                 } else if (cloudRec.hash && localByHash.has(cloudRec.hash)) {
                     localRec = localByHash.get(cloudRec.hash);
+                } else if (cloudRec.title && cloudRec.duration) {
+                    const fallbackKey = `${cloudRec.title}_${cloudRec.duration}`;
+                    if (localByTitleAndDuration.has(fallbackKey)) {
+                        localRec = localByTitleAndDuration.get(fallbackKey);
+                        // On le retire pour ne pas matcher plusieurs cloudRecs sur le même vieux local
+                        localByTitleAndDuration.delete(fallbackKey);
+                    }
                 }
             }
             
@@ -249,14 +289,31 @@ const pullCloudRecordings = async (userId) => {
 
         // --- SÉCURITÉ ANTI-DOUBLONS (AUTO-CLEANUP) ---
         // On va filtrer localRecordings pour supprimer ceux qui pointent déjà vers un dbId traité
+        // OU ceux qui partagent une URL déjà gérée (évite les doublons sans ID).
         const handledDbIds = new Set();
-        updatedItems.forEach(u => handledDbIds.add(u.dbId));
-        newItems.forEach(n => handledDbIds.add(n.dbId));
+        const handledRemoteUrls = new Set();
+
+        updatedItems.forEach(u => {
+            if (u.dbId) handledDbIds.add(u.dbId);
+            if (u.remoteUrl) handledRemoteUrls.add(u.remoteUrl);
+        });
+        newItems.forEach(n => {
+            if (n.dbId) handledDbIds.add(n.dbId);
+            if (n.remoteUrl) handledRemoteUrls.add(n.remoteUrl);
+        });
 
         const cleanedLocal = localRecordings.filter(loc => {
-            if (!loc.dbId) return true; // On garde les locaux purs (non encore sync)
-            if (handledDbIds.has(loc.dbId)) return false; // On dégage car déjà géré dans updatedItems
-            handledDbIds.add(loc.dbId); // On marque cet ID comme "vu" pour les suivants
+            // Si on a déjà traité cet élément (par son ID unique cloud)
+            if (loc.dbId && handledDbIds.has(loc.dbId)) return false; 
+            
+            // Si l'URL est déjà gérée par une version cloud plus fraîche
+            if (loc.remoteUrl && handledRemoteUrls.has(loc.remoteUrl)) return false;
+
+            // Dédoublonnage interne : si on voit deux fois le même dbId, on dégage les suivants
+            if (loc.dbId) {
+                if (handledDbIds.has(loc.dbId)) return false;
+                handledDbIds.add(loc.dbId);
+            }
             return true;
         });
 

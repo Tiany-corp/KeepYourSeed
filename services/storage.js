@@ -275,6 +275,49 @@ export const getRecordings = async () => {
     }
 };
 
+/**
+ * Nettoie le stockage local des doublons (ID, URL ou Hash identiques).
+ * Priorise les versions avec dbId et remoteUrl.
+ */
+export const deduplicateLocalStore = async () => {
+    try {
+        const recordings = await universalStorage.getData(STORAGE_KEY) || [];
+        if (recordings.length === 0) return [];
+
+        const uniqueMap = new Map();
+        const duplicatesIds = new Set();
+
+        recordings.forEach(rec => {
+            // Clé de duplication : dbId > remoteUrl > localUri
+            const key = rec.dbId || rec.remoteUrl || rec.localUri || rec.id;
+            
+            if (uniqueMap.has(key)) {
+                const existing = uniqueMap.get(key);
+                // Si la nouvelle version est plus complète (a un dbId que l'autre n'a pas), on remplace
+                if (!existing.dbId && rec.dbId) {
+                    uniqueMap.set(key, rec);
+                    duplicatesIds.add(existing.id);
+                } else {
+                    duplicatesIds.add(rec.id);
+                }
+            } else {
+                uniqueMap.set(key, rec);
+            }
+        });
+
+        if (duplicatesIds.size > 0) {
+            const cleaned = Array.from(uniqueMap.values());
+            await universalStorage.saveData(STORAGE_KEY, cleaned);
+            console.log(`[Storage] ${duplicatesIds.size} doublons supprimés localement.`);
+            return cleaned;
+        }
+        return recordings;
+    } catch (e) {
+        console.error('Deduplication failed', e);
+        return [];
+    }
+};
+
 export const clearRecordings = async () => {
     try { await universalStorage.removeData(STORAGE_KEY); } catch (e) { console.error('Failed to clear recordings', e); }
 };
