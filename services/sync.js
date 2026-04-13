@@ -122,6 +122,44 @@ export const pushOnly = async (userId) => {
 };
 
 /**
+ * Fonction de secours pour réparer les notes locales "bloquées".
+ * Elle convertit toutes les notes sans ID Cloud en statut 'pending' et force le push.
+ */
+export const forcePushAllLocalNotes = async (userId) => {
+    try {
+        if (!userId || _isSyncing) return { success: false, pushed: 0 };
+        _isSyncing = true;
+        
+        const localRecordings = await getRecordings();
+        let repairCount = 0;
+        
+        // 1. Réparation des statuts
+        const repaired = localRecordings.map(rec => {
+            if (!rec.dbId && rec.status === 'synced') {
+                repairCount++;
+                return { ...rec, status: 'pending' };
+            }
+            return rec;
+        });
+
+        if (repairCount > 0) {
+            await saveRawRecordings(repaired);
+            console.log(`[Sync] ${repairCount} notes locales bloquées ont été repassées en 'pending'.`);
+        }
+
+        // 2. Lancement du push normal
+        const pushed = await pushLocalChanges(userId);
+        return { success: true, pushed, repaired: repairCount };
+    } catch (error) {
+        console.error('Erreur forcePush:', error);
+        return { success: false, pushed: 0, error };
+    } finally {
+        _isSyncing = false;
+    }
+};
+
+
+/**
  * Envoie les créations ('pending') et mises à jour ('pending_update') vers Supabase.
  * Traitement en lot (Batch) pour éviter les sauvegardes répétées du gros tableau JSON.
  */
