@@ -5,7 +5,8 @@ import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket } from 'lucide-react-native';
+import { fixServerDatesFromLocal } from '../services/fixDates';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -105,6 +106,29 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         } catch (e) {
             console.error('Force push failed:', e);
             showAlert('Erreur', 'Une erreur est survenue lors du forçage de l\'envoi.', 'error');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleFixDates = async () => {
+        if (!session?.user?.id) return;
+        setIsSyncing(true);
+        try {
+            const result = await fixServerDatesFromLocal(session.user.id);
+            if (result.success) {
+                if (result.fixed > 0) {
+                    showAlert('Succès', `${result.fixed} dates ont été réparées sur le serveur !`, 'success');
+                    if (onDataCleared) onDataCleared();
+                } else {
+                    showAlert('Info', 'Toutes les dates semblent déjà correctes.', 'info');
+                }
+            } else {
+                showAlert('Erreur', 'Le script de date a échoué.', 'error');
+            }
+        } catch (e) {
+            console.error('Date fix failed:', e);
+            showAlert('Erreur', 'Erreur critique du script.', 'error');
         } finally {
             setIsSyncing(false);
         }
@@ -234,6 +258,21 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             )}
                             <Text style={[styles.menuItemText, { color: '#059669' }]}>
                                 Forcer l'envoi des notes locales
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handleFixDates}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? (
+                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
+                            ) : (
+                                <CalendarClock size={20} color="#CA8A04" style={styles.menuIcon} />
+                            )}
+                            <Text style={[styles.menuItemText, { color: '#CA8A04' }]}>
+                                Corriger les dates sur le serveur
                             </Text>
                         </TouchableOpacity>
 
