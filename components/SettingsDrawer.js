@@ -6,8 +6,8 @@ import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
 import { fixServerDatesFromLocal } from '../services/fixDates';
-import { recoverOrphanedAudios } from '../services/recover';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock, LifeBuoy } from 'lucide-react-native';
+import { recoverOrphanedAudios, undoRecoveredAudios } from '../services/recover';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock, LifeBuoy, Flame } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -151,6 +151,25 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
             }
         } catch (e) {
             console.error('Recover failed:', e);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleUndoRecover = async () => {
+        setIsSyncing(true);
+        try {
+            const result = await undoRecoveredAudios();
+            if (result.success) {
+                if (result.count > 0) {
+                    showAlert('Purge réussie', `${result.count} fichiers audio ont été définitivement supprimés.`, 'success');
+                    if (onDataCleared) onDataCleared();
+                } else {
+                    showAlert('Info', 'Aucun vocal de récupération à purger.', 'info');
+                }
+            }
+        } catch (e) {
+            console.error('Undo fail:', e);
         } finally {
             setIsSyncing(false);
         }
@@ -310,6 +329,21 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             )}
                             <Text style={[styles.menuItemText, { color: '#991B1B', fontWeight: 'bold' }]}>
                                 Urgence: Récupérer mémos perdus
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handleUndoRecover}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? (
+                                <ActivityIndicator size={20} color="#DC2626" style={styles.menuIcon} />
+                            ) : (
+                                <Flame size={20} color="#DC2626" style={styles.menuIcon} />
+                            )}
+                            <Text style={[styles.menuItemText, { color: '#DC2626' }]}>
+                                Purger vocaux de récupération
                             </Text>
                         </TouchableOpacity>
 

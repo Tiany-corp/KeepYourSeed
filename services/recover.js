@@ -66,3 +66,32 @@ export const recoverOrphanedAudios = async () => {
         return { success: false, msg: e.message };
     }
 };
+
+/**
+ * Supprime définitivement les fichiers audio qui ont été réanimés par la récupération d'urgence.
+ * Il supprime la fiche JSON et purge le blob originel dans IndexedDB.
+ */
+export const undoRecoveredAudios = async () => {
+    try {
+        const { del } = require('idb-keyval');
+        const localRecordings = await getRecordings();
+        
+        // Isoler ceux qui ont le tag de récupération
+        const recovered = localRecordings.filter(r => r.tags?.includes('Récupération Urgence'));
+        const kept = localRecordings.filter(r => !r.tags?.includes('Récupération Urgence'));
+        
+        if (recovered.length === 0) return { success: true, count: 0 };
+
+        for (const rec of recovered) {
+            // Suppression physique dans IndexedDB (audio_file_{id})
+            await del(`audio_file_${rec.id}`);
+        }
+
+        await saveRawRecordings(kept);
+
+        return { success: true, count: recovered.length };
+    } catch (e) {
+        console.error('Erreur undo récup', e);
+        return { success: false, msg: e.message };
+    }
+};
