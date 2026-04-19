@@ -6,7 +6,8 @@ import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
 import { fixServerDatesFromLocal } from '../services/fixDates';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock } from 'lucide-react-native';
+import { recoverOrphanedAudios } from '../services/recover';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock, LifeBuoy } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -129,6 +130,27 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         } catch (e) {
             console.error('Date fix failed:', e);
             showAlert('Erreur', 'Erreur critique du script.', 'error');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleRecover = async () => {
+        setIsSyncing(true);
+        try {
+            const result = await recoverOrphanedAudios();
+            if (result.success) {
+                if (result.count > 0) {
+                    showAlert('Sauvetage réussi', `${result.count} vocaux perdus ont été restaurés ! Va vite voir ta liste.`, 'success');
+                    if (onDataCleared) onDataCleared();
+                } else {
+                    showAlert('Info', 'Aucun vocal orphelin trouvé dans ton navigateur.', 'info');
+                }
+            } else {
+                showAlert('Erreur', result.msg || 'La récupération a échoué.', 'error');
+            }
+        } catch (e) {
+            console.error('Recover failed:', e);
         } finally {
             setIsSyncing(false);
         }
@@ -273,6 +295,21 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             )}
                             <Text style={[styles.menuItemText, { color: '#CA8A04' }]}>
                                 Corriger les dates sur le serveur
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handleRecover}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? (
+                                <ActivityIndicator size={20} color="#991B1B" style={styles.menuIcon} />
+                            ) : (
+                                <LifeBuoy size={20} color="#991B1B" style={styles.menuIcon} />
+                            )}
+                            <Text style={[styles.menuItemText, { color: '#991B1B', fontWeight: 'bold' }]}>
+                                Urgence: Récupérer mémos perdus
                             </Text>
                         </TouchableOpacity>
 
