@@ -160,6 +160,42 @@ export const forcePushAllLocalNotes = async (userId) => {
 
 
 /**
+ * Analyse la BDD Cloud et supprime du téléphone tous les enregistrements locaux
+ * qui possèdent un dbId mais qui ont été hard-delete (suppression manuelle DB) sur le Cloud.
+ */
+export const purgeHardDeletedCloudItems = async (userId) => {
+    try {
+        const { fetchCloudRecordings } = require('./cloud');
+        const cloudRecordings = await fetchCloudRecordings(userId);
+        if (!cloudRecordings) return { success: false, msg: "Connexion Cloud impossible." };
+
+        const localRecordings = await getRecordings();
+        const cloudDbIds = new Set(cloudRecordings.map(c => c.dbId).filter(Boolean));
+
+        const kept = [];
+        let deletedCount = 0;
+
+        for (const loc of localRecordings) {
+            if (loc.dbId && !cloudDbIds.has(loc.dbId)) {
+                // Ce fichier a été supprimé definitivement du cloud, on le purge localement
+                deletedCount++;
+                continue;
+            }
+            kept.push(loc);
+        }
+
+        if (deletedCount > 0) {
+            await saveRawRecordings(kept);
+        }
+
+        return { success: true, count: deletedCount };
+    } catch (e) {
+        console.error("Erreur purge locale:", e);
+        return { success: false, msg: e.message };
+    }
+};
+
+/**
  * Envoie les créations ('pending') et mises à jour ('pending_update') vers Supabase.
  * Traitement en lot (Batch) pour éviter les sauvegardes répétées du gros tableau JSON.
  */

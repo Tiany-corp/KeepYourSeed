@@ -7,7 +7,8 @@ import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '.
 import { emptyAudiosBucket } from '../services/cloud';
 import { fixServerDatesFromLocal } from '../services/fixDates';
 import { recoverOrphanedAudios, undoRecoveredAudios } from '../services/recover';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock, LifeBuoy, Flame } from 'lucide-react-native';
+import { purgeHardDeletedCloudItems } from '../services/sync';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock, LifeBuoy, Flame, DatabaseBackup } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -170,6 +171,25 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
             }
         } catch (e) {
             console.error('Undo fail:', e);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handlePurgeCloudDeletes = async () => {
+        setIsSyncing(true);
+        try {
+            const result = await purgeHardDeletedCloudItems(session?.user?.id);
+            if (result.success) {
+                if (result.count > 0) {
+                    showAlert('Nettoyage', `${result.count} fichiers supprimés sur Supabase ont été purgés de ton téléphone.`, 'success');
+                    if (onDataCleared) onDataCleared();
+                } else {
+                    showAlert('Info', 'Ton téléphone est déjà aligné avec Supabase.', 'info');
+                }
+            }
+        } catch (e) {
+            console.error('Hard purge fail:', e);
         } finally {
             setIsSyncing(false);
         }
@@ -344,6 +364,21 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             )}
                             <Text style={[styles.menuItemText, { color: '#DC2626' }]}>
                                 Purger vocaux de récupération
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handlePurgeCloudDeletes}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? (
+                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
+                            ) : (
+                                <DatabaseBackup size={20} color="#000000" style={styles.menuIcon} />
+                            )}
+                            <Text style={[styles.menuItemText, { color: '#000000', fontWeight: 'bold' }]}>
+                                Synchro destructive (Aligner tél)
                             </Text>
                         </TouchableOpacity>
 
