@@ -133,9 +133,12 @@ export const forcePushAllLocalNotes = async (userId) => {
         const localRecordings = await getRecordings();
         let repairCount = 0;
         
-        // 1. Réparation des statuts
+        // 1. Réparation des statuts (faux 'synced' ou erreurs persistantes)
         const repaired = localRecordings.map(rec => {
-            if (!rec.dbId && rec.status === 'synced') {
+            const isFalseSynced = !rec.dbId && rec.status === 'synced';
+            const isStuckError = !rec.dbId && rec.status === 'error';
+            
+            if (isFalseSynced || isStuckError) {
                 repairCount++;
                 return { ...rec, status: 'pending' };
             }
@@ -202,7 +205,13 @@ export const purgeHardDeletedCloudItems = async (userId) => {
 const pushLocalChanges = async (userId) => {
     const { updateRecordingMetadataInDatabase, deleteRecordingFromCloud, uploadRecordingToCloud, saveRecordingToDatabase } = require('./cloud');
     let localRecordings = await getRecordings();
-    const toSync = localRecordings.filter(r => r.status === 'pending' || r.status === 'pending_update');
+    
+    // On inclut 'error' pour retenter automatiquement les envois qui ont échoué par le passé
+    const toSync = localRecordings.filter(r => 
+        r.status === 'pending' || 
+        r.status === 'pending_update' || 
+        r.status === 'error'
+    );
     
     if (toSync.length === 0) return 0;
     
@@ -217,7 +226,10 @@ const pushLocalChanges = async (userId) => {
             const idx = workingList.findIndex(r => r.id === rec.id);
             if (idx === -1) continue;
 
-            if (rec.status === 'pending') {
+            const isCreation = rec.status === 'pending' || (rec.status === 'error' && !rec.dbId);
+            const isUpdate = rec.status === 'pending_update' || (rec.status === 'error' && rec.dbId);
+
+            if (isCreation) {
                 const remoteUrl = await uploadRecordingToCloud(rec.id, rec.localUri, userId);
                 if (remoteUrl) {
                     const dbId = await saveRecordingToDatabase(
