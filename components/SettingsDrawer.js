@@ -4,7 +4,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
 import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info } from 'lucide-react-native';
 import Logo from './Logo';
 
