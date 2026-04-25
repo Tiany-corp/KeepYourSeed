@@ -99,7 +99,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     if (onDataCleared) onDataCleared(); // Rafraîchir l'historique
                     loadStorageStats(); // Mettre à jour les stats de stockage
                 } else {
-                    showAlert('Info', 'Tout est déjà à jour !', 'success');
                     loadStorageStats();
                 }
             } else {
@@ -233,19 +232,15 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     )}
                                 </View>
                             </View>
-                            <TouchableOpacity 
+                        <TouchableOpacity 
                             style={styles.menuItem} 
                             onPress={handleSync}
                             disabled={isSyncing}
                         >
-                            {isSyncing ? (
-                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
-                            ) : (
-                                <CloudUpload size={20} color="#78350F" style={styles.menuIcon} />
-                            )}
                             <Text style={styles.menuItemText}>
                                 {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
                             </Text>
+                            {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
                         </TouchableOpacity>
 
                         <View style={styles.section}>
@@ -270,7 +265,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Compte</Text>
                             <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                                <LogOut size={20} color="#78716C" style={styles.menuIcon} />
                                 <Text style={styles.menuItemText}>Se déconnecter</Text>
                             </TouchableOpacity>
                         </View>
@@ -278,7 +272,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         <View style={[styles.section, { marginTop: 20 }]}>
                             <Text style={[styles.sectionTitle, styles.dangerTitle]}>Zone de danger</Text>
                             <TouchableOpacity style={styles.menuItem} onPress={handleClearLocalData}>
-                                <Database size={20} color="#991B1B" style={styles.menuIcon} />
                                 <Text style={[styles.menuItemText, { color: '#991B1B' }]}>Vider le cache local</Text>
                             </TouchableOpacity>
                         </View>
