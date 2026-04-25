@@ -234,7 +234,7 @@ const pushLocalChanges = async (userId) => {
                 if (remoteUrl) {
                     const dbId = await saveRecordingToDatabase(
                         userId, rec.title, remoteUrl, rec.duration,
-                        rec.type || 'note', rec.deliverDate, rec.tags || [], rec.parentId
+                        rec.type || 'note', rec.deliverDate, rec.tags || [], rec.date
                     );
                     if (dbId) {
                         workingList[idx] = { ...workingList[idx], status: 'synced', dbId };
@@ -347,8 +347,16 @@ const pullCloudRecordings = async (userId) => {
                         deliverDate: cloudRec.deliverDate,
                         tags: cloudRec.tags,
                         updatedAt: cloudRec.updatedAt,
+                        date: cloudRec.date, // FORCE la mise à jour de la date locale si le serveur a une date corrigée (ex: après fixDates)
                         // Si le cloud a une URL et que le local ne l'a plus (réparation après erreur 404), on la restaure
                         remoteUrl: cloudRec.remoteUrl || localRec.remoteUrl 
+                    });
+                } else if (cloudRec.date && localRec.date !== cloudRec.date) {
+                    // Si l'élément n'a pas besoin de mise à jour Méta globale, mais que la date du serveur diffère
+                    // (souvent suite à un script de correction ou un import décalé), on écrase discrètement la date locale.
+                    updatedItems.push({
+                        ...localRec,
+                        date: cloudRec.date
                     });
                 }
                 continue;

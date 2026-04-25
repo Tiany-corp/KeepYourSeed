@@ -88,7 +88,7 @@ export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
  * @param {string|null} deliverDate - ISO date for message delivery (null for notes)
  * @returns {Promise<Object|null>} - The inserted record or null if failed
  */
-export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = []) => {
+export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], originalDate = null) => {
     try {
         const insertData = {
             user_id: userId,
@@ -102,6 +102,9 @@ export const saveRecordingToDatabase = async (userId, title, audioUrl, duration,
         }
         if (tags && tags.length > 0) {
             insertData.tags = tags;
+        }
+        if (originalDate) {
+            insertData.created_at = originalDate;
         }
 
         const { data, error } = await supabase
