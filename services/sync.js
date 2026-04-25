@@ -264,9 +264,17 @@ const pushLocalChanges = async (userId) => {
             if (isCreation) {
                 const remoteUrl = await uploadRecordingToCloud(rec.id, rec.localUri, userId);
                 if (remoteUrl) {
+                    // RÉSOLUTION DU PARENT : Si on a un parentId local, on cherche son dbId Cloud
+                    let cloudParentId = null;
+                    if (rec.parentId) {
+                        const parent = workingList.find(r => r.id === rec.parentId);
+                        cloudParentId = parent ? parent.dbId : null;
+                    }
+
                     const dbId = await saveRecordingToDatabase(
                         userId, rec.title, remoteUrl, rec.duration,
-                        rec.type || 'note', rec.deliverDate, rec.tags || [], rec.date
+                        rec.type || 'note', rec.deliverDate, rec.tags || [], rec.date,
+                        cloudParentId
                     );
                     if (dbId) {
                         workingList[idx] = { ...workingList[idx], status: 'synced', dbId };
@@ -285,7 +293,8 @@ const pushLocalChanges = async (userId) => {
                         title: rec.title,
                         type: rec.type,
                         deliverDate: rec.deliverDate,
-                        tags: rec.tags
+                        tags: rec.tags,
+                        parentId: rec.parentId // Déjà un dbId s'il vient du Cloud, ou un id local si pas encore résolu
                     });
                 }
 
@@ -377,6 +386,7 @@ const pullCloudRecordings = async (userId) => {
                         updatedAt: cloudRec.updatedAt,
                         date: cloudRec.date,
                         deletedAt: cloudRec.deletedAt, // Sync de l'état de la corbeille
+                        parentId: cloudRec.parentId,   // Sync de la hiérarchie
                         remoteUrl: cloudRec.remoteUrl || localRec.remoteUrl 
                     });
                 } else if (localRec.deletedAt !== cloudRec.deletedAt) {

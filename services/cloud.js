@@ -88,7 +88,7 @@ export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
  * @param {string|null} deliverDate - ISO date for message delivery (null for notes)
  * @returns {Promise<Object|null>} - The inserted record or null if failed
  */
-export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], originalDate = null) => {
+export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], originalDate = null, parentId = null) => {
     try {
         const insertData = {
             user_id: userId,
@@ -105,6 +105,9 @@ export const saveRecordingToDatabase = async (userId, title, audioUrl, duration,
         }
         if (originalDate) {
             insertData.created_at = originalDate;
+        }
+        if (parentId) {
+            insertData.parent_id = parentId;
         }
 
         const { data, error } = await supabase
@@ -160,6 +163,7 @@ export const fetchCloudRecordings = async (userId) => {
             deliverDate: row.deliver_date || null,
             tags: row.tags || [],
             deletedAt: row.deleted_at || null,
+            parentId: row.parent_id || null,
         }));
 
     } catch (e) {
@@ -179,6 +183,7 @@ export const updateRecordingMetadataInDatabase = async ({
     type,
     deliverDate,
     tags,
+    parentId,
 }) => {
     try {
         if (!userId || !recording) return false;
@@ -188,6 +193,7 @@ export const updateRecordingMetadataInDatabase = async ({
             type: type || 'note',
             tags: Array.isArray(tags) ? tags : [],
             deliver_date: type === 'message' && deliverDate ? deliverDate : null,
+            parent_id: parentId || null,
             updated_at: new Date().toISOString(), // Important pour le LWW
         };
 

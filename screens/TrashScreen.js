@@ -15,7 +15,7 @@ export default function TrashScreen({ navigation }) {
     const { session } = useContext(AppContext);
     const [recordings, setRecordings] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    
+
     // --- États pour les orphelins ---
     const [orphans, setOrphans] = useState([]);
     const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
@@ -70,7 +70,7 @@ export default function TrashScreen({ navigation }) {
     const handlePermanentDelete = (item) => {
         const title = item?.title || 'cet enregistrement';
         const confirmMsg = `Supprimer définitivement "${title}" ? Cette action est irréversible.`;
-        
+
         const executePermanentDelete = async () => {
             try {
                 await permanentlyDeleteRecording(item.id);
@@ -96,9 +96,9 @@ export default function TrashScreen({ navigation }) {
 
     const handleEmptyTrash = () => {
         if (recordings.length === 0) return;
-        
+
         const confirmMsg = `Vider la corbeille (${recordings.length} notes) ? Tout sera supprimé définitivement.`;
-        
+
         const executeEmpty = async () => {
             setIsLoading(true);
             try {
@@ -184,11 +184,11 @@ export default function TrashScreen({ navigation }) {
                 }
                 rightContent={
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <TouchableOpacity 
-                            onPress={openOrphansModal} 
+                        <TouchableOpacity
+                            onPress={openOrphansModal}
                             disabled={orphans.length === 0 || isCheckingOrphans}
                             style={[
-                                styles.emptyTrashBtn, 
+                                styles.emptyTrashBtn,
                                 { backgroundColor: '#F5F5F5', marginRight: 12 },
                                 (orphans.length === 0 || isCheckingOrphans) && { opacity: 0.4 }
                             ]}
@@ -228,7 +228,7 @@ export default function TrashScreen({ navigation }) {
                                 item={item}
                                 isPlaying={audioPlayer.currentTrack?.id === item.id && audioPlayer.isPlaying}
                                 onTogglePlay={() => audioPlayer.play(item)}
-                                onOptions={() => {}} // Pas d'options standards en corbeille
+                                onOptions={() => { }} // Pas d'options standards en corbeille
                                 isTrashMode={true} // Nouveau flag pour adapter l'UI du composant
                                 onRestore={() => handleRestore(item)}
                                 onDeletePermanent={() => handlePermanentDelete(item)}
@@ -250,13 +250,13 @@ export default function TrashScreen({ navigation }) {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Nettoyage Cloud</Text>
-                            <Text style={styles.modalSubtitle}>Ces fichiers n'existent plus sur Supabase mais sont toujours sur ton téléphone.</Text>
+                            <Text style={styles.modalSubtitle}>Ces fichiers n'existent plus sur ton Cloud mais sont toujours sur ton téléphone. Clique sur "Purger" si tu veux aussi les supprimer sur ton téléphone.</Text>
                         </View>
 
                         <ScrollView style={styles.modalList}>
                             {orphans.map(item => (
-                                <TouchableOpacity 
-                                    key={item.id} 
+                                <TouchableOpacity
+                                    key={item.id}
                                     style={styles.orphanRow}
                                     onPress={() => toggleOrphanSelection(item.id)}
                                 >
@@ -277,8 +277,8 @@ export default function TrashScreen({ navigation }) {
                             <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowOrphansModal(false)}>
                                 <Text style={styles.modalCancelTxt}>Annuler</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.modalConfirmBtn, selectedOrphans.size === 0 && { opacity: 0.5 }]} 
+                            <TouchableOpacity
+                                style={[styles.modalConfirmBtn, selectedOrphans.size === 0 && { opacity: 0.5 }]}
                                 onPress={executePurgeOrphans}
                                 disabled={selectedOrphans.size === 0}
                             >

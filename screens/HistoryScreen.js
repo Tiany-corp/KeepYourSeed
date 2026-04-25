@@ -92,13 +92,30 @@ export default function HistoryScreen() {
 
     // Grouper les recordings avec useMemo pour éviter la recréation des références
     const { parentRecordings, childrenByParent } = useMemo(() => {
-        const parents = recordings.filter(r => !r.parentId && !r.deletedAt);
+        // Un parent est une note qui n'a pas de parentId OU dont le parentId n'est pas trouvé dans la liste
+        // (on vérifie l'existence pour éviter de cacher des notes dont le parent aurait été supprimé physiquement)
+        const allIds = new Set(recordings.map(r => r.id));
+        const allDbIds = new Set(recordings.map(r => r.dbId?.toString()).filter(Boolean));
+
+        const parents = recordings.filter(r => 
+            !r.parentId || 
+            (!allIds.has(r.parentId) && !allDbIds.has(r.parentId?.toString()))
+        );
+
         const childrenMap = {};
         recordings.filter(r => r.parentId && !r.deletedAt).forEach(child => {
-            if (!childrenMap[child.parentId]) childrenMap[child.parentId] = [];
-            childrenMap[child.parentId].push(child);
+            // On cherche le parent : soit par ID local, soit par DB ID (pour la synchro cross-device)
+            const parent = recordings.find(p => 
+                p.id === child.parentId || 
+                (p.dbId && p.dbId.toString() === child.parentId?.toString())
+            );
+            
+            if (parent) {
+                if (!childrenMap[parent.id]) childrenMap[parent.id] = [];
+                childrenMap[parent.id].push(child);
+            }
         });
-        return { parentRecordings: parents, childrenByParent: childrenMap };
+        return { parentRecordings: parents.filter(r => !r.deletedAt), childrenByParent: childrenMap };
     }, [recordings]);
 
     // Extraction des tags uniques
