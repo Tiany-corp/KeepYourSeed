@@ -4,11 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { emptyAudiosBucket } from '../services/cloud';
-import { fixServerDatesFromLocal, fixLocalDatesFromServer } from '../services/fixDates';
-import { recoverOrphanedAudios, undoRecoveredAudios } from '../services/recover';
-import { purgeHardDeletedCloudItems } from '../services/sync';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock, LifeBuoy, Flame, DatabaseBackup } from 'lucide-react-native';
+import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -117,129 +114,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         }
     };
 
-    const handleForcePush = async () => {
-        if (!session?.user?.id) return;
-        setIsSyncing(true);
-        try {
-            const { forcePushAllLocalNotes } = require('../services/sync');
-            const result = await forcePushAllLocalNotes(session.user.id);
-            if (result.success) {
-                if (result.repaired > 0 || result.pushed > 0) {
-                    showAlert('Succès', `${result.repaired} notes réparées, ${result.pushed} envoyées.`, 'success');
-                    if (onDataCleared) onDataCleared();
-                } else {
-                    showAlert('Info', 'Aucune note locale bloquée n\'a été trouvée.', 'info');
-                }
-            } else {
-                showAlert('Erreur', 'Le forçage a échoué.', 'error');
-            }
-        } catch (e) {
-            console.error('Force push failed:', e);
-            showAlert('Erreur', 'Une erreur est survenue lors du forçage de l\'envoi.', 'error');
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-    const handleFixDates = async () => {
-        if (!session?.user?.id) return;
-        setIsSyncing(true);
-        try {
-            const result = await fixServerDatesFromLocal(session.user.id);
-            if (result.success) {
-                if (result.fixed > 0) {
-                    showAlert('Succès', `${result.fixed} dates ont été réparées sur le serveur !`, 'success');
-                    if (onDataCleared) onDataCleared();
-                } else {
-                    showAlert('Info', 'Toutes les dates semblent déjà correctes.', 'info');
-                }
-            } else {
-                showAlert('Erreur', 'Le script de date a échoué.', 'error');
-            }
-        } catch (e) {
-            console.error('Date fix failed:', e);
-            showAlert('Erreur', 'Erreur critique du script.', 'error');
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-    const handleFixLocalDates = async () => {
-        setIsSyncing(true);
-        try {
-            const result = await fixLocalDatesFromServer(session?.user?.id);
-            if (result.success) {
-                showAlert('Succès', `${result.fixed} vocaux ont récupéré leur vraie date originelle depuis Supabase.`, 'success');
-                if (onDataCleared) onDataCleared();
-            } else {
-                showAlert('Erreur', result.msg || "Échec de l'alignement des dates.", 'error');
-            }
-        } catch (e) {
-            console.error('Fix local dates fail:', e);
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-    const handleRecover = async () => {
-        setIsSyncing(true);
-        try {
-            const result = await recoverOrphanedAudios();
-            if (result.success) {
-                if (result.count > 0) {
-                    showAlert('Sauvetage réussi', `${result.count} vocaux perdus ont été restaurés ! Va vite voir ta liste.`, 'success');
-                    if (onDataCleared) onDataCleared();
-                } else {
-                    showAlert('Info', 'Aucun vocal orphelin trouvé dans ton navigateur.', 'info');
-                }
-            } else {
-                showAlert('Erreur', result.msg || 'La récupération a échoué.', 'error');
-            }
-        } catch (e) {
-            console.error('Recover failed:', e);
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-    const handleUndoRecover = async () => {
-        setIsSyncing(true);
-        try {
-            const result = await undoRecoveredAudios();
-            if (result.success) {
-                if (result.count > 0) {
-                    showAlert('Purge réussie', `${result.count} fichiers audio ont été définitivement supprimés.`, 'success');
-                    if (onDataCleared) onDataCleared();
-                } else {
-                    showAlert('Info', 'Aucun vocal de récupération à purger.', 'info');
-                }
-            }
-        } catch (e) {
-            console.error('Undo fail:', e);
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
-    const handlePurgeCloudDeletes = async () => {
-        setIsSyncing(true);
-        try {
-            const result = await purgeHardDeletedCloudItems(session?.user?.id);
-            if (result.success) {
-                if (result.count > 0) {
-                    showAlert('Nettoyage', `${result.count} fichiers supprimés sur Supabase ont été purgés de ton téléphone.`, 'success');
-                    if (onDataCleared) onDataCleared();
-                } else {
-                    showAlert('Info', 'Ton téléphone est déjà aligné avec Supabase.', 'info');
-                }
-            }
-        } catch (e) {
-            console.error('Hard purge fail:', e);
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
     const handleLogout = async () => {
         try {
             await supabase.auth.signOut();
@@ -249,31 +123,27 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         }
     };
 
-    const doEmptyBucket = async () => {
-        const success = await emptyAudiosBucket(session?.user?.id);
-        if (success) {
-            await clearRecordings();
-            if (onDataCleared) onDataCleared();
-            showAlert('Succès', 'Le cloud et le stockage local ont été vidés.', 'success');
-        } else {
-            showAlert('Erreur', 'Impossible de vider le bucket.', 'error');
-        }
-    };
-
-    const handleEmptyBucket = () => {
-        if (Platform.OS === 'web') {
-            if (window.confirm('⚠️ Tous les fichiers audio seront supprimés. Continuer ?')) {
-                doEmptyBucket();
+    const handleClearLocalData = () => {
+        const confirmMsg = "Supprimer toutes les notes sur ce téléphone ? Elles resteront sur ton Cloud.";
+        const executeClear = async () => {
+            setIsSyncing(true);
+            try {
+                await clearRecordings();
+                if (onDataCleared) onDataCleared();
+                showAlert('Succès', 'Stockage local vidé.', 'success');
+                loadStorageStats();
+            } finally {
+                setIsSyncing(false);
             }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(confirmMsg)) executeClear();
         } else {
-            Alert.alert(
-                '⚠️ Vider le cloud',
-                'Tous les fichiers audio seront supprimés du cloud. Cette action est irréversible.',
-                [
-                    { text: 'Annuler', style: 'cancel' },
-                    { text: 'Supprimer tout', style: 'destructive', onPress: doEmptyBucket },
-                ]
-            );
+            Alert.alert('⚠️ Attention', confirmMsg, [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Vider', style: 'destructive', onPress: executeClear }
+            ]);
         }
     };
 
@@ -364,9 +234,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     )}
                                 </View>
                             </View>
-                        </View>
-
-                        <TouchableOpacity 
+                            <TouchableOpacity 
                             style={styles.menuItem} 
                             onPress={handleSync}
                             disabled={isSyncing}
@@ -381,120 +249,40 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
-                            onPress={handleForcePush}
-                            disabled={isSyncing}
-                        >
-                            {isSyncing ? (
-                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
-                            ) : (
-                                <Rocket size={20} color="#059669" style={styles.menuIcon} />
-                            )}
-                            <Text style={[styles.menuItemText, { color: '#059669' }]}>
-                                Forcer l'envoi des notes locales
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
-                            onPress={handleFixDates}
-                            disabled={isSyncing}
-                        >
-                            {isSyncing ? (
-                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
-                            ) : (
-                                <CalendarClock size={20} color="#CA8A04" style={styles.menuIcon} />
-                            )}
-                            <Text style={[styles.menuItemText, { color: '#CA8A04' }]}>
-                                Corriger les dates sur le serveur
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
-                            onPress={handleFixLocalDates}
-                            disabled={isSyncing}
-                        >
-                            {isSyncing ? (
-                                <ActivityIndicator size={20} color="#059669" style={styles.menuIcon} />
-                            ) : (
-                                <CalendarClock size={20} color="#059669" style={styles.menuIcon} />
-                            )}
-                            <Text style={[styles.menuItemText, { color: '#059669' }]}>
-                                Absorber les dates du serveur
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
-                            onPress={handleRecover}
-                            disabled={isSyncing}
-                        >
-                            {isSyncing ? (
-                                <ActivityIndicator size={20} color="#991B1B" style={styles.menuIcon} />
-                            ) : (
-                                <LifeBuoy size={20} color="#991B1B" style={styles.menuIcon} />
-                            )}
-                            <Text style={[styles.menuItemText, { color: '#991B1B', fontWeight: 'bold' }]}>
-                                Urgence: Récupérer mémos perdus
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
-                            onPress={handleUndoRecover}
-                            disabled={isSyncing}
-                        >
-                            {isSyncing ? (
-                                <ActivityIndicator size={20} color="#DC2626" style={styles.menuIcon} />
-                            ) : (
-                                <Flame size={20} color="#DC2626" style={styles.menuIcon} />
-                            )}
-                            <Text style={[styles.menuItemText, { color: '#DC2626' }]}>
-                                Purger vocaux de récupération
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
-                            onPress={handlePurgeCloudDeletes}
-                            disabled={isSyncing}
-                        >
-                            {isSyncing ? (
-                                <ActivityIndicator size={20} color="#78350F" style={styles.menuIcon} />
-                            ) : (
-                                <DatabaseBackup size={20} color="#000000" style={styles.menuIcon} />
-                            )}
-                            <Text style={[styles.menuItemText, { color: '#000000', fontWeight: 'bold' }]}>
-                                Synchro destructive (Aligner tél)
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.menuItem} onPress={() => { onClose(); navigation.navigate('Trash'); }}>
-                            <Trash2 size={20} color="#78350F" style={styles.menuIcon} />
-                            <Text style={styles.menuItemText}>Ma Corbeille</Text>
-                        </TouchableOpacity>
-
-                        {/* Wi‑Fi‑only toggle */}
-                        <View style={styles.menuItem}>
-                            <Switch
-                                value={wifiOnly}
-                                onValueChange={async (value) => {
-                                    setWifiOnly(value);
-                                    await setWifiOnlyPreference(value);
-                                    showAlert('Info', value ? 'Synchronisation Wi‑Fi uniquement activée' : 'Synchronisation Wi‑Fi uniquement désactivée', 'info');
-                                }}
-                            />
-                            <Text style={styles.menuItemText}>Wi‑Fi uniquement (uploads autorisés en 4G)</Text>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Préférences</Text>
+                            <View style={styles.settingRow}>
+                                <View style={styles.settingInfo}>
+                                    <ShieldCheck size={20} color="#78350F" style={styles.menuIcon} />
+                                    <Text style={styles.menuItemText}>Wi-Fi uniquement</Text>
+                                </View>
+                                <Switch
+                                    value={wifiOnly}
+                                    onValueChange={async (value) => {
+                                        setWifiOnly(value);
+                                        await setWifiOnlyPreference(value);
+                                    }}
+                                    trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
+                                    thumbColor={wifiOnly ? '#78350F' : '#F5F5F4'}
+                                />
+                            </View>
                         </View>
 
-                        <View style={styles.separator} />
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Compte</Text>
+                            <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+                                <LogOut size={20} color="#78716C" style={styles.menuIcon} />
+                                <Text style={styles.menuItemText}>Se déconnecter</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                            <LogOut size={20} color="#78350F" style={styles.menuIcon} />
-                            <Text style={styles.menuItemText}>Se déconnecter</Text>
-                        </TouchableOpacity>
+                        <View style={[styles.section, { marginTop: 20 }]}>
+                            <Text style={[styles.sectionTitle, styles.dangerTitle]}>Zone de danger</Text>
+                            <TouchableOpacity style={styles.menuItem} onPress={handleClearLocalData}>
+                                <Database size={20} color="#991B1B" style={styles.menuIcon} />
+                                <Text style={[styles.menuItemText, { color: '#991B1B' }]}>Vider le cache local</Text>
+                            </TouchableOpacity>
+                        </View>
                     </ScrollView>
                 ) : (
                     <View style={styles.menuContainer}>
@@ -625,5 +413,15 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#D4A574',
         textDecorationLine: 'underline',
+    },
+    settingRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    settingInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
 });
