@@ -242,8 +242,9 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             </Text>
                             {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
                         </TouchableOpacity>
+                    </View>
 
-                        <View style={styles.section}>
+                    <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Préférences</Text>
                             <View style={styles.settingRow}>
                                 <View style={styles.settingInfo}>
