@@ -71,9 +71,18 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
             if (result.success) {
                 if (result.pushed > 0 || result.pulled > 0) {
                     let msg = '';
-                    if (result.pushed > 0) msg += `${result.pushed} envoyée(s). `;
-                    if (result.pulled > 0) msg += `${result.pulled} récupérée(s).`;
-                    showAlert('Succès', msg || 'Synchronisation terminée !', 'success');
+                    if (result.pushed > 0) msg += `${result.pushed} envoyée(s). \n`;
+                    if (result.pulled > 0) {
+                        msg += `${result.pulled} récupérée(s)`;
+                        if (result.newTitles && result.newTitles.length > 0) {
+                            const titles = result.newTitles.slice(0, 3).map(t => `"${t}"`).join(', ');
+                            const more = result.newTitles.length > 3 ? ` et ${result.newTitles.length - 3} autre(s)` : '';
+                            msg += ` : ${titles}${more}.`;
+                        } else {
+                            msg += '.';
+                        }
+                    }
+                    showAlert('Succès', msg.trim() || 'Synchronisation terminée !', 'success');
                     if (onDataCleared) onDataCleared(); // Rafraîchir l'historique
                 } else {
                     showAlert('Info', 'Tout est déjà à jour !', 'success');

@@ -78,7 +78,8 @@ export const syncAll = async (userId, isManual = false) => {
         return {
             success: true,
             pushed: pushedCount,
-            pulled: pulledCount,
+            pulled: pulledCount.count !== undefined ? pulledCount.count : pulledCount,
+            newTitles: pulledCount.newTitles || [],
             status: (!isWifi && wifiOnly && !isManual) ? 'wifi-required' : 'done'
         };
     } catch (error) {
@@ -415,14 +416,17 @@ const pullCloudRecordings = async (userId) => {
             cacheSupabaseAudioLocally(merged);
             
             console.log(`[Sync] Terminé: ${newItems.length} créés, ${updatedItems.length} mis à jour, ${localRecordings.length - cleanedLocal.length} doublons supprimés.`);
-            return newItems.length + updatedItems.length;
+            return { 
+                count: newItems.length + updatedItems.length,
+                newTitles: newItems.map(n => n.title || 'Sans titre')
+            };
         }
 
         // Même si pas de nouveaux items, on vérifie si certains audios distants ne sont pas encore cachés
         cacheSupabaseAudioLocally(localRecordings);
-        return 0;
+        return { count: 0, newTitles: [] };
     } catch (e) {
         console.error('Erreur pullCloudRecordings:', e);
-        return 0;
+        return { count: 0, newTitles: [] };
     }
 };
