@@ -201,12 +201,8 @@ export default function HistoryScreen() {
                     recording: itemToDelete,
                 });
                 if (!ok) {
-                    showAlert('Attention', 'Supprime localement, mais suppression cloud echouee.', 'warning');
-                } else {
-                    showAlert('Succes', 'Enregistrement supprime.', 'success');
+                    showAlert('Attention', 'Supprimé localement, mais la synchronisation cloud a échoué.', 'warning');
                 }
-            } else {
-                showAlert('Succes', 'Enregistrement supprime localement.', 'success');
             }
         } catch (e) {
             console.error('Delete failed:', e);
