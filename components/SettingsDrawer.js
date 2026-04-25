@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
@@ -308,7 +308,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
 
                 {/* Menu items — seulement si connecté */}
                 {session?.user ? (
-                    <View style={styles.menuContainer}>
+                    <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
                         <TouchableOpacity 
                             style={styles.menuItem} 
                             onPress={handleSync}
@@ -435,10 +435,10 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         <View style={styles.separator} />
 
                         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                            <LogOut size={20} color="#292524" style={styles.menuIcon} />
+                            <LogOut size={20} color="#78350F" style={styles.menuIcon} />
                             <Text style={styles.menuItemText}>Se déconnecter</Text>
                         </TouchableOpacity>
-                    </View>
+                    </ScrollView>
                 ) : (
                     <View style={styles.menuContainer}>
                         <Text style={styles.guestHint}>
