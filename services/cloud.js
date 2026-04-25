@@ -138,7 +138,6 @@ export const fetchCloudRecordings = async (userId) => {
             .from('recordings')
             .select('*')
             .eq('user_id', userId)
-            .is('deleted_at', null)
             .order('created_at', { ascending: false });
 
         if (error) {

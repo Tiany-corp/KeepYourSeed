@@ -325,11 +325,7 @@ const pullCloudRecordings = async (userId) => {
                 }
             }
             
-            // SÉCURITÉ : Si l'élément est déjà supprimé localement, on l'ignore totalement
-            // On ne veut pas qu'il réapparaisse dans le "Main" si le cloud n'est pas encore au courant
-            if (localRec && localRec.deletedAt) {
-                continue;
-            }
+            // On ne bloque plus ici pour permettre la synchronisation de la corbeille (restauration/suppression)
             
             if (localRec) {
                 // RÉCONCILIATION : On met à jour l'existant au lieu de dupliquer
@@ -342,15 +338,21 @@ const pullCloudRecordings = async (userId) => {
                 if (needsIdUpdate || (cloudTime > localTime && localRec.status !== 'pending_update')) {
                     updatedItems.push({
                         ...localRec,
-                        dbId: cloudRec.dbId, // On attache l'ID database s'il manquait
+                        dbId: cloudRec.dbId,
                         title: cloudRec.title,
                         type: cloudRec.type,
                         deliverDate: cloudRec.deliverDate,
                         tags: cloudRec.tags,
                         updatedAt: cloudRec.updatedAt,
-                        date: cloudRec.date, // FORCE la mise à jour de la date locale si le serveur a une date corrigée (ex: après fixDates)
-                        // Si le cloud a une URL et que le local ne l'a plus (réparation après erreur 404), on la restaure
+                        date: cloudRec.date,
+                        deletedAt: cloudRec.deletedAt, // Sync de l'état de la corbeille
                         remoteUrl: cloudRec.remoteUrl || localRec.remoteUrl 
+                    });
+                } else if (localRec.deletedAt !== cloudRec.deletedAt) {
+                    // Sync spécifique de la corbeille si le reste est à jour
+                    updatedItems.push({
+                        ...localRec,
+                        deletedAt: cloudRec.deletedAt
                     });
                 } else if (cloudRec.date && localRec.date !== cloudRec.date) {
                     // Si l'élément n'a pas besoin de mise à jour Méta globale, mais que la date du serveur diffère
