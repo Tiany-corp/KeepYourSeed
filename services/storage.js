@@ -78,6 +78,18 @@ const universalStorage = {
             await AsyncStorage.removeItem(`audio_path_${id}`);
         }
     },
+    getAudioSize: async (uriOrId) => {
+        try {
+            if (Platform.OS === 'web') {
+                const id = uriOrId.replace('indexeddb://', '');
+                const blob = await get(`audio_file_${id}`);
+                return blob ? blob.size : 0;
+            } else {
+                const info = await FileSystem.getInfoAsync(uriOrId);
+                return info.exists ? (info.size || 0) : 0;
+            }
+        } catch { return 0; }
+    }
 };
 
 // --- CACHE AUDIO DEPUIS SUPABASE VERS LOCAL ---
@@ -147,6 +159,35 @@ const cacheSupabaseAudioLocally = async (recordings) => {
 };
 
 export { cacheSupabaseAudioLocally };
+
+/**
+ * Calcule la taille totale occupée par les fichiers audio sur le téléphone.
+ */
+export const calculateStorageSize = async (recordings) => {
+    let totalBytes = 0;
+    // On fait ça en parallèle par petits lots pour ne pas bloquer
+    const CONCURRENCY = 10;
+    const itemsWithLocal = recordings.filter(r => r.localUri);
+    
+    for (let i = 0; i < itemsWithLocal.length; i += CONCURRENCY) {
+        const chunk = itemsWithLocal.slice(i, i + CONCURRENCY);
+        const sizes = await Promise.all(chunk.map(r => universalStorage.getAudioSize(r.localUri)));
+        totalBytes += sizes.reduce((acc, s) => acc + s, 0);
+    }
+    
+    return totalBytes;
+};
+
+/**
+ * Formate une taille en octets vers une chaîne lisible (Mo, Go).
+ */
+export const formatSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 Mo';
+    const mb = bytes / (1024 * 1024);
+    if (mb < 1024) return `${mb.toFixed(1)} Mo`;
+    const gb = mb / 1024;
+    return `${gb.toFixed(2)} Go`;
+};
 
 /**
  * LOCAL FIRST : Résout la source audio UNIQUEMENT depuis le stockage local.

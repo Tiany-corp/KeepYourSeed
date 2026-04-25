@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Sw
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
-import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings } from '../services/storage';
+import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
 import { fixServerDatesFromLocal, fixLocalDatesFromServer } from '../services/fixDates';
 import { recoverOrphanedAudios, undoRecoveredAudios } from '../services/recover';
@@ -21,7 +21,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const [wifiOnly, setWifiOnly] = useState(false);
     const { showAlert } = useAlert();
     const navigation = useNavigation();
-    const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100 });
+    const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100, formattedSize: '0 Mo' });
 
     const loadStorageStats = async () => {
         const recordings = await getRecordings();
@@ -29,7 +29,11 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         const local = nonDeleted.filter(r => r.localUri).length;
         const total = nonDeleted.length;
         const percent = total > 0 ? Math.round((local / total) * 100) : 100;
-        setStorageStats({ local, total, percent });
+        
+        const sizeBytes = await calculateStorageSize(recordings);
+        const formattedSize = formatSize(sizeBytes);
+        
+        setStorageStats({ local, total, percent, formattedSize });
     };
 
     // Load preferences and stats on mount or when visible
@@ -345,7 +349,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     <View style={[styles.progressBarFill, { width: `${storageStats.percent}%` }]} />
                                 </View>
                                 <View style={styles.statsFooter}>
-                                    <Text style={styles.statsSublabel}>{storageStats.local} / {storageStats.total} fichiers téléchargés</Text>
+                                    <Text style={styles.statsSublabel}>{storageStats.local} / {storageStats.total} ({storageStats.formattedSize})</Text>
                                     {storageStats.local < storageStats.total && (
                                         <TouchableOpacity onPress={async () => {
                                             setIsSyncing(true);
