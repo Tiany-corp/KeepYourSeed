@@ -18,13 +18,18 @@ export default function AppHeader({ // Mon composant app header recoit en propri
     title = 'KeepYourSeed',
     showLogo = true,
     rightContent,
+    leftContent,
     onGoToHistory,
 }) {
     return (
         <View style={styles.header}>
-            <TouchableOpacity onPress={onOpenSettings} style={styles.iconButton}>
-                <Menu size={22} color="#78350F" strokeWidth={1.5} />
-            </TouchableOpacity>
+            {leftContent ? (
+                leftContent
+            ) : (
+                <TouchableOpacity onPress={onOpenSettings} style={styles.iconButton}>
+                    <Menu size={22} color="#78350F" strokeWidth={1.5} />
+                </TouchableOpacity>
+            )}
 
             <View style={styles.headerTitleContainer}>
                 {showLogo && <Logo size={24} />}
