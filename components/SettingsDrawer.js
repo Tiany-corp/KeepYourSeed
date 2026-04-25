@@ -84,27 +84,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     }
                     showAlert('Succès', msg.trim() || 'Synchronisation terminée !', 'success');
                     if (onDataCleared) onDataCleared(); // Rafraîchir l'historique
-                }
-
-                // --- ALERTE GROUPÉE POUR LES SUPPRESSIONS DÉFINITIVES ---
-                if (result.orphans > 0) {
-                    const confirmMsg = `${result.orphans} vocal/vocaux ont été supprimés définitivement du Cloud. Veux-tu les supprimer de cet appareil pour rester synchronisé ?`;
-                    setTimeout(() => {
-                        if (Platform.OS === 'web') {
-                            if (window.confirm(confirmMsg)) {
-                                handlePurgeCloudDeletes();
-                            }
-                        } else {
-                            Alert.alert(
-                                'Désynchronisation détectée',
-                                confirmMsg,
-                                [
-                                    { text: 'Garder', style: 'cancel' },
-                                    { text: 'Supprimer', style: 'destructive', onPress: handlePurgeCloudDeletes }
-                                ]
-                            );
-                        }
-                    }, 500); // Petit délai pour laisser la première alerte de succès s'afficher
+                } else {
+                    showAlert('Info', 'Tout est déjà à jour !', 'success');
                 }
             } else {
                 showAlert('Erreur', 'La synchronisation a échoué.', 'error');

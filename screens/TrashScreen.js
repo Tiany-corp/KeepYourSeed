@@ -3,7 +3,8 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { getRecordings, restoreRecording, permanentlyDeleteRecording } from '../services/storage';
 import { restoreRecordingFromCloud, permanentlyDeleteFromCloud, fetchTrashRecordings } from '../services/cloud';
-import { ArrowLeft, RotateCcw, Trash2, ShieldAlert } from 'lucide-react-native';
+import { purgeHardDeletedCloudItems } from '../services/sync';
+import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, RefreshCcw } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import RecordingItem from '../components/history/RecordingItem';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
@@ -108,6 +109,26 @@ export default function TrashScreen({ navigation }) {
         }
     };
 
+    const handlePurgeCloudDeletes = async () => {
+        setIsLoading(true);
+        try {
+            const result = await purgeHardDeletedCloudItems(session?.user?.id);
+            if (result.success) {
+                if (result.count > 0) {
+                    showAlert('Nettoyage', `${result.count} fichiers orphelins purgés de ton téléphone.`, 'success');
+                    loadTrash(); // Rafraîchir au cas où
+                } else {
+                    showAlert('Info', 'Ton téléphone est déjà parfaitement aligné avec le cloud.', 'info');
+                }
+            }
+        } catch (e) {
+            console.error('Hard purge fail:', e);
+            showAlert('Erreur', 'Impossible de purger les orphelins.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
             <RotateCcw size={64} color="#D4A574" strokeWidth={1} style={{ marginBottom: 16, opacity: 0.5 }} />
@@ -129,11 +150,16 @@ export default function TrashScreen({ navigation }) {
                     </TouchableOpacity>
                 }
                 rightContent={
-                    recordings.length > 0 && (
-                        <TouchableOpacity onPress={handleEmptyTrash} style={styles.emptyTrashBtn}>
-                            <Trash2 size={18} color="#B91C1C" />
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <TouchableOpacity onPress={handlePurgeCloudDeletes} style={[styles.emptyTrashBtn, { backgroundColor: '#F5F5F5', marginRight: 12 }]}>
+                            <RefreshCcw size={18} color="#78716C" />
                         </TouchableOpacity>
-                    )
+                        {recordings.length > 0 && (
+                            <TouchableOpacity onPress={handleEmptyTrash} style={styles.emptyTrashBtn}>
+                                <Trash2 size={18} color="#B91C1C" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 }
             />
 
