@@ -219,21 +219,8 @@ export default function HistoryScreen() {
     };
 
     const handleDeleteItem = (item) => {
-        const title = item?.title || 'cet enregistrement';
-        if (Platform.OS === 'web') {
-            if (window.confirm(`Supprimer "${title}" ?`)) {
-                executeDelete(item);
-            }
-            return;
-        }
-        Alert.alert(
-            'Supprimer',
-            `Voulez-vous supprimer "${title}" ?`,
-            [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Supprimer', style: 'destructive', onPress: () => executeDelete(item) },
-            ]
-        );
+        // On supprime la validation car l'item va dans la corbeille (restaurable)
+        executeDelete(item);
     };
 
     const handleEditDelete = () => {
