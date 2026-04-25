@@ -168,7 +168,7 @@ export const forcePushAllLocalNotes = async (userId) => {
  * Analyse la BDD Cloud et supprime du téléphone tous les enregistrements locaux
  * qui possèdent un dbId mais qui ont été hard-delete (suppression manuelle DB) sur le Cloud.
  */
-export const purgeHardDeletedCloudItems = async (userId) => {
+export const purgeHardDeletedCloudItems = async (userId, specificIdsToPurge = null) => {
     try {
         const { fetchCloudRecordings } = require('./cloud');
         const cloudRecordings = await fetchCloudRecordings(userId);
@@ -182,8 +182,18 @@ export const purgeHardDeletedCloudItems = async (userId) => {
 
         for (const loc of localRecordings) {
             if (loc.dbId && !cloudDbIds.has(loc.dbId)) {
+                // Si on a fourni une liste d'IDs, on ne supprime que ceux-là
+                if (specificIdsToPurge && !specificIdsToPurge.includes(loc.id)) {
+                    kept.push(loc);
+                    continue;
+                }
+                
                 // Ce fichier a été supprimé definitivement du cloud, on le purge localement
                 deletedCount++;
+                try {
+                    const { del } = require('idb-keyval');
+                    await del(`audio_file_${loc.id}`);
+                } catch(e) {}
                 continue;
             }
             kept.push(loc);
@@ -197,6 +207,26 @@ export const purgeHardDeletedCloudItems = async (userId) => {
     } catch (e) {
         console.error("Erreur purge locale:", e);
         return { success: false, msg: e.message };
+    }
+};
+
+/**
+ * Récupère la liste des enregistrements locaux qui sont orphelins (supprimés du cloud).
+ */
+export const getOrphanedCloudItems = async (userId) => {
+    try {
+        const { fetchCloudRecordings } = require('./cloud');
+        const cloudRecordings = await fetchCloudRecordings(userId);
+        if (!cloudRecordings) return { success: false, orphans: [] };
+
+        const localRecordings = await getRecordings();
+        const cloudDbIds = new Set(cloudRecordings.map(c => c.dbId).filter(Boolean));
+
+        const orphans = localRecordings.filter(loc => loc.dbId && !cloudDbIds.has(loc.dbId));
+        return { success: true, orphans };
+    } catch (e) {
+        console.error("Erreur get orphans:", e);
+        return { success: false, orphans: [] };
     }
 };
 

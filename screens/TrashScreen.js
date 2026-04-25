@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { getRecordings, restoreRecording, permanentlyDeleteRecording } from '../services/storage';
 import { restoreRecordingFromCloud, permanentlyDeleteFromCloud, fetchTrashRecordings } from '../services/cloud';
-import { purgeHardDeletedCloudItems } from '../services/sync';
-import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, RefreshCcw } from 'lucide-react-native';
+import { purgeHardDeletedCloudItems, getOrphanedCloudItems } from '../services/sync';
+import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, RefreshCcw, CheckSquare, Square } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import RecordingItem from '../components/history/RecordingItem';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
@@ -15,6 +15,13 @@ export default function TrashScreen({ navigation }) {
     const { session } = useContext(AppContext);
     const [recordings, setRecordings] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    
+    // --- États pour les orphelins ---
+    const [orphans, setOrphans] = useState([]);
+    const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
+    const [showOrphansModal, setShowOrphansModal] = useState(false);
+    const [selectedOrphans, setSelectedOrphans] = useState(new Set());
+
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
 
@@ -32,9 +39,20 @@ export default function TrashScreen({ navigation }) {
         }
     }, []);
 
+    const checkOrphans = useCallback(async () => {
+        if (!session?.user?.id) return;
+        setIsCheckingOrphans(true);
+        const result = await getOrphanedCloudItems(session.user.id);
+        if (result.success) {
+            setOrphans(result.orphans);
+        }
+        setIsCheckingOrphans(false);
+    }, [session?.user?.id]);
+
     useEffect(() => {
         loadTrash();
-    }, [loadTrash]);
+        checkOrphans();
+    }, [loadTrash, checkOrphans]);
 
     const handleRestore = async (item) => {
         try {
@@ -109,17 +127,32 @@ export default function TrashScreen({ navigation }) {
         }
     };
 
-    const handlePurgeCloudDeletes = async () => {
+    const openOrphansModal = () => {
+        if (orphans.length === 0) return;
+        setSelectedOrphans(new Set(orphans.map(o => o.id))); // Sélectionne tout par défaut
+        setShowOrphansModal(true);
+    };
+
+    const toggleOrphanSelection = (id) => {
+        setSelectedOrphans(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const executePurgeOrphans = async () => {
+        if (selectedOrphans.size === 0) return;
+        setShowOrphansModal(false);
         setIsLoading(true);
         try {
-            const result = await purgeHardDeletedCloudItems(session?.user?.id);
+            const idsToPurge = Array.from(selectedOrphans);
+            const result = await purgeHardDeletedCloudItems(session?.user?.id, idsToPurge);
             if (result.success) {
-                if (result.count > 0) {
-                    showAlert('Nettoyage', `${result.count} fichiers orphelins purgés de ton téléphone.`, 'success');
-                    loadTrash(); // Rafraîchir au cas où
-                } else {
-                    showAlert('Info', 'Ton téléphone est déjà parfaitement aligné avec le cloud.', 'info');
-                }
+                showAlert('Nettoyage', `${idsToPurge.length} fichiers orphelins purgés.`, 'success');
+                loadTrash();
+                checkOrphans(); // Revérifier les orphelins restants
             }
         } catch (e) {
             console.error('Hard purge fail:', e);
@@ -151,8 +184,20 @@ export default function TrashScreen({ navigation }) {
                 }
                 rightContent={
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <TouchableOpacity onPress={handlePurgeCloudDeletes} style={[styles.emptyTrashBtn, { backgroundColor: '#F5F5F5', marginRight: 12 }]}>
-                            <RefreshCcw size={18} color="#78716C" />
+                        <TouchableOpacity 
+                            onPress={openOrphansModal} 
+                            disabled={orphans.length === 0 || isCheckingOrphans}
+                            style={[
+                                styles.emptyTrashBtn, 
+                                { backgroundColor: '#F5F5F5', marginRight: 12 },
+                                (orphans.length === 0 || isCheckingOrphans) && { opacity: 0.4 }
+                            ]}
+                        >
+                            {isCheckingOrphans ? (
+                                <ActivityIndicator size="small" color="#78716C" />
+                            ) : (
+                                <RefreshCcw size={18} color="#78716C" />
+                            )}
                         </TouchableOpacity>
                         {recordings.length > 0 && (
                             <TouchableOpacity onPress={handleEmptyTrash} style={styles.emptyTrashBtn}>
@@ -193,6 +238,56 @@ export default function TrashScreen({ navigation }) {
                     ListEmptyComponent={renderEmptyState}
                 />
             )}
+
+            {/* Modale de sélection des orphelins */}
+            <Modal
+                visible={showOrphansModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowOrphansModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Nettoyage Cloud</Text>
+                            <Text style={styles.modalSubtitle}>Ces fichiers n'existent plus sur Supabase mais sont toujours sur ton téléphone.</Text>
+                        </View>
+
+                        <ScrollView style={styles.modalList}>
+                            {orphans.map(item => (
+                                <TouchableOpacity 
+                                    key={item.id} 
+                                    style={styles.orphanRow}
+                                    onPress={() => toggleOrphanSelection(item.id)}
+                                >
+                                    {selectedOrphans.has(item.id) ? (
+                                        <CheckSquare size={20} color="#78350F" />
+                                    ) : (
+                                        <Square size={20} color="#D6D3D1" />
+                                    )}
+                                    <View style={styles.orphanInfo}>
+                                        <Text style={styles.orphanTitle} numberOfLines={1}>{item.title}</Text>
+                                        <Text style={styles.orphanDate}>{new Date(item.date).toLocaleDateString()}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowOrphansModal(false)}>
+                                <Text style={styles.modalCancelTxt}>Annuler</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.modalConfirmBtn, selectedOrphans.size === 0 && { opacity: 0.5 }]} 
+                                onPress={executePurgeOrphans}
+                                disabled={selectedOrphans.size === 0}
+                            >
+                                <Text style={styles.modalConfirmTxt}>Purger ({selectedOrphans.size})</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -254,5 +349,91 @@ const styles = StyleSheet.create({
         color: '#78716C',
         textAlign: 'center',
         lineHeight: 20,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#FAF7F2',
+        borderRadius: 16,
+        maxHeight: '80%',
+        overflow: 'hidden',
+    },
+    modalHeader: {
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E8D5BF',
+        backgroundColor: '#F5F0E8',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#78350F',
+        marginBottom: 4,
+    },
+    modalSubtitle: {
+        fontSize: 13,
+        color: '#78716C',
+        lineHeight: 18,
+    },
+    modalList: {
+        padding: 10,
+    },
+    orphanRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F0E8',
+    },
+    orphanInfo: {
+        marginLeft: 12,
+        flex: 1,
+    },
+    orphanTitle: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#3F3F46',
+        marginBottom: 2,
+    },
+    orphanDate: {
+        fontSize: 12,
+        color: '#A8A29E',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#E8D5BF',
+        backgroundColor: '#FFFFFF',
+    },
+    modalCancelBtn: {
+        flex: 1,
+        padding: 12,
+        alignItems: 'center',
+        borderRadius: 8,
+        marginRight: 8,
+        backgroundColor: '#F5F5F5',
+    },
+    modalCancelTxt: {
+        color: '#57534E',
+        fontWeight: '600',
+        fontSize: 15,
+    },
+    modalConfirmBtn: {
+        flex: 1,
+        padding: 12,
+        alignItems: 'center',
+        borderRadius: 8,
+        marginLeft: 8,
+        backgroundColor: '#B91C1C',
+    },
+    modalConfirmTxt: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        fontSize: 15,
     },
 });
