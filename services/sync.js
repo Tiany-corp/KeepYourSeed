@@ -80,6 +80,7 @@ export const syncAll = async (userId, isManual = false) => {
             pushed: pushedCount,
             pulled: pulledCount.count !== undefined ? pulledCount.count : pulledCount,
             newTitles: pulledCount.newTitles || [],
+            orphans: pulledCount.orphans || 0,
             status: (!isWifi && wifiOnly && !isManual) ? 'wifi-required' : 'done'
         };
     } catch (error) {
@@ -404,6 +405,12 @@ const pullCloudRecordings = async (userId) => {
             return true;
         });
 
+        // --- DÉTECTION DES ORPHELINS (pour alerte utilisateur) ---
+        // Un orphelin est un local qui a un dbId, mais qui n'est plus dans le cloud
+        const orphansCount = localRecordings.filter(loc => 
+            loc.dbId && !handledDbIds.has(loc.dbId)
+        ).length;
+
         if (newItems.length > 0 || updatedItems.length > 0 || cleanedLocal.length !== localRecordings.length) {
             // Fusion finale : Nouveaux + Mis à jour + Locaux restants
             let merged = [...newItems, ...updatedItems, ...cleanedLocal];
@@ -420,15 +427,16 @@ const pullCloudRecordings = async (userId) => {
             console.log(`[Sync] Terminé: ${newItems.length} créés, ${updatedItems.length} mis à jour, ${localRecordings.length - cleanedLocal.length} doublons supprimés.`);
             return { 
                 count: newItems.length + updatedItems.length,
-                newTitles: newItems.map(n => n.title || 'Sans titre')
+                newTitles: newItems.map(n => n.title || 'Sans titre'),
+                orphans: orphansCount
             };
         }
 
         // Même si pas de nouveaux items, on vérifie si certains audios distants ne sont pas encore cachés
         cacheSupabaseAudioLocally(localRecordings);
-        return { count: 0, newTitles: [] };
+        return { count: 0, newTitles: [], orphans: orphansCount };
     } catch (e) {
         console.error('Erreur pullCloudRecordings:', e);
-        return { count: 0, newTitles: [] };
+        return { count: 0, newTitles: [], orphans: 0 };
     }
 };
