@@ -82,44 +82,65 @@ const universalStorage = {
 
 // --- CACHE AUDIO DEPUIS SUPABASE VERS LOCAL ---
 const cacheSupabaseAudioLocally = async (recordings) => {
+    if (!recordings || recordings.length === 0) return;
+
     try {
         const { getSignedAudioUrl } = require('./cloud');
-        for (const rec of recordings) {
-            if (!rec.remoteUrl || rec.localUri) continue;
-            
-            const { url: signedUrl, error } = await getSignedAudioUrl(rec.remoteUrl);
-            
-            if (error === 'NOT_FOUND') {
-                console.warn(`Fichier cloud manquant pour "${rec.title}" – Tentative de réparation.`);
-                // Si on a quand même un localUri (qui aurait pu être râté par la condition au dessus), on garde,
-                // sinon on nettoie le remoteUrl car il est mort.
-                if (rec.localUri) {
-                    await updateRecording(rec.id, { remoteUrl: null, status: 'pending' });
-                } else {
-                    await updateRecording(rec.id, { remoteUrl: null });
-                }
-                continue;
-            }
-            
-            if (!signedUrl) continue;
+        
+        // On ne traite que ceux qui ont besoin d'être téléchargés
+        const toDownload = recordings
+            .filter(rec => rec.remoteUrl && !rec.localUri)
+            .sort((a, b) => new Date(b.date) - new Date(a.date)); // Priorité aux plus récents
 
-            if (Platform.OS === 'web') {
-                const response = await fetch(signedUrl);
-                if (!response.ok) continue;
-                const blob = await response.blob();
-                const audioId = `audio_${rec.id}`;
-                await universalStorage.saveAudioBlob(audioId, blob);
-                await updateRecording(rec.id, { localUri: `indexeddb://${audioId}` });
-            } else {
-                const fileExt = rec.remoteUrl.split('.').pop() || 'm4a';
-                const localFileName = `rec_${rec.id}.${fileExt}`;
-                const localFilePath = `${FileSystem.documentDirectory}${localFileName}`;
-                const downloadResult = await FileSystem.downloadAsync(signedUrl, localFilePath);
-                if (downloadResult.status === 200) {
-                    await updateRecording(rec.id, { localUri: downloadResult.uri });
+        if (toDownload.length === 0) return;
+
+        console.log(`[Cache] Lancement du téléchargement de ${toDownload.length} fichiers...`);
+
+        // Fonction de téléchargement unitaire
+        const downloadOne = async (rec) => {
+            try {
+                const { url: signedUrl, error } = await getSignedAudioUrl(rec.remoteUrl);
+                
+                if (error === 'NOT_FOUND') {
+                    if (rec.localUri) {
+                        await updateRecording(rec.id, { remoteUrl: null, status: 'pending' });
+                    } else {
+                        await updateRecording(rec.id, { remoteUrl: null });
+                    }
+                    return;
                 }
+                
+                if (!signedUrl) return;
+
+                if (Platform.OS === 'web') {
+                    const response = await fetch(signedUrl);
+                    if (!response.ok) return;
+                    const blob = await response.blob();
+                    const audioId = `audio_${rec.id}`;
+                    await universalStorage.saveAudioBlob(audioId, blob);
+                    await updateRecording(rec.id, { localUri: `indexeddb://${audioId}` });
+                } else {
+                    const fileExt = rec.remoteUrl.split('.').pop() || 'm4a';
+                    const localFileName = `rec_${rec.id}.${fileExt}`;
+                    const localFilePath = `${FileSystem.documentDirectory}${localFileName}`;
+                    const downloadResult = await FileSystem.downloadAsync(signedUrl, localFilePath);
+                    if (downloadResult.status === 200) {
+                        await updateRecording(rec.id, { localUri: downloadResult.uri });
+                    }
+                }
+            } catch (err) {
+                console.warn(`[Cache] Échec pour ${rec.title}:`, err.message);
             }
+        };
+
+        // Exécution par paquets (Concurrency control)
+        const CONCURRENCY = 5;
+        for (let i = 0; i < toDownload.length; i += CONCURRENCY) {
+            const chunk = toDownload.slice(i, i + CONCURRENCY);
+            await Promise.all(chunk.map(rec => downloadOne(rec)));
         }
+
+        console.log(`[Cache] Cycle de téléchargement terminé.`);
     } catch (e) {
         console.warn('Cache audio échoué:', e.message);
     }

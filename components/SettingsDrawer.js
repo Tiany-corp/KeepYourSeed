@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Sw
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
-import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
+import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
 import { fixServerDatesFromLocal, fixLocalDatesFromServer } from '../services/fixDates';
 import { recoverOrphanedAudios, undoRecoveredAudios } from '../services/recover';
@@ -21,14 +21,27 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const [wifiOnly, setWifiOnly] = useState(false);
     const { showAlert } = useAlert();
     const navigation = useNavigation();
+    const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100 });
 
-    // Load Wi‑Fi‑only preference on mount
+    const loadStorageStats = async () => {
+        const recordings = await getRecordings();
+        const nonDeleted = recordings.filter(r => !r.deletedAt);
+        const local = nonDeleted.filter(r => r.localUri).length;
+        const total = nonDeleted.length;
+        const percent = total > 0 ? Math.round((local / total) * 100) : 100;
+        setStorageStats({ local, total, percent });
+    };
+
+    // Load preferences and stats on mount or when visible
     useEffect(() => {
-        (async () => {
-            const pref = await getWifiOnlyPreference();
-            setWifiOnly(pref);
-        })();
-    }, []);
+        if (visible) {
+            loadStorageStats();
+            (async () => {
+                const pref = await getWifiOnlyPreference();
+                setWifiOnly(pref);
+            })();
+        }
+    }, [visible]);
 
     useEffect(() => {
         if (visible) {
@@ -84,8 +97,10 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     }
                     showAlert('Succès', msg.trim() || 'Synchronisation terminée !', 'success');
                     if (onDataCleared) onDataCleared(); // Rafraîchir l'historique
+                    loadStorageStats(); // Mettre à jour les stats de stockage
                 } else {
                     showAlert('Info', 'Tout est déjà à jour !', 'success');
+                    loadStorageStats();
                 }
             } else {
                 showAlert('Erreur', 'La synchronisation a échoué.', 'error');
@@ -318,6 +333,35 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Menu items — seulement si connecté */}
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Stockage & Cache</Text>
+                            
+                            <View style={styles.statsContainer}>
+                                <View style={styles.statsRow}>
+                                    <Text style={styles.statsLabel}>Disponibilité hors-ligne</Text>
+                                    <Text style={styles.statsValue}>{storageStats.percent}%</Text>
+                                </View>
+                                <View style={styles.progressBarBg}>
+                                    <View style={[styles.progressBarFill, { width: `${storageStats.percent}%` }]} />
+                                </View>
+                                <View style={styles.statsFooter}>
+                                    <Text style={styles.statsSublabel}>{storageStats.local} / {storageStats.total} fichiers téléchargés</Text>
+                                    {storageStats.local < storageStats.total && (
+                                        <TouchableOpacity onPress={async () => {
+                                            setIsSyncing(true);
+                                            const recordings = await getRecordings();
+                                            const { cacheSupabaseAudioLocally } = require('../services/storage');
+                                            await cacheSupabaseAudioLocally(recordings);
+                                            await loadStorageStats();
+                                            setIsSyncing(false);
+                                        }}>
+                                            <Text style={styles.downloadBtnText}>Télécharger tout</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        </View>
+
                         <TouchableOpacity 
                             style={styles.menuItem} 
                             onPress={handleSync}
@@ -507,5 +551,75 @@ const styles = StyleSheet.create({
     authButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#78350F', marginHorizontal: 20, marginBottom: 12, paddingVertical: 14, borderRadius: 12 },
     authButtonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
     authButtonOutline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#78350F' },
-    authButtonOutlineText: { fontSize: 16, fontWeight: '600', color: '#78350F' }
+    authButtonOutlineText: { fontSize: 16, fontWeight: '600', color: '#78350F' },
+    section: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 8,
+    },
+    sectionTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#A8A29E',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 12,
+    },
+    statsContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#E8D5BF',
+        // Shadow for premium look
+        ...Platform.select({
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
+            android: { elevation: 2 },
+            web: { boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }
+        })
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    statsLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#78350F',
+    },
+    statsValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#78350F',
+    },
+    progressBarBg: {
+        height: 6,
+        backgroundColor: '#F5F0E8',
+        borderRadius: 3,
+        overflow: 'hidden',
+        marginBottom: 6,
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#D4A574',
+    },
+    statsSublabel: {
+        fontSize: 12,
+        color: '#A8A29E',
+    },
+    statsFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 2,
+    },
+    downloadBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#D4A574',
+        textDecorationLine: 'underline',
+    },
 });
