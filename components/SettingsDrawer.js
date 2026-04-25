@@ -5,7 +5,7 @@ import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference } from '../services/storage';
 import { emptyAudiosBucket } from '../services/cloud';
-import { fixServerDatesFromLocal } from '../services/fixDates';
+import { fixServerDatesFromLocal, fixLocalDatesFromServer } from '../services/fixDates';
 import { recoverOrphanedAudios, undoRecoveredAudios } from '../services/recover';
 import { purgeHardDeletedCloudItems } from '../services/sync';
 import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, Rocket, CalendarClock, LifeBuoy, Flame, DatabaseBackup } from 'lucide-react-native';
@@ -131,6 +131,23 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         } catch (e) {
             console.error('Date fix failed:', e);
             showAlert('Erreur', 'Erreur critique du script.', 'error');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleFixLocalDates = async () => {
+        setIsSyncing(true);
+        try {
+            const result = await fixLocalDatesFromServer(session?.user?.id);
+            if (result.success) {
+                showAlert('Succès', `${result.fixed} vocaux ont récupéré leur vraie date originelle depuis Supabase.`, 'success');
+                if (onDataCleared) onDataCleared();
+            } else {
+                showAlert('Erreur', result.msg || "Échec de l'alignement des dates.", 'error');
+            }
+        } catch (e) {
+            console.error('Fix local dates fail:', e);
         } finally {
             setIsSyncing(false);
         }
@@ -334,6 +351,21 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             )}
                             <Text style={[styles.menuItemText, { color: '#CA8A04' }]}>
                                 Corriger les dates sur le serveur
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handleFixLocalDates}
+                            disabled={isSyncing}
+                        >
+                            {isSyncing ? (
+                                <ActivityIndicator size={20} color="#059669" style={styles.menuIcon} />
+                            ) : (
+                                <CalendarClock size={20} color="#059669" style={styles.menuIcon} />
+                            )}
+                            <Text style={[styles.menuItemText, { color: '#059669' }]}>
+                                Absorber les dates du serveur
                             </Text>
                         </TouchableOpacity>
 

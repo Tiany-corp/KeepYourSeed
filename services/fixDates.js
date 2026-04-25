@@ -45,3 +45,50 @@ export const fixServerDatesFromLocal = async (userId) => {
         return { success: false, error: err };
     }
 };
+
+/**
+ * Script Inverse (Pour le téléphone) :
+ * Aligne brutalement les dates locales sur les dates du serveur.
+ * Utile quand le serveur a de bonnes dates (ex: suite à fixServerDatesFromLocal)
+ * mais que le téléphone refuse de les absorber naturellement.
+ */
+export const fixLocalDatesFromServer = async (userId) => {
+    try {
+        const { saveRawRecordings } = require('./storage');
+        const localRecordings = await getRecordings();
+        const cloudRecordings = await fetchCloudRecordings(userId);
+
+        if (!cloudRecordings || cloudRecordings.length === 0) {
+            return { success: false, msg: "Impossible de récupérer les données du serveur." };
+        }
+
+        let fixedCount = 0;
+        const cloudMap = new Map(cloudRecordings.map(c => [c.dbId, c]));
+
+        const updatedLocals = localRecordings.map(localRec => {
+            if (localRec.dbId && cloudMap.has(localRec.dbId)) {
+                const cloudRec = cloudMap.get(localRec.dbId);
+                if (localRec.date !== cloudRec.date) {
+                    fixedCount++;
+                    return {
+                        ...localRec,
+                        date: cloudRec.date,
+                        updatedAt: cloudRec.updatedAt // On prend aussi l'updatedAt du cloud
+                    };
+                }
+            }
+            return localRec;
+        });
+
+        if (fixedCount > 0) {
+            // Trier par date pour être sûr que l'historique est propre
+            updatedLocals.sort((a, b) => new Date(b.date) - new Date(a.date));
+            await saveRawRecordings(updatedLocals);
+        }
+
+        return { success: true, fixed: fixedCount };
+    } catch (err) {
+        console.error("Erreur critique dans le script de date local:", err);
+        return { success: false, msg: err.message };
+    }
+};
