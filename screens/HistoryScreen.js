@@ -219,7 +219,7 @@ export default function HistoryScreen() {
     };
 
     const handleDeleteItem = (item) => {
-        // On supprime la validation car l'item va dans la corbeille (restaurable)
+        // Suppression immédiate vers la corbeille (action réversible)
         executeDelete(item);
     };
 
@@ -307,7 +307,7 @@ export default function HistoryScreen() {
                 <View style={styles.listContent}>
                     {renderListHeader()}
                     {[...Array(6)].map((_, index) => (
-                        <HistorySkeleton key={index} />
+                        <HistorySkeleton key={index} /> // quand ca charge
                     ))}
                 </View>
             ) : (
@@ -354,7 +354,7 @@ export default function HistoryScreen() {
                     activeOpacity={1}
                     onPress={() => setSelectedOptionsItem(null)}
                 >
-                    <Animated.View 
+                    <Animated.View
                         entering={() => {
                             'worklet';
                             return {
