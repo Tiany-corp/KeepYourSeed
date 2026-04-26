@@ -29,7 +29,12 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         const sizeBytes = await calculateStorageSize(recordings);
         const formattedSize = formatSize(sizeBytes);
         
-        setStorageStats({ local, total, percent, formattedSize });
+        // Estimation du poids manquant (1 min = ~0.5 Mo)
+        const missing = nonDeleted.filter(r => !r.localUri);
+        const totalMissingDurationMs = missing.reduce((sum, r) => sum + (r.duration || 60000), 0);
+        const missingMo = ((totalMissingDurationMs / 60000) * 0.5).toFixed(1);
+        
+        setStorageStats({ local, total, percent, formattedSize, missingMo });
     };
 
     // Load preferences and stats on mount or when visible
@@ -219,7 +224,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 </View>
                                 {storageStats.local < storageStats.total && (
                                     <TouchableOpacity 
-                                        style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}
+                                        style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, alignItems: 'center' }}
                                         onPress={async () => {
                                             setIsSyncing(true);
                                             const recordings = await getRecordings();
@@ -231,6 +236,9 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     >
                                         <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '600' }}>
                                             {(storageStats.total - storageStats.local)} en attente
+                                        </Text>
+                                        <Text style={{ fontSize: 10, color: '#D97706', marginTop: 2 }}>
+                                            (~{storageStats.missingMo} Mo)
                                         </Text>
                                     </TouchableOpacity>
                                 )}
