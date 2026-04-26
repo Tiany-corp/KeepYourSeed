@@ -180,14 +180,19 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Infos utilisateur */}
                 {session?.user ? (
                     <View style={styles.userInfoContainer}>
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>
-                                {session.user.email?.charAt(0).toUpperCase()}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
+                            <View style={styles.avatar}>
+                                <Text style={styles.avatarText}>
+                                    {session.user.email?.charAt(0).toUpperCase()}
+                                </Text>
+                            </View>
+                            <Text style={styles.emailText} numberOfLines={1}>
+                                {session.user.email}
                             </Text>
                         </View>
-                        <Text style={styles.emailText} numberOfLines={1}>
-                            {session.user.email}
-                        </Text>
+                        <TouchableOpacity onPress={handleLogout} style={{ padding: 8, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
+                            <LogOut size={18} color="#991B1B" />
+                        </TouchableOpacity>
                     </View>
                 ) : (
                     <View style={styles.userInfoContainer}>
@@ -205,16 +210,23 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Menu items — seulement si connecté */}
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
-                        <View style={[styles.statsContainer, { marginBottom: 20 }]}>
-                            <View style={styles.statsRow}>
-                                <Text style={styles.statsLabel}>Disponibilité hors-ligne</Text>
-                                <Text style={styles.statsValue}>{storageStats.percent}%</Text>
+                        
+                        {/* Barre de stockage intégrée sans fond blanc */}
+                        <View style={{ paddingVertical: 16, paddingHorizontal: 20 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Database size={20} color="#78350F" style={styles.menuIcon} />
+                                    <Text style={styles.menuItemText}>Disponibilité hors-ligne</Text>
+                                </View>
+                                <Text style={{ fontSize: 13, color: '#78350F', fontWeight: 'bold' }}>{storageStats.percent}%</Text>
                             </View>
-                            <View style={styles.progressBarBg}>
+                            
+                            <View style={[styles.progressBarBg, { marginVertical: 0 }]}>
                                 <View style={[styles.progressBarFill, { width: `${storageStats.percent}%` }]} />
                             </View>
-                            <View style={styles.statsFooter}>
-                                <Text style={styles.statsSublabel}>{storageStats.local} / {storageStats.total} ({storageStats.formattedSize})</Text>
+                            
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                                <Text style={{ fontSize: 12, color: '#A8A29E' }}>{storageStats.local} / {storageStats.total} audios ({storageStats.formattedSize})</Text>
                                 {storageStats.local < storageStats.total && (
                                     <TouchableOpacity onPress={async () => {
                                         setIsSyncing(true);
@@ -224,7 +236,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                         await loadStorageStats();
                                         setIsSyncing(false);
                                     }}>
-                                        <Text style={styles.downloadBtnText}>Télécharger tout</Text>
+                                        <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '600' }}>Télécharger</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
@@ -265,14 +277,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 thumbColor={wifiOnly ? '#78350F' : '#F5F5F4'}
                             />
                         </View>
-
-                        <View style={[styles.separator, { marginVertical: 16 }]} />
-
-                        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                            <LogOut size={20} color="#991B1B" style={styles.menuIcon} />
-                            <Text style={[styles.menuItemText, { color: '#991B1B' }]}>Se déconnecter</Text>
-                        </TouchableOpacity>
-
                     </ScrollView>
                 ) : (
                     <View style={styles.menuContainer}>
@@ -315,10 +319,10 @@ const styles = StyleSheet.create({
     headerTitleContainer: { flexDirection: 'row', alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#292524' },
     closeButton: { padding: 4 },
-    userInfoContainer: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 20 },
-    avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#78350F', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-    avatarText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
-    emailText: { fontSize: 14, color: '#78716C' },
+    userInfoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 20, paddingHorizontal: 20 },
+    avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#78350F', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    avatarText: { color: '#ffffff', fontSize: 20, fontWeight: 'bold' },
+    emailText: { fontSize: 14, color: '#78716C', flex: 1 },
     separator: { height: 1, backgroundColor: '#D4A574', marginHorizontal: 20 },
     menuContainer: { flex: 1, paddingTop: 8 },
     menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20 },
