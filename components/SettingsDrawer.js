@@ -278,12 +278,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             </TouchableOpacity>
                         </View>
 
-                        <View style={[styles.section, { marginTop: 20 }]}>
-                            <Text style={[styles.sectionTitle, styles.dangerTitle]}>Zone de danger</Text>
-                            <TouchableOpacity style={styles.menuItem} onPress={handleClearLocalData}>
-                                <Text style={[styles.menuItemText, { color: '#991B1B' }]}>Vider le cache local</Text>
-                            </TouchableOpacity>
-                        </View>
                     </ScrollView>
                 ) : (
                     <View style={styles.menuContainer}>
