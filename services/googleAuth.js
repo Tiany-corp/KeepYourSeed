@@ -59,9 +59,8 @@ export async function signInWithGoogle() {
     const isActuallyWeb = Platform.OS === 'web' || typeof window !== 'undefined';
     
     if (isActuallyWeb) {
-        // Test radical : on force l'URL de base sans le pathname pour voir
+        // Web: simple OAuth redirect (root fallback to match Supabase Site URL)
         const redirectTo = window.location.origin + '/';
-        console.log('🌐 [GoogleAuth] TEST REDIRECT TO:', redirectTo);
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
