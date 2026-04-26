@@ -57,10 +57,13 @@ async function extractAndSetSession(url) {
 export async function signInWithGoogle() {
     if (Platform.OS === 'web') {
         // Web: simple OAuth redirect
+        const redirectTo = window.location.origin + window.location.pathname;
+        console.log('🔑 [GoogleAuth] Web Redirect URL:', redirectTo);
+
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.href.split('#')[0],
+                redirectTo: redirectTo,
             },
         });
         if (error) throw error;
