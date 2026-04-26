@@ -180,18 +180,17 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Infos utilisateur */}
                 {session?.user ? (
                     <View style={styles.userInfoContainer}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
-                            <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>
-                                    {session.user.email?.charAt(0).toUpperCase()}
-                                </Text>
-                            </View>
-                            <Text style={styles.emailText} numberOfLines={1}>
-                                {session.user.email}
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>
+                                {session.user.email?.charAt(0).toUpperCase()}
                             </Text>
                         </View>
-                        <TouchableOpacity onPress={handleLogout} style={{ padding: 8, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
-                            <LogOut size={18} color="#991B1B" />
+                        <Text style={styles.emailText} numberOfLines={1}>
+                            {session.user.email}
+                        </Text>
+                        <TouchableOpacity onPress={handleLogout} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#FEE2E2', borderRadius: 20 }}>
+                            <LogOut size={14} color="#991B1B" style={{ marginRight: 6 }} />
+                            <Text style={{ fontSize: 13, color: '#991B1B', fontWeight: '600' }}>Se déconnecter</Text>
                         </TouchableOpacity>
                     </View>
                 ) : (
@@ -319,10 +318,10 @@ const styles = StyleSheet.create({
     headerTitleContainer: { flexDirection: 'row', alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#292524' },
     closeButton: { padding: 4 },
-    userInfoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 20, paddingHorizontal: 20 },
-    avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#78350F', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-    avatarText: { color: '#ffffff', fontSize: 20, fontWeight: 'bold' },
-    emailText: { fontSize: 14, color: '#78716C', flex: 1 },
+    userInfoContainer: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 20 },
+    avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#78350F', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+    avatarText: { color: '#ffffff', fontSize: 24, fontWeight: 'bold' },
+    emailText: { fontSize: 14, color: '#78716C', marginBottom: 12 },
     separator: { height: 1, backgroundColor: '#D4A574', marginHorizontal: 20 },
     menuContainer: { flex: 1, paddingTop: 8 },
     menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20 },
