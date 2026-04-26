@@ -291,7 +291,8 @@ export default function TrashScreen({ navigation }) {
                                             handleKeepOrphan(item);
                                         }}
                                     >
-                                        <ShieldCheck size={20} color="#10B981" />
+                                        <ShieldCheck size={14} color="#10B981" />
+                                        <Text style={styles.keepBtnText}>Garder en local</Text>
                                     </TouchableOpacity>
                                 </TouchableOpacity>
                             ))}
@@ -428,7 +429,20 @@ const styles = StyleSheet.create({
         color: '#A8A29E',
     },
     keepBtn: {
-        padding: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: '#ECFDF5',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#D1FAE5',
+        marginLeft: 8,
+    },
+    keepBtnText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#059669',
         marginLeft: 4,
     },
     modalActions: {
