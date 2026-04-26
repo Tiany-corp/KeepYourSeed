@@ -30,7 +30,7 @@ export default function HistoryScreen() {
     const PAGE_SIZE = 20;
     const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
     const [dailyMemory, setDailyMemory] = useState(null);
-    const [isDailyMemorySeen, setIsDailyMemorySeen] = useState(true); // Vu par défaut (évite le clignotement au chargement)
+    const [isDailyMemorySeen, setIsDailyMemorySeen] = useState(null); // null = en attente de vérification
     // ...
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -63,7 +63,13 @@ export default function HistoryScreen() {
                 setDailyMemory(memory);
                 if (memory) {
                     const seenId = await getSeenDailyMemoryId(session.user.id);
-                    setIsDailyMemorySeen(seenId === memory.id);
+                    // Comparaison stricte en string pour éviter les problèmes de type
+                    const seen = !!seenId && !!memory.id && String(seenId) === String(memory.id);
+                    
+                    console.log(`[DailyMemory] MemoryID: ${memory.id}, LastSeenID: ${seenId}, FinalStatus: ${seen ? 'SEEN' : 'UNSEEN'}`);
+                    setIsDailyMemorySeen(seen);
+                } else {
+                    setIsDailyMemorySeen(true); // Rien à voir
                 }
             });
 
@@ -108,19 +114,19 @@ export default function HistoryScreen() {
         const allIds = new Set(recordings.map(r => r.id));
         const allDbIds = new Set(recordings.map(r => r.dbId?.toString()).filter(Boolean));
 
-        const parents = recordings.filter(r => 
-            !r.parentId || 
+        const parents = recordings.filter(r =>
+            !r.parentId ||
             (!allIds.has(r.parentId) && !allDbIds.has(r.parentId?.toString()))
         );
 
         const childrenMap = {};
         recordings.filter(r => r.parentId && !r.deletedAt).forEach(child => {
             // On cherche le parent : soit par ID local, soit par DB ID (pour la synchro cross-device)
-            const parent = recordings.find(p => 
-                p.id === child.parentId || 
+            const parent = recordings.find(p =>
+                p.id === child.parentId ||
                 (p.dbId && p.dbId.toString() === child.parentId?.toString())
             );
-            
+
             if (parent) {
                 if (!childrenMap[parent.id]) childrenMap[parent.id] = [];
                 childrenMap[parent.id].push(child);
@@ -297,14 +303,16 @@ export default function HistoryScreen() {
 
         return (
             <View>
-                {/* Pensée Souvenir */}
-                <DailyMemoryCard
-                    dailyMemory={dailyMemory}
-                    isOpened={isDailyMemorySeen}
-                    isPlaying={(currentTrack?.id === dailyMemory?.id) && audioPlayerIsPlaying}
-                    onTogglePlay={handleToggleDailyMemory}
-                    isLoading={loadingTrackId === dailyMemory?.id}
-                />
+                {/* Pensée Souvenir - On ne l'affiche que quand on connaît son statut vu/non vu */}
+                {dailyMemory && isDailyMemorySeen !== null && (
+                    <DailyMemoryCard
+                        dailyMemory={dailyMemory}
+                        isOpened={isDailyMemorySeen}
+                        isPlaying={(currentTrack?.id === dailyMemory?.id) && audioPlayerIsPlaying}
+                        onTogglePlay={handleToggleDailyMemory}
+                        isLoading={loadingTrackId === dailyMemory?.id}
+                    />
+                )}
 
                 {/* Barre de filtres (Tags) */}
                 <TagFilterBar

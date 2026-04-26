@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { Mic, Square, Mail } from 'lucide-react-native';
+import { Mic, Square, Send } from 'lucide-react-native';
 
 /**
  * Bouton d'enregistrement avec deux modes : Note classique ou Message au futur.
@@ -68,8 +68,8 @@ export default function RecordButton({
                             onPress={() => handleStart('message')}
                             style={styles.secondaryButton}
                         >
-                            <Mail size={16} color="#78716C" strokeWidth={1.5} />
-                            <Text style={styles.secondaryButtonText}>Envoyer un message à ton futur</Text>
+                            <Send size={16} color="#78716C" strokeWidth={1.5} />
+                            <Text style={styles.secondaryButtonText}>Envoyer un message à ton futur toi</Text>
                         </TouchableOpacity>
                     </View>
                 )}

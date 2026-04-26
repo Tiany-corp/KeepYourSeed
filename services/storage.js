@@ -460,15 +460,34 @@ export const getDailyMemory = async (userId) => {
         let memory = await universalStorage.getData(todayKey);
 
         if (!memory) {
-            const { fetchPendingMessage, markMessageAsOpened, fetchRandomRecording } = require('./cloud');
+            const { fetchPendingMessage, markMessageAsOpened, fetchCloudRecordings } = require('./cloud');
+            
+            // 1. Priorité aux messages en attente (Messages au futur)
             memory = await fetchPendingMessage(userId);
             if (memory && memory.dbId) {
                 await markMessageAsOpened(memory.dbId);
             }
+            
+            // 2. Sinon, on pioche une pensée aléatoire mais DETERMINISTE pour la journée
             if (!memory) {
-                memory = await fetchRandomRecording(userId);
-                if (memory) memory.type = memory.type || 'note';
+                const allCloud = await fetchCloudRecordings(userId);
+                if (allCloud && allCloud.length > 0) {
+                    // On utilise le jour de l'année + l'ID user pour créer un index stable
+                    const now = new Date();
+                    const start = new Date(now.getFullYear(), 0, 0);
+                    const diff = now - start;
+                    const oneDay = 1000 * 60 * 60 * 24;
+                    const dayOfYear = Math.floor(diff / oneDay);
+                    
+                    // Simple hash de l'userId pour que deux users n'aient pas la même pensée le même jour
+                    const userHash = (userId || 'guest').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                    const index = (dayOfYear + userHash) % allCloud.length;
+                    
+                    memory = allCloud[index];
+                    if (memory) memory.type = memory.type || 'note';
+                }
             }
+            
             if (memory) {
                 await universalStorage.saveData(todayKey, memory);
             }

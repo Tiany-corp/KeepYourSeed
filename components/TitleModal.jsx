@@ -421,7 +421,7 @@ export default function TitleModal({
                     >
                         <Text style={styles.modeSwitchText}>
                             {mode === 'note'
-                                ? '✉️ Transformer en message au futur'
+                                ? '🚀 Transformer en message au futur toi'
                                 : '📝 Enregistrer comme note classique'}
                         </Text>
                     </TouchableOpacity>

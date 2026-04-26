@@ -141,6 +141,7 @@ export const fetchCloudRecordings = async (userId) => {
             .from('recordings')
             .select('*')
             .eq('user_id', userId)
+            .is('deleted_at', null)
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -434,6 +435,7 @@ export const fetchRandomRecording = async (userId) => {
         const row = data[0];
         return {
             id: `cloud_${row.id}`,
+            dbId: row.id,
             localUri: null,
             remoteUrl: row.audio_url,
             status: 'synced',

@@ -70,7 +70,9 @@ export default function RecordScreen() {
             }
             const seenId = await getSeenDailyMemoryId(session?.user?.id);
             if (!cancelled) {
-                setHasUnseenMemory(seenId !== dailyMemory.id);
+                // Un message est considéré non vu si seenId est vide OU s'il ne correspond pas à la pensée actuelle
+                const isUnseen = !seenId || String(seenId) !== String(dailyMemory.id);
+                setHasUnseenMemory(isUnseen);
             }
         };
         syncSeenState();
@@ -87,9 +89,15 @@ export default function RecordScreen() {
             
             if (session?.user && !isFetchingMemory.current) {
                 isFetchingMemory.current = true;
-                getDailyMemory(session.user.id).then(memory => {
+                getDailyMemory(session.user.id).then(async (memory) => {
                     setDailyMemory(memory);
                     isFetchingMemory.current = false;
+                    
+                    // Rafraîchir aussi le statut "vu" pour le badge
+                    if (memory) {
+                        const seenId = await getSeenDailyMemoryId(session.user.id);
+                        setHasUnseenMemory(!seenId || String(seenId) !== String(memory.id));
+                    }
                 }).catch(() => {
                     isFetchingMemory.current = false;
                 });
@@ -164,11 +172,7 @@ export default function RecordScreen() {
         setPendingRecording(null);
     };
 
-    const handleGoToHistory = async () => {
-        if (dailyMemory?.id) {
-            await setSeenDailyMemoryId(session?.user?.id, dailyMemory.id);
-            setHasUnseenMemory(false);
-        }
+    const handleGoToHistory = () => {
         navigation.navigate('History');
     };
 
