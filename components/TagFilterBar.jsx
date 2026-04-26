@@ -10,7 +10,7 @@ import { ChevronDown, Check } from 'lucide-react-native';
  * - selectedTag (String) : L'ID du tag actuellement sélectionné, ou null si "Tous"
  * - onSelectTag (fn) : Callback invoqué au clic sur un tag (passe l'id ou null)
  */
-export default function TagFilterBar({ availableTags, selectedTag, onSelectTag }) {
+const TagFilterBar = React.memo(({ availableTags, selectedTag, onSelectTag }) => {
     const [modalVisible, setModalVisible] = useState(false);
     const hasTags = availableTags && availableTags.length > 0;
     const selectedTagObject = selectedTag && hasTags ? availableTags.find(t => t.id === selectedTag) : null;
@@ -67,7 +67,9 @@ export default function TagFilterBar({ availableTags, selectedTag, onSelectTag }
             </Modal>
         </View>
     );
-}
+});
+
+export default TagFilterBar;
 
 const styles = StyleSheet.create({
     filterContainer: {

@@ -270,6 +270,16 @@ export default function HistoryScreen() {
         );
     }, [currentTrack?.id, audioPlayerIsPlaying, loadingTrackId, childrenByParent, handleTogglePlay, handleOptions, session?.user]);
 
+    const handleToggleDailyMemory = useCallback(async () => {
+        if (!dailyMemory) return;
+        if (!isDailyMemorySeen && session?.user) {
+            setIsDailyMemorySeen(true);
+            await setSeenDailyMemoryId(session.user.id, dailyMemory.id);
+        }
+        audioPlayer.play(dailyMemory);
+        audioPlayer.openModal();
+    }, [dailyMemory, isDailyMemorySeen, session?.user, audioPlayer]);
+
     const renderListHeader = () => {
         const hasFilters = availableTags.length > 0;
         if (!dailyMemory && !hasFilters) return null;
@@ -281,14 +291,7 @@ export default function HistoryScreen() {
                     dailyMemory={dailyMemory}
                     isOpened={isDailyMemorySeen}
                     isPlaying={(currentTrack?.id === dailyMemory?.id) && audioPlayerIsPlaying}
-                    onTogglePlay={async () => {
-                        if (!isDailyMemorySeen && session?.user) {
-                            setIsDailyMemorySeen(true);
-                            await setSeenDailyMemoryId(session.user.id, dailyMemory.id);
-                        }
-                        audioPlayer.play(dailyMemory);
-                        audioPlayer.openModal();
-                    }}
+                    onTogglePlay={handleToggleDailyMemory}
                     isLoading={loadingTrackId === dailyMemory?.id}
                 />
 

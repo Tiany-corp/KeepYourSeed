@@ -14,7 +14,7 @@ import Logo from './Logo';
  * - onDismiss (fn)         : callback pour ignorer l'exercice
  * - isRecording (bool)     : si on est en train d'enregistrer la synthèse
  */
-export default function ConsolidationCard({ parent, onLongPress, onDismiss, isRecording }) {
+const ConsolidationCard = React.memo(({ parent, onLongPress, onDismiss, isRecording }) => {
     if (!parent) return null;
 
     return (
@@ -52,7 +52,9 @@ export default function ConsolidationCard({ parent, onLongPress, onDismiss, isRe
             </TouchableOpacity>
         </View>
     );
-}
+});
+
+export default ConsolidationCard;
 
 const styles = StyleSheet.create({
     container: {

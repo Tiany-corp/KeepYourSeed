@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, memo } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import AnimatedPlayButton from '../AnimatedPlayButton';
 import Animated, {
@@ -15,7 +15,7 @@ import { formatDateWithTime } from '../../utils/date';
  * Carte spéciale pour le "souvenir du jour" affichée en haut de l'historique.
  * Glow orange pulsant tant que le souvenir n'a pas été ouvert.
  */
-const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay, isLoading }) => {
+const DailyMemoryCard = memo(({ dailyMemory, isOpened, isPlaying, onTogglePlay, isLoading }) => {
     const pulse = useSharedValue(0);
     const scale = useSharedValue(1);
 
@@ -89,7 +89,7 @@ const DailyMemoryCard = ({ dailyMemory, isOpened, isPlaying, onTogglePlay, isLoa
             </Pressable>
         </Animated.View>
     );
-};
+});
 
 const styles = StyleSheet.create({
     dailyMemorySection: {
