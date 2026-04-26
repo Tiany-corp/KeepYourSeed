@@ -12,7 +12,13 @@ export default function useAudioRecorder() {
     const recorder = useExpoAudioRecorder(
         Platform.OS === 'web' ? {
             isMeteringEnabled: true,
-        } : RecordingPresets.HIGH_QUALITY
+        } : {
+            // Équilibre parfait pour la voix : Clair mais léger
+            bitrate: 64000,         // 64 kbps (standard haute qualité pour la voix)
+            sampleRate: 44100,      // On garde une bonne définition
+            numberOfChannels: 1,    // Mono (essentiel pour le gain de place)
+            extension: '.m4a',      // Format AAC (très efficace)
+        }
     );
     
     // État local pour le pont de compatibilité avec l'ancienne UI

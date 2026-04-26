@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert
 import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
-import { syncAll, pushOnly } from '../services/sync';
+import { syncAll } from '../services/sync';
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
@@ -47,11 +47,21 @@ export default function HistoryScreen() {
     } = audioPlayer;
     const { showAlert } = useAlert();
 
+    // === Utilitaire anti-doublons : garantit qu'aucun ID n'apparaît 2 fois ===
+    const dedup = (arr) => {
+        const seen = new Set();
+        return arr.filter(item => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+        });
+    };
+
     useEffect(() => {
         const initializeRecordings = async () => {
             // Charger le local immédiatement pour la réactivité
             const localData = await getRecordings();
-            setRecordings(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+            setRecordings(dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date))));
             setIsLoading(false);
             setIsInitialLoad(false);
         };
@@ -89,7 +99,7 @@ export default function HistoryScreen() {
 
     async function loadRecordings() {
         const data = await getRecordings();
-        setRecordings(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+        setRecordings(dedup(data.sort((a, b) => new Date(b.date) - new Date(a.date))));
     }
 
     // Pull-to-refresh : sync manuelle (bypass cooldown) puis rechargement local
@@ -201,9 +211,9 @@ export default function HistoryScreen() {
 
             showAlert('Succès', 'Enregistrement modifié.', 'success');
 
-            // 2. Push silencieux en arrière-plan (pas de pull, pas de cooldown)
+            // 2. Synchronisation complète silencieuse (Push + Pull)
             if (session?.user) {
-                pushOnly(session.user.id).catch(err => console.log('Silent push failed after edit', err));
+                syncAll(session.user.id, true).catch(err => console.log('Silent sync failed after edit', err));
             }
 
         } catch (e) {

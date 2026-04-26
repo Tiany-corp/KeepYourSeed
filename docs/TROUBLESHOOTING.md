@@ -46,4 +46,37 @@ Dans `services/storage.js` (`getDailyMemory`), avant de retourner l'objet mis en
 #### 🚩 Cause Racine
 La couche "Glow" utilisait exactement les mêmes dimensions que la carte principale (`top: 0, bottom: 0...`) et s'appuyait uniquement sur l'ombre (`elevation` sur Android). Or, sur Android, une ombre sous un objet de même taille reste cachée si l'opacité est animée.
 #### ✅ Solution Appliquée
-Modification de `glowLayer` dans `DailyMemoryCard.js` pour utiliser des coordonnées négatives (`top: -4, bottom: -4...`) et un `backgroundColor` translucide (`rgba(245, 158, 11, 0.4)`), créant un vrai "débordement" visible cross-platform.
+Modification de `glowLayer` dans `DailyMemoryCard.js` pour utiliser des coordonnées négatives (`top: -8, bottom: -8...`) et un `backgroundColor` translucide, créant un vrai "débordement" visible cross-platform.
+
+### Problème : Animation "Glow" absente à la première connexion
+**Date** : 26 Avril 2026
+**Symptôme** : Malgré un statut "non vu", l'animation de halo orange ne se déclenche pas lors de la première arrivée sur l'Historique après un Login.
+#### 🚩 Cause Racine
+1. **État initial** : `isDailyMemorySeen` était à `true` par défaut, masquant l'animation pendant le chargement.
+2. **Race Condition** : Dans `RecordScreen.js`, le clic sur le badge de notification marquait la pensée comme "vue" dans le stockage local *avant* de naviguer vers l'Historique. L'Historique recevait donc un état déjà "vu".
+#### ✅ Solution Appliquée
+1. Initialisation de `isDailyMemorySeen` à `null` pour attendre la confirmation du stockage avant de monter le composant.
+2. Suppression du marquage "vu" prématuré dans `RecordScreen.js`. Le statut ne passe à "vu" que lors de l'interaction réelle avec la carte dans l'Historique.
+
+---
+
+## ☁️ Cloud & Architecture
+
+### Problème : Pensées souvenir différentes entre PC et Mobile
+**Date** : 26 Avril 2026
+**Symptôme** : Un utilisateur connecté au même compte voit une pensée A sur son téléphone et une pensée B sur son PC le même jour.
+#### 🚩 Cause Racine
+La fonction SQL `get_random_recording` utilisait `ORDER BY random()`. Sans cache partagé entre les appareils, chaque appel retournait un résultat différent, brisant la cohérence de l'expérience utilisateur.
+#### ✅ Solution Appliquée
+Implémentation d'une logique **déterministe** dans `services/storage.js`. L'application récupère la liste des enregistrements et en choisit un via un index calculé sur le `dayOfYear` + un hash de l' `userId`. La pensée est ainsi identique sur tous les supports pour une journée donnée.
+
+### Problème : Historique vide sur un nouvel appareil (4G/WiFi)
+**Date** : 26 Avril 2026
+**Symptôme** : Lors d'une première connexion sur un nouveau device en 4G, l'historique restait vide alors que des données existaient sur le Cloud.
+#### 🚩 Cause Racine
+La synchronisation était totalement bloquée si la préférence "WiFi uniquement" était active et que l'utilisateur était en 4G. Cela bloquait non seulement les fichiers audio (lourds) mais aussi les métadonnées (légères), donnant l'impression que le compte était vide.
+#### ✅ Solution Appliquée
+Découplage de la synchronisation dans `services/sync.js` :
+1. **Métadonnées** : Toujours synchronisées (4G autorisée) pour peupler l'UI immédiatement.
+2. **Fichiers Audio** : Restent soumis à la restriction WiFi (mise en cache locale différée).
+3. Ajout d'un indicateur visuel dans les paramètres pour forcer le téléchargement manuel si besoin.

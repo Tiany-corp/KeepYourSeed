@@ -364,7 +364,21 @@ export const getRecordings = async () => {
             cacheSupabaseAudioLocally(demoRecordings);
             return demoRecordings;
         }
-        return data;
+        // === SANITISATION : Corrige les dbId corrompus (objets au lieu de UUID string) ===
+        const sanitized = data.map(rec => {
+            if (rec.dbId && typeof rec.dbId === 'object') {
+                return { ...rec, dbId: rec.dbId.id || null };
+            }
+            return rec;
+        });
+
+        // Si des corrections ont été faites, on persiste le nettoyage
+        if (sanitized.some((rec, i) => rec !== data[i])) {
+            await universalStorage.saveData(STORAGE_KEY, sanitized);
+            console.log('[Storage] Données corrompues (dbId objets) nettoyées automatiquement.');
+        }
+
+        return sanitized;
     } catch (e) {
         console.error('Failed to load recordings', e);
         return [];

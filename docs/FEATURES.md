@@ -19,19 +19,13 @@ Ces fonctionnalités constituent le cœur de l'application.
 ### Persistance & Cloud
 - [x] **Local-First** : Stockage asynchrone ultra-réactif (AsyncStorage / IndexedDB).
 - [x] **Cloud Sync (Supabase)** : Sauvegarde automatique des audios et métadonnées.
+- [x] **Sync Hybride** : Métadonnées prioritaires (4G) et audios intelligents (WiFi/Manuel).
 - [x] **Dédoublonage** : Gestion intelligente des uploads lors des passages offline/online.
 
----
-
-## 🟡 2. Améliorations (V1.1) - EN COURS 🏗️
-
-### Social & Partage
-- [ ] **Partage Externe** : Partager un souvenir via WhatsApp/Instagram (génération d'un visuel).
-- [ ] **Export MP3** : Possibilité de télécharger ses pensées en dehors de l'app.
-
-### Expérience Utilisateur
-- [ ] **Notifications Rappel** : Notification douce le soir si aucune pensée n'a été gardée.
-- [ ] **Capsule Temporelle ⏳** : Envoyer un message à son "Soi du futur" (invisible jusqu'à date T).
+### Capsule Temporelle (Messages au futur)
+- [x] **Message à ton futur toi** : Envoi de messages audio différés (🚀).
+- [x] **Livraison Intelligente** : Les messages apparaissent dans le "Souvenir du jour" dès qu'ils sont dus.
+- [x] **Visualisation "DM"** : Icône style messagerie pour une expérience plus intime.
 
 ---
 

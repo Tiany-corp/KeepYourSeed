@@ -5,7 +5,7 @@ import { AppContext } from '../contexts/AppContext';
 import useAudioRecorder from '../hooks/useAudioRecorder';
 import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getCurrentStreak, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
-import { pushOnly } from '../services/sync';
+import { syncAll } from '../services/sync';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
 import { Flame } from 'lucide-react-native';
@@ -157,9 +157,9 @@ export default function RecordScreen() {
         // Mettre à jour la streak dynamiquement après un nouvel enregistrement
         getCurrentStreak().then(setStreakCount);
 
-        // Push silencieux en arrière-plan (pas de pull, pas de blocage UI)
+        // Synchronisation complète silencieuse en arrière-plan (Push + Pull)
         if (session?.user) {
-            pushOnly(session.user.id).catch(() => {});
+            syncAll(session.user.id, true).catch(() => {});
         }
 
         showAlert("Sauvegardé", "Ta pensée a été enregistrée.", "success");
