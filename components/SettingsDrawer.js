@@ -242,6 +242,14 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             </Text>
                             {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
                         </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={() => { onClose(); navigation.navigate('Trash'); }}
+                        >
+                            <Trash2 size={20} color="#78350F" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Ma Corbeille</Text>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.section}>
