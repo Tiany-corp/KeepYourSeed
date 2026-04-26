@@ -53,7 +53,7 @@ const DailyMemoryCard = memo(({ dailyMemory, isOpened, isPlaying, onTogglePlay, 
 
     return (
         <Animated.View style={[styles.dailyMemorySection, animatedScaleStyle]}>
-            <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir ⏳</Text>
+            <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir</Text>
             <Pressable
                 onPress={onTogglePlay}
                 onPressIn={handlePressIn}
@@ -76,12 +76,12 @@ const DailyMemoryCard = memo(({ dailyMemory, isOpened, isPlaying, onTogglePlay, 
                             <Text style={styles.itemDate}>{formatDateWithTime(dailyMemory.date)}</Text>
                         </View>
                         <View style={[styles.playButtonIcon, (isPlaying || isLoading) && styles.playButtonIconActive]}>
-                            <AnimatedPlayButton 
+                            <AnimatedPlayButton
                                 key={dailyMemory.id}
-                                isPlaying={isPlaying || isLoading} 
-                                size={18} 
-                                color="#FFFFFF" 
-                                strokeWidth={1.5} 
+                                isPlaying={isPlaying || isLoading}
+                                size={18}
+                                color="#FFFFFF"
+                                strokeWidth={1.5}
                             />
                         </View>
                     </View>
@@ -111,17 +111,18 @@ const styles = StyleSheet.create({
     },
     glowLayer: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderRadius: 16,
-        backgroundColor: '#F5EADB', // Même couleur que la carte pour bloquer la transparence et projeter l'ombre
+        top: -4,
+        left: -4,
+        right: -4,
+        bottom: -4,
+        borderRadius: 20,
+        backgroundColor: 'rgba(245, 158, 11, 0.4)', // Halo orange
+        // Optionnel : on garde une petite ombre pour iOS/Web si supporté
         shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.8,
-        shadowRadius: 16,
-        elevation: 8,
+        shadowRadius: 10,
+        elevation: 4,
     },
     dailyMemoryCard: {
         backgroundColor: '#F5EADB',
