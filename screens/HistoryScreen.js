@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal, RefreshControl } from 'react-native';
 import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
@@ -23,6 +23,7 @@ export default function HistoryScreen() {
     const { session, setDrawerOpen } = useContext(AppContext);
     const navigation = useNavigation();
     const [recordings, setRecordings] = useState([]);
+    const hasInitialSyncRun = useRef(false);
     const [isLoading, setIsLoading] = useState(false);
 
     // Pagination
@@ -65,6 +66,16 @@ export default function HistoryScreen() {
                     setIsDailyMemorySeen(seenId === memory.id);
                 }
             });
+
+            // Lancement silencieux de la synchronisation au démarrage
+            if (!hasInitialSyncRun.current) {
+                hasInitialSyncRun.current = true;
+                syncAll(session.user.id, false).then(result => {
+                    if (result.success && result.pulled > 0) {
+                        loadRecordings(); // Recharge la liste si de nouveaux vocaux sont arrivés
+                    }
+                }).catch(e => console.log('Auto-sync en arrière-plan échouée:', e));
+            }
         }
     }, [session]);
 
