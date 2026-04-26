@@ -59,10 +59,9 @@ export async function signInWithGoogle() {
     const isActuallyWeb = Platform.OS === 'web' || typeof window !== 'undefined';
     
     if (isActuallyWeb) {
-        // Web: Utilisation forcée de l'URL du navigateur
-        const redirectTo = window.location.origin + (window.location.pathname || '/');
-        console.log('🌐 [GoogleAuth] MODE WEB DÉTECTÉ');
-        console.log('🔗 [GoogleAuth] Redirecting to:', redirectTo);
+        // Test radical : on force l'URL de base sans le pathname pour voir
+        const redirectTo = window.location.origin + '/';
+        console.log('🌐 [GoogleAuth] TEST REDIRECT TO:', redirectTo);
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
