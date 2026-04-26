@@ -55,7 +55,9 @@ async function extractAndSetSession(url) {
  * with a Linking fallback for Android browsers that don't return properly.
  */
 export async function signInWithGoogle() {
-    if (Platform.OS === 'web') {
+    const isWeb = Platform.OS === 'web' || (typeof window !== 'undefined' && window.location);
+    
+    if (isWeb) {
         // Web: simple OAuth redirect
         const redirectTo = window.location.origin + window.location.pathname;
         console.log('🔑 [GoogleAuth] Web Redirect URL:', redirectTo);
