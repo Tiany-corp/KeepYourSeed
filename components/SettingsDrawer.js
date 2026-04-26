@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw } from 'lucide-react-native';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -205,38 +205,37 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Menu items — seulement si connecté */}
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Stockage & Cache</Text>
-                            
-                            <View style={styles.statsContainer}>
-                                <View style={styles.statsRow}>
-                                    <Text style={styles.statsLabel}>Disponibilité hors-ligne</Text>
-                                    <Text style={styles.statsValue}>{storageStats.percent}%</Text>
-                                </View>
-                                <View style={styles.progressBarBg}>
-                                    <View style={[styles.progressBarFill, { width: `${storageStats.percent}%` }]} />
-                                </View>
-                                <View style={styles.statsFooter}>
-                                    <Text style={styles.statsSublabel}>{storageStats.local} / {storageStats.total} ({storageStats.formattedSize})</Text>
-                                    {storageStats.local < storageStats.total && (
-                                        <TouchableOpacity onPress={async () => {
-                                            setIsSyncing(true);
-                                            const recordings = await getRecordings();
-                                            const { cacheSupabaseAudioLocally } = require('../services/storage');
-                                            await cacheSupabaseAudioLocally(recordings);
-                                            await loadStorageStats();
-                                            setIsSyncing(false);
-                                        }}>
-                                            <Text style={styles.downloadBtnText}>Télécharger tout</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
+                        <View style={[styles.statsContainer, { marginBottom: 20 }]}>
+                            <View style={styles.statsRow}>
+                                <Text style={styles.statsLabel}>Disponibilité hors-ligne</Text>
+                                <Text style={styles.statsValue}>{storageStats.percent}%</Text>
                             </View>
+                            <View style={styles.progressBarBg}>
+                                <View style={[styles.progressBarFill, { width: `${storageStats.percent}%` }]} />
+                            </View>
+                            <View style={styles.statsFooter}>
+                                <Text style={styles.statsSublabel}>{storageStats.local} / {storageStats.total} ({storageStats.formattedSize})</Text>
+                                {storageStats.local < storageStats.total && (
+                                    <TouchableOpacity onPress={async () => {
+                                        setIsSyncing(true);
+                                        const recordings = await getRecordings();
+                                        const { cacheSupabaseAudioLocally } = require('../services/storage');
+                                        await cacheSupabaseAudioLocally(recordings);
+                                        await loadStorageStats();
+                                        setIsSyncing(false);
+                                    }}>
+                                        <Text style={styles.downloadBtnText}>Télécharger tout</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+
                         <TouchableOpacity 
                             style={styles.menuItem} 
                             onPress={handleSync}
                             disabled={isSyncing}
                         >
+                            <RefreshCcw size={20} color="#78350F" style={styles.menuIcon} />
                             <Text style={styles.menuItemText}>
                                 {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
                             </Text>
@@ -250,33 +249,29 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             <Trash2 size={20} color="#78350F" style={styles.menuIcon} />
                             <Text style={styles.menuItemText}>Ma Corbeille</Text>
                         </TouchableOpacity>
-                    </View>
 
-                    <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Préférences</Text>
-                            <View style={styles.settingRow}>
-                                <View style={styles.settingInfo}>
-                                    <ShieldCheck size={20} color="#78350F" style={styles.menuIcon} />
-                                    <Text style={styles.menuItemText}>Wi-Fi uniquement</Text>
-                                </View>
-                                <Switch
-                                    value={wifiOnly}
-                                    onValueChange={async (value) => {
-                                        setWifiOnly(value);
-                                        await setWifiOnlyPreference(value);
-                                    }}
-                                    trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
-                                    thumbColor={wifiOnly ? '#78350F' : '#F5F5F4'}
-                                />
+                        <View style={[styles.menuItem, { paddingVertical: 8, justifyContent: 'space-between' }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Wifi size={20} color="#78350F" style={styles.menuIcon} />
+                                <Text style={styles.menuItemText}>Wi-Fi uniquement</Text>
                             </View>
+                            <Switch
+                                value={wifiOnly}
+                                onValueChange={async (value) => {
+                                    setWifiOnly(value);
+                                    await setWifiOnlyPreference(value);
+                                }}
+                                trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
+                                thumbColor={wifiOnly ? '#78350F' : '#F5F5F4'}
+                            />
                         </View>
 
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Compte</Text>
-                            <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-                                <Text style={styles.menuItemText}>Se déconnecter</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <View style={[styles.separator, { marginVertical: 16 }]} />
+
+                        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+                            <LogOut size={20} color="#991B1B" style={styles.menuIcon} />
+                            <Text style={[styles.menuItemText, { color: '#991B1B' }]}>Se déconnecter</Text>
+                        </TouchableOpacity>
 
                     </ScrollView>
                 ) : (
