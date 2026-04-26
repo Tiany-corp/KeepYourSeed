@@ -206,32 +206,31 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
                         
-                        {/* Barre de stockage intégrée sans fond blanc */}
+                        {/* Info de stockage simplifiée */}
                         <View style={{ paddingVertical: 16, paddingHorizontal: 20 }}>
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Database size={20} color="#78350F" style={styles.menuIcon} />
-                                    <Text style={styles.menuItemText}>Disponibilité hors-ligne</Text>
+                                    <View>
+                                        <Text style={styles.menuItemText}>Stockage local</Text>
+                                        <Text style={{ fontSize: 13, color: '#A8A29E', marginTop: 2 }}>{storageStats.formattedSize} ({storageStats.local} audios)</Text>
+                                    </View>
                                 </View>
-                                <Text style={{ fontSize: 13, color: '#78350F', fontWeight: 'bold' }}>{storageStats.percent}%</Text>
-                            </View>
-                            
-                            <View style={[styles.progressBarBg, { marginVertical: 0 }]}>
-                                <View style={[styles.progressBarFill, { width: `${storageStats.percent}%` }]} />
-                            </View>
-                            
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-                                <Text style={{ fontSize: 12, color: '#A8A29E' }}>{storageStats.local} / {storageStats.total} audios ({storageStats.formattedSize})</Text>
                                 {storageStats.local < storageStats.total && (
-                                    <TouchableOpacity onPress={async () => {
-                                        setIsSyncing(true);
-                                        const recordings = await getRecordings();
-                                        const { cacheSupabaseAudioLocally } = require('../services/storage');
-                                        await cacheSupabaseAudioLocally(recordings);
-                                        await loadStorageStats();
-                                        setIsSyncing(false);
-                                    }}>
-                                        <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '600' }}>Télécharger</Text>
+                                    <TouchableOpacity 
+                                        style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}
+                                        onPress={async () => {
+                                            setIsSyncing(true);
+                                            const recordings = await getRecordings();
+                                            const { cacheSupabaseAudioLocally } = require('../services/storage');
+                                            await cacheSupabaseAudioLocally(recordings);
+                                            await loadStorageStats();
+                                            setIsSyncing(false);
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '600' }}>
+                                            {(storageStats.total - storageStats.local)} en attente
+                                        </Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
