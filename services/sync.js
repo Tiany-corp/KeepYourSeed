@@ -64,14 +64,10 @@ export const syncAll = async (userId, isManual = false) => {
             console.log('Push sauté (Wi-Fi requis)');
         }
 
-        // 2. PULL : Autorisé si (Wifi) OR (Manual)
-        // Note: Le pull télécharge des fichiers audio, donc on le restreint plus strictement
-        const canPull = isManual || isWifi;
-        if (canPull) {
-            pulledCount = await pullCloudRecordings(userId);
-        } else {
-            console.log('Pull sauté (Wi-Fi requis pour téléchargement)');
-        }
+        // 2. PULL : Toujours autorisé pour les métadonnées (texte)
+        // Le téléchargement audio en tâche de fond dépend des restrictions Wi-Fi
+        const canDownloadAudio = isManual || isWifi || !wifiOnly;
+        pulledCount = await pullCloudRecordings(userId, canDownloadAudio);
 
         _isSyncing = false;
         _lastSyncTime = Date.now();
@@ -328,7 +324,7 @@ const pushLocalChanges = async (userId) => {
  * Récupère les métadonnées depuis le cloud et les fusionne en local.
  * Déclenche ensuite le téléchargement des fichiers audio manquants.
  */
-const pullCloudRecordings = async (userId) => {
+const pullCloudRecordings = async (userId, canDownloadAudio = true) => {
     try {
         const cloudRecordings = await fetchCloudRecordings(userId);
         const localRecordings = await getRecordings();
@@ -467,8 +463,12 @@ const pullCloudRecordings = async (userId) => {
             // Sauvegarde atomique (JSON direct pour éviter les boucles d'updateRecording)
             await saveRawRecordings(merged);
             
-            // Lancer le cache audio en tâche de fond pour les nouveaux venus
-            cacheSupabaseAudioLocally(merged);
+            if (canDownloadAudio) {
+                // Lancer le cache audio en tâche de fond pour les nouveaux venus
+                cacheSupabaseAudioLocally(merged);
+            } else {
+                console.log(`[Sync] Métadonnées à jour. Cache audio ignoré (Wi-Fi requis).`);
+            }
             
             console.log(`[Sync] Terminé: ${newItems.length} créés, ${updatedItems.length} mis à jour, ${localRecordings.length - cleanedLocal.length} doublons supprimés.`);
             return { 
