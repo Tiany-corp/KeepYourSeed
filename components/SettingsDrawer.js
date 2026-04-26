@@ -99,6 +99,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     if (onDataCleared) onDataCleared(); // Rafraîchir l'historique
                     loadStorageStats(); // Mettre à jour les stats de stockage
                 } else {
+                    showAlert('À jour', 'Toutes vos pensées sont déjà synchronisées.', 'success');
                     loadStorageStats();
                 }
             } else {
