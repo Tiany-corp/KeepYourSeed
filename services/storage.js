@@ -250,6 +250,30 @@ export const updateRecording = async (id, updates) => {
     }
 };
 
+/**
+ * Détache définitivement un enregistrement du Cloud pour le garder UNIQUEMENT sur le téléphone.
+ * Il ne sera plus jamais proposé à la purge des orphelins.
+ */
+export const markAsKeepLocalOnly = async (id) => {
+    try {
+        const recordings = await getRecordings();
+        const updatedRecordings = recordings.map(rec =>
+            rec.id === id ? { 
+                ...rec, 
+                keepLocalOnly: true, 
+                dbId: null, // On coupe le lien cloud
+                remoteUrl: null,
+                status: 'local_only' // Nouveau statut informatif
+            } : rec
+        );
+        await universalStorage.saveData(STORAGE_KEY, updatedRecordings);
+        return updatedRecordings;
+    } catch (e) {
+        console.error('Failed to mark as local only', e);
+        return [];
+    }
+};
+
 export const saveRawRecordings = async (recordings) => {
     try {
         await universalStorage.saveData(STORAGE_KEY, recordings);

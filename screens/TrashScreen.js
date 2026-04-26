@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { getRecordings, restoreRecording, permanentlyDeleteRecording } from '../services/storage';
+import { getRecordings, restoreRecording, permanentlyDeleteRecording, markAsKeepLocalOnly } from '../services/storage';
 import { restoreRecordingFromCloud, permanentlyDeleteFromCloud, fetchTrashRecordings } from '../services/cloud';
 import { purgeHardDeletedCloudItems, getOrphanedCloudItems } from '../services/sync';
-import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, RefreshCcw, CheckSquare, Square } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, RefreshCcw, CheckSquare, Square, ShieldCheck } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import RecordingItem from '../components/history/RecordingItem';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
@@ -162,6 +162,21 @@ export default function TrashScreen({ navigation }) {
         }
     };
 
+    const handleKeepOrphan = async (item) => {
+        try {
+            await markAsKeepLocalOnly(item.id);
+            setOrphans(prev => prev.filter(o => o.id !== item.id));
+            showAlert('Gardé', `"${item.title}" sera conservé en local uniquement.`, 'success');
+            
+            // Si c'était le dernier orphelin, on ferme la modale
+            if (orphans.length <= 1) {
+                setShowOrphansModal(false);
+            }
+        } catch (e) {
+            showAlert('Erreur', 'Impossible de modifier le statut de la note.', 'error');
+        }
+    };
+
     const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
             <RotateCcw size={64} color="#D4A574" strokeWidth={1} style={{ marginBottom: 16, opacity: 0.5 }} />
@@ -269,6 +284,15 @@ export default function TrashScreen({ navigation }) {
                                         <Text style={styles.orphanTitle} numberOfLines={1}>{item.title}</Text>
                                         <Text style={styles.orphanDate}>{new Date(item.date).toLocaleDateString()}</Text>
                                     </View>
+                                    <TouchableOpacity 
+                                        style={styles.keepBtn} 
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            handleKeepOrphan(item);
+                                        }}
+                                    >
+                                        <ShieldCheck size={20} color="#10B981" />
+                                    </TouchableOpacity>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -402,6 +426,10 @@ const styles = StyleSheet.create({
     orphanDate: {
         fontSize: 12,
         color: '#A8A29E',
+    },
+    keepBtn: {
+        padding: 8,
+        marginLeft: 4,
     },
     modalActions: {
         flexDirection: 'row',

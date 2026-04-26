@@ -222,7 +222,13 @@ export const getOrphanedCloudItems = async (userId) => {
         const localRecordings = await getRecordings();
         const cloudDbIds = new Set(cloudRecordings.map(c => c.dbId).filter(Boolean));
 
-        const orphans = localRecordings.filter(loc => loc.dbId && !cloudDbIds.has(loc.dbId));
+        // Un orphelin est une note qui a un dbId (donc censée être sur le cloud) 
+        // mais n'y est plus, ET qui n'a pas été marquée comme "garder en local uniquement".
+        const orphans = localRecordings.filter(loc => 
+            loc.dbId && 
+            !cloudDbIds.has(loc.dbId) && 
+            !loc.keepLocalOnly
+        );
         return { success: true, orphans };
     } catch (e) {
         console.error("Erreur get orphans:", e);
