@@ -188,10 +188,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         <Text style={styles.emailText} numberOfLines={1}>
                             {session.user.email}
                         </Text>
-                        <TouchableOpacity onPress={handleLogout} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, backgroundColor: '#FEE2E2', borderRadius: 20 }}>
-                            <LogOut size={14} color="#991B1B" style={{ marginRight: 6 }} />
-                            <Text style={{ fontSize: 13, color: '#991B1B', fontWeight: '600' }}>Se déconnecter</Text>
-                        </TouchableOpacity>
                     </View>
                 ) : (
                     <View style={styles.userInfoContainer}>
@@ -276,6 +272,13 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 thumbColor={wifiOnly ? '#78350F' : '#F5F5F4'}
                             />
                         </View>
+
+                        <View style={[styles.separator, { marginVertical: 16 }]} />
+
+                        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
+                            <LogOut size={20} color="#991B1B" style={styles.menuIcon} />
+                            <Text style={[styles.menuItemText, { color: '#991B1B' }]}>Se déconnecter</Text>
+                        </TouchableOpacity>
                     </ScrollView>
                 ) : (
                     <View style={styles.menuContainer}>
