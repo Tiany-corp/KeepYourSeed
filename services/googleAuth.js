@@ -17,7 +17,13 @@ async function extractAndSetSession(url) {
         const parsed = new URL(url);
         // Supabase returns tokens in the URL fragment (#access_token=...&refresh_token=...)
         const fragment = parsed.hash?.substring(1) || '';
-        const params = new URLSearchParams(fragment);
+        let params = new URLSearchParams(fragment);
+        
+        // Fallback si ce n'est pas dans le fragment mais dans les query params
+        if (!params.get('access_token')) {
+            params = parsed.searchParams;
+        }
+
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
 
@@ -60,8 +66,11 @@ export async function signInWithGoogle() {
         if (error) throw error;
     } else {
         // Native: open browser for auth, then capture tokens
-        const redirectUrl = AuthSession.makeRedirectUri();
-        console.log('🔑 [GoogleAuth] Redirect URL:', redirectUrl);
+        const redirectUrl = AuthSession.makeRedirectUri({
+            scheme: 'keepyourseed',
+        });
+        
+        console.log('🔑 [GoogleAuth] Native Redirect URL:', redirectUrl);
 
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -70,8 +79,6 @@ export async function signInWithGoogle() {
                 skipBrowserRedirect: true,
             },
         });
-
-        if (error) throw error;
 
         if (error) throw error;
 
