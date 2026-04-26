@@ -55,12 +55,14 @@ async function extractAndSetSession(url) {
  * with a Linking fallback for Android browsers that don't return properly.
  */
 export async function signInWithGoogle() {
-    const isWeb = Platform.OS === 'web' || (typeof window !== 'undefined' && window.location);
+    // Détection ultra-robuste du Web
+    const isActuallyWeb = Platform.OS === 'web' || typeof window !== 'undefined';
     
-    if (isWeb) {
-        // Web: simple OAuth redirect
-        const redirectTo = window.location.origin + window.location.pathname;
-        console.log('🔑 [GoogleAuth] Web Redirect URL:', redirectTo);
+    if (isActuallyWeb) {
+        // Web: Utilisation forcée de l'URL du navigateur
+        const redirectTo = window.location.origin + (window.location.pathname || '/');
+        console.log('🌐 [GoogleAuth] MODE WEB DÉTECTÉ');
+        console.log('🔗 [GoogleAuth] Redirecting to:', redirectTo);
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
