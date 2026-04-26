@@ -457,22 +457,38 @@ const getSeenDailyMemoryKey = (userId) => `${SEEN_DAILY_MEMORY_PREFIX}${userId |
 export const getDailyMemory = async (userId) => {
     try {
         const todayKey = getTodayKey();
-        const cached = await universalStorage.getData(todayKey);
-        if (cached) return cached;
+        let memory = await universalStorage.getData(todayKey);
 
-        const { fetchPendingMessage, markMessageAsOpened, fetchRandomRecording } = require('./cloud');
-        const pendingMessage = await fetchPendingMessage(userId);
-        if (pendingMessage) {
-            if (pendingMessage.dbId) await markMessageAsOpened(pendingMessage.dbId);
-            await universalStorage.saveData(todayKey, pendingMessage);
-            return pendingMessage;
+        if (!memory) {
+            const { fetchPendingMessage, markMessageAsOpened, fetchRandomRecording } = require('./cloud');
+            memory = await fetchPendingMessage(userId);
+            if (memory && memory.dbId) {
+                await markMessageAsOpened(memory.dbId);
+            }
+            if (!memory) {
+                memory = await fetchRandomRecording(userId);
+                if (memory) memory.type = memory.type || 'note';
+            }
+            if (memory) {
+                await universalStorage.saveData(todayKey, memory);
+            }
         }
-        const randomRecording = await fetchRandomRecording(userId);
-        if (randomRecording) {
-            randomRecording.type = randomRecording.type || 'note';
-            await universalStorage.saveData(todayKey, randomRecording);
+
+        // TRES IMPORTANT: Rattacher le fichier local (localUri)
+        // car l'objet mis en cache ou venant du Cloud n'a souvent que l'URL distante.
+        if (memory) {
+            const allLocal = await getRecordings();
+            const localMatch = allLocal.find(r => 
+                (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) || 
+                (r.dbId && memory.id === `cloud_${r.dbId}`)
+            );
+            
+            if (localMatch && localMatch.localUri) {
+                memory.localUri = localMatch.localUri;
+            }
         }
-        return randomRecording;
+
+        return memory;
     } catch (e) { return null; }
 };
 

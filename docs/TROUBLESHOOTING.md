@@ -28,4 +28,22 @@ Le paramètre `redirectTo` envoyé à Supabase était mal détecté ou mal forma
 
 ## 📁 Stockage & Synchronisation
 
-*(Ajouter ici les futurs problèmes de synchronisation ou de cache audio)*
+### Problème : "Audio pas encore disponible en local" sur le Souvenir du Jour
+**Date** : 26 Avril 2026
+**Symptôme** : Au clic sur "Play" de la pensée souvenir, le fichier audio ne se lance pas et la console affiche `Audio "..." pas encore disponible en local`.
+#### 🚩 Cause Racine
+La fonction `fetchRandomRecording` récupérait un enregistrement aléatoire depuis Supabase via RPC. Comme le serveur ignore l'emplacement physique du fichier sur le téléphone, il renvoyait l'objet avec un `localUri` nul. Cet objet était mis en cache tel quel, rendant la lecture impossible par le lecteur "Local-First".
+#### ✅ Solution Appliquée
+Dans `services/storage.js` (`getDailyMemory`), avant de retourner l'objet mis en cache ou venant du cloud, on recherche une correspondance locale basée sur le `remoteUrl` ou le `dbId` pour lui ré-attacher dynamiquement son `localUri`.
+
+---
+
+## 🎨 UI & Animations
+
+### Problème : Animation "Pulse/Glow" invisible sur Android/Web
+**Date** : 26 Avril 2026
+**Symptôme** : L'effet de halo (Glow) autour de la "Pensée souvenir" fonctionnait sur iOS mais était totalement invisible sur Android et Web.
+#### 🚩 Cause Racine
+La couche "Glow" utilisait exactement les mêmes dimensions que la carte principale (`top: 0, bottom: 0...`) et s'appuyait uniquement sur l'ombre (`elevation` sur Android). Or, sur Android, une ombre sous un objet de même taille reste cachée si l'opacité est animée.
+#### ✅ Solution Appliquée
+Modification de `glowLayer` dans `DailyMemoryCard.js` pour utiliser des coordonnées négatives (`top: -4, bottom: -4...`) et un `backgroundColor` translucide (`rgba(245, 158, 11, 0.4)`), créant un vrai "débordement" visible cross-platform.
