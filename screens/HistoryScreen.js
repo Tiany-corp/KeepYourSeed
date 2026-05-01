@@ -58,41 +58,65 @@ export default function HistoryScreen() {
     };
 
     useEffect(() => {
-        const initializeRecordings = async () => {
-            // Charger le local immédiatement pour la réactivité
-            const localData = await getRecordings();
-            setRecordings(dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date))));
-            setIsLoading(false);
-            setIsInitialLoad(false);
-        };
-
-        initializeRecordings();
-
-        if (session?.user) {
-            getDailyMemory(session.user.id).then(async (memory) => {
-                setDailyMemory(memory);
-                if (memory) {
-                    const seenId = await getSeenDailyMemoryId(session.user.id);
-                    // Comparaison stricte en string pour éviter les problèmes de type
-                    const seen = !!seenId && !!memory.id && String(seenId) === String(memory.id);
-                    
-                    console.log(`[DailyMemory] MemoryID: ${memory.id}, LastSeenID: ${seenId}, FinalStatus: ${seen ? 'SEEN' : 'UNSEEN'}`);
-                    setIsDailyMemorySeen(seen);
-                } else {
-                    setIsDailyMemorySeen(true); // Rien à voir
-                }
+        const initialize = async () => {
+            // Charger les vocaux (toujours disponible)
+            const recordingsPromise = getRecordings().then(localData => {
+                return dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
             });
 
-            // Lancement silencieux de la synchronisation au démarrage
-            if (!hasInitialSyncRun.current) {
+            // Charger la pensée souvenir (si connecté)
+            let dailyPromise = Promise.resolve(null);
+            if (session?.user) {
+                dailyPromise = getDailyMemory(session.user.id).then(async (memory) => {
+                    let seen = true;
+                    if (memory) {
+                        const seenId = await getSeenDailyMemoryId(session.user.id);
+                        seen = !!seenId && !!memory.id && String(seenId) === String(memory.id);
+                    }
+                    return { memory, seen };
+                }).catch(() => null);
+            }
+
+            // Timeout de sécurité : si la pensée prend trop longtemps, on affiche quand même
+            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('timeout'), 2000));
+
+            // Attendre les vocaux + (pensée OU timeout)
+            const [sortedRecordings, dailyResult] = await Promise.all([
+                recordingsPromise,
+                Promise.race([dailyPromise, timeoutPromise])
+            ]);
+
+            // Appliquer tout d'un coup
+            setRecordings(sortedRecordings);
+            if (dailyResult && dailyResult !== 'timeout') {
+                setDailyMemory(dailyResult.memory);
+                setIsDailyMemorySeen(dailyResult.seen);
+            }
+            setIsLoading(false);
+            setIsInitialLoad(false);
+
+            // Si la pensée a timeout, on la charge en arrière-plan
+            if (dailyResult === 'timeout' && session?.user) {
+                dailyPromise.then(result => {
+                    if (result) {
+                        setDailyMemory(result.memory);
+                        setIsDailyMemorySeen(result.seen);
+                    }
+                });
+            }
+
+            // Sync silencieuse
+            if (session?.user && !hasInitialSyncRun.current) {
                 hasInitialSyncRun.current = true;
                 syncAll(session.user.id, false).then(result => {
                     if (result.success && result.pulled > 0) {
-                        loadRecordings(); // Recharge la liste si de nouveaux vocaux sont arrivés
+                        loadRecordings();
                     }
-                }).catch(e => console.log('Auto-sync en arrière-plan échouée:', e));
+                }).catch(e => console.log('Auto-sync échouée:', e));
             }
-        }
+        };
+
+        initialize();
     }, [session]);
 
     const [refreshing, setRefreshing] = useState(false);
@@ -313,7 +337,7 @@ export default function HistoryScreen() {
 
         return (
             <View>
-                {/* Pensée Souvenir - On ne l'affiche que quand on connaît son statut vu/non vu */}
+                {/* Pensée Souvenir */}
                 {dailyMemory && isDailyMemorySeen !== null && (
                     <DailyMemoryCard
                         dailyMemory={dailyMemory}

@@ -80,3 +80,34 @@ Découplage de la synchronisation dans `services/sync.js` :
 1. **Métadonnées** : Toujours synchronisées (4G autorisée) pour peupler l'UI immédiatement.
 2. **Fichiers Audio** : Restent soumis à la restriction WiFi (mise en cache locale différée).
 3. Ajout d'un indicateur visuel dans les paramètres pour forcer le téléchargement manuel si besoin.
+
+---
+
+## 🔄 Synchronisation & Doublons
+
+### Problème : Apparition de doublons lors de la synchronisation (ID dupliqués dans React)
+**Date** : 26 Avril 2026
+**Symptôme** : Après un enregistrement ou un refresh, des vocaux apparaissent en double. Tenter d'en supprimer un supprime les deux. Erreur console : `Encountered two children with the same key`.
+
+#### 🚩 Cause Racine (Multiples)
+1.  **UUID Corrompus** : La fonction `saveRecordingToDatabase` renvoyait l'objet complet de la ligne Supabase au lieu de juste l'UUID. Cet objet était stocké tel quel dans le `dbId` local, créant des erreurs de syntaxe UUID (`[object Object]`) lors des tentatives de suppression ou de matching.
+2.  **Matching par Date instable** : Le format de date différait parfois entre le Cloud (`T` séparateur ISO) et le Local (espace séparateur SQL), empêchant la réconciliation immédiate après upload.
+3.  **Logique de Fusion Fragile** : L'utilisation de 3 listes séparées (`new`, `updated`, `cleaned`) dans `sync.js` permettait des chevauchements si un item n'était pas correctement identifié.
+
+#### ✅ Solution Appliquée
+1.  **Sanitisation Auto (`storage.js`)** : Ajout d'un filtre dans `getRecordings` qui détecte les `dbId` de type "objet" et les convertit dynamiquement en UUID string (id).
+2.  **Architecture Map-Based (`sync.js`)** : Réécriture complète de `pullCloudRecordings` utilisant un `Map` unique indexé par ID local. Il est désormais structurellement impossible d'avoir deux fois le même ID local dans la liste fusionnée.
+3.  **Dédoublonnage au Rendu (`HistoryScreen.js`)** : Ajout d'une fonction `dedup` systématique avant de peupler le state `recordings`, servant de dernier filet de sécurité pour la stabilité de la FlatList.
+
+### Problème : Consommation de stockage excessive (Cloud)
+**Date** : 26 Avril 2026
+**Symptôme** : Les enregistrements audio consomment trop d'espace (~50MB pour 2 mois d'usage solo), risquant de saturer le quota gratuit de Supabase (1GB) avec plusieurs utilisateurs.
+
+#### 🚩 Cause Racine
+Utilisation du preset `RecordingPresets.HIGH_QUALITY` d'Expo qui enregistre en Stéréo, 44.1kHz avec un débit élevé, non nécessaire pour de la voix simple.
+
+#### ✅ Solution Appliquée
+Passage à une configuration manuelle optimisée dans `useAudioRecorder.js` :
+- **Bitrate** : 64 kbps (au lieu de ~192+ kbps).
+- **Canaux** : Mono (au lieu de Stéréo).
+- **Gain d'espace** : Réduction d'environ 3x à 4x du poids des fichiers sans perte de compréhension vocale.

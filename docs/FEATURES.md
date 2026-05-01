@@ -7,6 +7,7 @@ Ces fonctionnalités constituent le cœur de l'application.
 
 ### Enregistrement & Capture
 - [x] **Enregistrement Audio** : Interface simple avec bouton central dominant.
+- [x] **Optimisation Stockage** : Compression vocale intelligente (64kbps Mono) pour diviser par 4 l'espace disque.
 - [x] **Timer & Feedback** : Timer haute précision (60 FPS) via Reanimated.
 - [x] **Titres & Émojis** : Fenêtre de nommage (`TitleModal`) après chaque capture.
 - [x] **Tags Contextuels** : Système de tags personnalisables avec sélecteur d'émojis.
@@ -14,13 +15,14 @@ Ces fonctionnalités constituent le cœur de l'application.
 ### Lecture & Consultation
 - [x] **Lecteur Universel** : Play/Pause, barre de progression et mémorisation de position.
 - [x] **Historique Tactile** : FlatList optimisée avec mémorisation (`React.memo`).
-- [x] **Souvenir du Jour (Daily Memory)** : Signal Aura pulsant pour encourager l'écoute.
+- [x] **Souvenir du Jour (Daily Memory)** : Algorithme déterministe (identique sur tous les supports). Signal Aura pulsant pour encourager l'écoute.
 
 ### Persistance & Cloud
 - [x] **Local-First** : Stockage asynchrone ultra-réactif (AsyncStorage / IndexedDB).
 - [x] **Cloud Sync (Supabase)** : Sauvegarde automatique des audios et métadonnées.
 - [x] **Sync Hybride** : Métadonnées prioritaires (4G) et audios intelligents (WiFi/Manuel).
-- [x] **Dédoublonage** : Gestion intelligente des uploads lors des passages offline/online.
+- [x] **Dédoublonage & Sanitisation** : Nettoyage automatique des doublons et réparation des données corrompues.
+
 
 ### Capsule Temporelle (Messages au futur)
 - [x] **Message à ton futur toi** : Envoi de messages audio différés (🚀).

@@ -347,6 +347,7 @@ export const permanentlyDeleteRecording = async (id) => {
     }
 };
 
+
 export const getRecordings = async () => {
     try {
         const data = await universalStorage.getData(STORAGE_KEY) ?? [];
@@ -364,18 +365,20 @@ export const getRecordings = async () => {
             cacheSupabaseAudioLocally(demoRecordings);
             return demoRecordings;
         }
+
         // === SANITISATION : Corrige les dbId corrompus (objets au lieu de UUID string) ===
+        let hasFixed = false;
         const sanitized = data.map(rec => {
             if (rec.dbId && typeof rec.dbId === 'object') {
+                hasFixed = true;
                 return { ...rec, dbId: rec.dbId.id || null };
             }
             return rec;
         });
 
-        // Si des corrections ont été faites, on persiste le nettoyage
-        if (sanitized.some((rec, i) => rec !== data[i])) {
+        if (hasFixed) {
             await universalStorage.saveData(STORAGE_KEY, sanitized);
-            console.log('[Storage] Données corrompues (dbId objets) nettoyées automatiquement.');
+            console.log('[Storage] Données corrompues nettoyées.');
         }
 
         return sanitized;
@@ -384,6 +387,7 @@ export const getRecordings = async () => {
         return [];
     }
 };
+
 
 /**
  * Nettoie le stockage local des doublons (ID, URL ou Hash identiques).
@@ -468,61 +472,79 @@ const SEEN_DAILY_MEMORY_PREFIX = '@seen_daily_memory_';
 const getTodayKey = () => `${DAILY_MEMORY_PREFIX}${new Date().toISOString().split('T')[0]}`;
 const getSeenDailyMemoryKey = (userId) => `${SEEN_DAILY_MEMORY_PREFIX}${userId || 'guest'}`;
 
-export const getDailyMemory = async (userId) => {
+export const getDailyMemory = async (userId = null) => {
     try {
         const todayKey = getTodayKey();
         let memory = await universalStorage.getData(todayKey);
 
-        if (!memory) {
-            const { fetchPendingMessage, markMessageAsOpened, fetchCloudRecordings } = require('./cloud');
-            
-            // 1. Priorité aux messages en attente (Messages au futur)
-            memory = await fetchPendingMessage(userId);
-            if (memory && memory.dbId) {
-                await markMessageAsOpened(memory.dbId);
-            }
-            
-            // 2. Sinon, on pioche une pensée aléatoire mais DETERMINISTE pour la journée
-            if (!memory) {
-                const allCloud = await fetchCloudRecordings(userId);
-                if (allCloud && allCloud.length > 0) {
-                    // On utilise le jour de l'année + l'ID user pour créer un index stable
-                    const now = new Date();
-                    const start = new Date(now.getFullYear(), 0, 0);
-                    const diff = now - start;
-                    const oneDay = 1000 * 60 * 60 * 24;
-                    const dayOfYear = Math.floor(diff / oneDay);
-                    
-                    // Simple hash de l'userId pour que deux users n'aient pas la même pensée le même jour
-                    const userHash = (userId || 'guest').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                    const index = (dayOfYear + userHash) % allCloud.length;
-                    
-                    memory = allCloud[index];
-                    if (memory) memory.type = memory.type || 'note';
-                }
-            }
-            
-            if (memory) {
-                await universalStorage.saveData(todayKey, memory);
-            }
-        }
-
-        // TRES IMPORTANT: Rattacher le fichier local (localUri)
-        // car l'objet mis en cache ou venant du Cloud n'a souvent que l'URL distante.
+        // 1. Si on a déjà la pensée en cache local (par date), on la renvoie instantanément
         if (memory) {
+            // Rattacher le localUri pour la lecture
             const allLocal = await getRecordings();
             const localMatch = allLocal.find(r => 
                 (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) || 
                 (r.dbId && memory.id === `cloud_${r.dbId}`)
             );
-            
+            if (localMatch && localMatch.localUri) {
+                memory.localUri = localMatch.localUri;
+            }
+            return memory;
+        }
+
+        // 2. Pas de cache : on calcule d'abord LOCALEMENT (instantané, pas de réseau)
+        const allLocal = await getRecordings();
+        if (allLocal && allLocal.length > 0) {
+            const now = new Date();
+            const available = allLocal.filter(r => 
+                !r.deletedAt && (!r.deliverDate || new Date(r.deliverDate) <= now)
+            );
+
+            if (available.length > 0) {
+                const start = new Date(now.getFullYear(), 0, 0);
+                const diff = now - start;
+                const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const userHash = (userId || 'guest').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                const index = (dayOfYear + userHash) % available.length;
+                memory = { ...available[index] };
+            }
+        }
+
+        // 3. Vérifier s'il y a un message au futur (appel réseau)
+        // On ne le fait QU'APRÈS avoir déjà une pensée locale en main
+        if (userId) {
+            try {
+                const { fetchPendingMessage, markMessageAsOpened } = require('./cloud');
+                const pendingMsg = await fetchPendingMessage(userId);
+                if (pendingMsg) {
+                    memory = pendingMsg; // Le message au futur prend la priorité
+                    if (pendingMsg.dbId) {
+                        await markMessageAsOpened(pendingMsg.dbId);
+                    }
+                }
+            } catch (e) {
+                // Si le réseau échoue, on garde la pensée locale déjà calculée
+                console.log('[DailyMemory] Réseau indisponible, pensée locale utilisée.');
+            }
+        }
+
+        // 4. Sauvegarder le résultat pour les prochains accès (cache par date)
+        if (memory) {
+            await universalStorage.saveData(todayKey, memory);
+            // Rattacher le localUri
+            const localMatch = allLocal?.find(r => 
+                (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) || 
+                (r.dbId && memory.id === `cloud_${r.dbId}`)
+            );
             if (localMatch && localMatch.localUri) {
                 memory.localUri = localMatch.localUri;
             }
         }
 
         return memory;
-    } catch (e) { return null; }
+    } catch (e) {
+        console.error('Erreur getDailyMemory:', e);
+        return null;
+    }
 };
 
 export const getSeenDailyMemoryId = async (userId) => { try { return await universalStorage.getData(getSeenDailyMemoryKey(userId)); } catch (e) { return null; } };
