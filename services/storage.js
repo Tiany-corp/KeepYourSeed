@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { get, set, del } from 'idb-keyval';
 import * as FileSystem from 'expo-file-system/legacy';
+import { supabase } from './supabase';
 
 export const STORAGE_KEY = '@recordings_v2';
 
@@ -469,7 +470,11 @@ export const getChildRecordings = async (parentId) => {
 
 const DAILY_MEMORY_PREFIX = '@daily_memory_';
 const SEEN_DAILY_MEMORY_PREFIX = '@seen_daily_memory_';
-const getTodayKey = () => `${DAILY_MEMORY_PREFIX}${new Date().toISOString().split('T')[0]}`;
+const getTodayKey = () => {
+    const now = new Date();
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return `${DAILY_MEMORY_PREFIX}${localDate}`;
+};
 const getSeenDailyMemoryKey = (userId) => `${SEEN_DAILY_MEMORY_PREFIX}${userId || 'guest'}`;
 
 export const clearDailyMemoriesCache = async () => {
@@ -499,14 +504,13 @@ export const updateDailyMemoryInCache = async (id, updates) => {
 export const getDailyMemories = async (userId = null, forceRefresh = false) => {
     try {
         const todayKey = getTodayKey();
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         
-        // Si on force le rafraîchissement, on ignore le cache
         let cached = forceRefresh ? null : await universalStorage.getData(todayKey);
         
-        // Si on a déjà le cache (tableau d'objets), on le renvoie
-        if (cached && Array.isArray(cached)) {
-            // Vérification : on s'assure que le cache ne contient que des messages d'aujourd'hui
-            const todayStr = new Date().toISOString().split('T')[0];
+        // 1. Validation du cache (Plus d'appel lourd ici)
+        if (cached && Array.isArray(cached) && !forceRefresh) {
             const isCacheValid = cached.every(item => {
                 if (item.type !== 'message') return true; 
                 return item.deliverDate && item.deliverDate.split('T')[0] === todayStr;
@@ -517,7 +521,8 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
                 return cached.map(memory => {
                     const localMatch = allLocal.find(r => 
                         (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) || 
-                        (r.dbId && memory.id === `cloud_${r.dbId}`)
+                        (r.dbId && memory.id === `cloud_${r.dbId}`) ||
+                        (r.id === memory.id)
                     );
                     return localMatch && localMatch.localUri ? { ...memory, localUri: localMatch.localUri } : memory;
                 });
@@ -525,10 +530,9 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
         }
 
         const allLocal = await getRecordings();
-        const now = new Date();
         const results = [];
 
-        // 1. Chercher la pensée souvenir locale (le rituel)
+        // 2. La pensée souvenir du jour (Rituel local) - TOUJOURS EN PREMIER
         const notes = allLocal.filter(r => 
             !r.deletedAt && r.type === 'note' && (!r.deliverDate || new Date(r.deliverDate) <= now)
         );
@@ -541,64 +545,75 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
             results.push({ ...notes[index] });
         }
 
-        // 2. Chercher les messages "reçus" (via le cloud si connecté, ou localement)
+        // 3. Messages du jour (Cloud)
         if (userId) {
             try {
-                const { fetchPendingMessages, markMessageAsOpened } = require('./cloud');
-                // 1. Récupérer les messages du futur arrivés à échéance depuis le cloud
-                const pendingMessages = await fetchPendingMessages(userId);
-                
-                // 2. Les messages renvoyés par Supabase sont déjà filtrés pour la journée d'aujourd'hui
-                const todaysMessages = pendingMessages;
+                // On récupère TOUS les messages non ouverts (plus sûr pour les décalages horaires)
+                const { data: cloudData } = await supabase
+                    .from('recordings')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('type', 'message')
+                    .eq('opened', false)
+                    .lte('deliver_date', now.toISOString()); // Tout ce qui est dû jusqu'à maintenant
 
-                // 3. Récupérer la pensée souvenir du jour (déjà calculée plus haut dans 'results')
-                const dailyNote = results.find(r => r.type === 'note');
-
-                // 4. Fusionner (Messages d'abord, puis Note du jour)
-                const memories = [...todaysMessages];
-                if (dailyNote && !todaysMessages.some(m => m.id === dailyNote.id)) {
-                    memories.push(dailyNote);
+                if (cloudData && cloudData.length > 0) {
+                    cloudData.forEach(row => {
+                        // On ne garde que ceux d'AUJOURD'HUI selon l'heure du téléphone
+                        const deliverStr = row.deliver_date ? row.deliver_date.split('T')[0] : null;
+                        if (deliverStr === todayStr && !results.some(r => r.dbId === row.id)) {
+                            results.push({
+                                id: `cloud_${row.id}`,
+                                dbId: row.id,
+                                localUri: null,
+                                remoteUrl: row.audio_url,
+                                status: 'synced',
+                                date: row.created_at,
+                                deliverDate: row.deliver_date,
+                                duration: row.duration_seconds || 0,
+                                title: row.title || 'Sans titre',
+                                type: 'message',
+                                tags: row.tags || [],
+                                opened: false,
+                            });
+                        }
+                    });
                 }
-
-                // 5. Mettre en cache pour la journée
-                await universalStorage.saveData(todayKey, memories);
-                return memories;
             } catch (e) {
-                console.log('[DailyMemories] Erreur cloud, fallback local.');
+                console.log('[DailyMemories] Erreur cloud fetch', e);
             }
         }
 
-        // Compléter avec les messages locaux non ouverts (filtrés sur AUJOURD'HUI)
-        const todayStr = new Date().toISOString().split('T')[0];
+        // 4. Messages du jour (Local - pour ceux pas encore synchronisés)
         const localMessages = allLocal.filter(r => 
             r.type === 'message' && 
             !r.deletedAt && 
             r.deliverDate && 
             r.deliverDate.split('T')[0] === todayStr
         );
-        for (const msg of localMessages) {
+        localMessages.forEach(msg => {
             if (!results.some(r => r.id === msg.id || (r.dbId && r.dbId === msg.dbId))) {
                 results.push(msg);
             }
-        }
+        });
 
-        // Rattacher les localUri
+        // 5. Uniformisation et sauvegarde
         const finalResults = results.map(memory => {
             const localMatch = allLocal.find(r => 
                 (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) || 
-                (r.dbId && memory.id === `cloud_${r.dbId}`)
+                (r.dbId && memory.id === `cloud_${r.dbId}`) ||
+                (r.id === memory.id)
             );
             return localMatch && localMatch.localUri ? { ...memory, localUri: localMatch.localUri } : memory;
         });
 
-        // Mettre en cache pour la journée
         if (finalResults.length > 0) {
             await universalStorage.saveData(todayKey, finalResults);
         }
 
         return finalResults;
     } catch (e) {
-        console.error('Erreur getDailyMemories:', e);
+        console.error('Erreur critique getDailyMemories:', e);
         return [];
     }
 };
