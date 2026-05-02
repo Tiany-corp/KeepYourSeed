@@ -444,6 +444,7 @@ export const fetchRandomRecording = async (userId) => {
             title: row.title || 'Sans titre',
             type: row.type || 'note',
             tags: row.tags || [],
+            opened: row.opened || false,
         };
 
     } catch (e) {
@@ -453,63 +454,67 @@ export const fetchRandomRecording = async (userId) => {
 };
 
 /**
- * Récupère le plus ancien message non ouvert dont la date de livraison est passée.
+ * Récupère TOUS les messages non ouverts dont la date de livraison est passée.
  * @param {string} userId - UUID de l'utilisateur
- * @returns {Promise<Object|null>} - Un recording de type 'message' ou null
+ * @returns {Promise<Array>} - Un tableau de recordings de type 'message'
  */
-export const fetchPendingMessage = async (userId) => {
+export const fetchPendingMessages = async (userId) => {
     try {
-        const now = new Date().toISOString();
+        const todayStr = new Date().toISOString().split('T')[0];
+        // On demande à Supabase de ne chercher que les messages dont la date de livraison est comprise dans la journée d'aujourd'hui
+        const startOfDay = `${todayStr}T00:00:00.000Z`;
+        const endOfDay = `${todayStr}T23:59:59.999Z`;
+
         const { data, error } = await supabase
             .from('recordings')
             .select('*')
             .eq('user_id', userId)
             .eq('type', 'message')
             .eq('opened', false)
-            .lte('deliver_date', now)
-            .order('deliver_date', { ascending: true })
-            .limit(1);
+            .gte('deliver_date', startOfDay)
+            .lte('deliver_date', endOfDay)
+            .order('deliver_date', { ascending: true });
 
         if (error) {
-            console.error('fetchPendingMessage error:', error);
-            return null;
+            console.error('fetchPendingMessages error:', error);
+            return [];
         }
 
-        if (!data || data.length === 0) return null;
+        if (!data || data.length === 0) return [];
 
-        const row = data[0];
-        return {
+        return data.map(row => ({
             id: `cloud_${row.id}`,
             dbId: row.id,
             localUri: null,
             remoteUrl: row.audio_url,
             status: 'synced',
             date: row.created_at,
+            deliverDate: row.deliver_date, // <- Ajout crucial ici
             duration: row.duration_seconds || 0,
             title: row.title || 'Sans titre',
-            type: 'message',
-            deliverDate: row.deliver_date,
+            type: row.type || 'message',
             tags: row.tags || [],
-        };
+            opened: row.opened || false,
+        }));
+
     } catch (e) {
-        console.error('Failed to fetch pending message:', e);
-        return null;
+        console.error('Failed to fetch pending messages:', e);
+        return [];
     }
 };
 
 /**
- * Marque un message comme ouvert dans la base de données.
- * @param {number} recordId - ID de l'enregistrement dans Supabase
+ * Marque un message comme ouvert dans Supabase.
  */
-export const markMessageAsOpened = async (recordId) => {
+export const markMessageAsOpened = async (dbId) => {
     try {
         const { error } = await supabase
             .from('recordings')
             .update({ opened: true })
-            .eq('id', recordId);
-
+            .eq('id', dbId);
         if (error) console.error('markMessageAsOpened error:', error);
     } catch (e) {
         console.error('Failed to mark message as opened:', e);
     }
 };
+

@@ -13,11 +13,11 @@ export default function useAudioRecorder() {
         Platform.OS === 'web' ? {
             isMeteringEnabled: true,
         } : {
-            // Équilibre parfait pour la voix : Clair mais léger
-            bitrate: 64000,         // 64 kbps (standard haute qualité pour la voix)
-            sampleRate: 44100,      // On garde une bonne définition
-            numberOfChannels: 1,    // Mono (essentiel pour le gain de place)
-            extension: '.m4a',      // Format AAC (très efficace)
+            // Équilibre premium pour la voix : Riche et chaleureux
+            bitrate: 96000,         // 96 kbps (qualité radio/podcast)
+            sampleRate: 44100,      // Haute définition
+            numberOfChannels: 1,    // Mono (parfait pour la voix)
+            extension: '.m4a',      // Format AAC efficient
         }
     );
     
@@ -87,6 +87,19 @@ export default function useAudioRecorder() {
                 saveToIndexedDB(uri, audioId);
                 return `indexeddb://${audioId}`;
             }
+
+            // LOG DE DIAGNOSTIC (Test qualité/poids)
+            try {
+                const { formatSize } = require('../services/storage');
+                if (Platform.OS === 'web') {
+                    const response = await fetch(uri);
+                    const blob = await response.blob();
+                    console.log(`[AudioTest] Poids final (Web): ${formatSize(blob.size)}`);
+                } else {
+                    const info = await FileSystem.getInfoAsync(uri);
+                    console.log(`[AudioTest] Poids final (Native): ${formatSize(info.size)}`);
+                }
+            } catch (e) {}
 
             return uri;
         } catch (error) {

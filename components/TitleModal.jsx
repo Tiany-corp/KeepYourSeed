@@ -8,6 +8,8 @@ import {
     Pressable,
     StyleSheet,
     Platform,
+    ScrollView,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { Trash2, Plus, X } from 'lucide-react-native';
 import CustomDatePicker from './CustomDatePicker';
@@ -88,6 +90,12 @@ export default function TitleModal({
     const [selectedNewEmoji, setSelectedNewEmoji] = useState(CUSTOM_TAG_EMOJIS[0]);
     const [showNewTagForm, setShowNewTagForm] = useState(false);
     const [showConfirmCancel, setShowConfirmCancel] = useState(false);
+
+    // Nouveaux états pour le sélecteur de date
+    const [offsetValues, setOffsetValues] = useState({ day: '1', week: '1', month: '1', year: '1' });
+    const [showCustomDate, setShowCustomDate] = useState(false);
+    const [activeOffsetUnit, setActiveOffsetUnit] = useState(null);
+
     const inputRef = useRef(null);
     const wasVisibleRef = useRef(false);
 
@@ -101,6 +109,9 @@ export default function TitleModal({
             setSelectedNewEmoji(CUSTOM_TAG_EMOJIS[0]);
             setShowNewTagForm(false);
             setShowConfirmCancel(false);
+            setOffsetValues({ day: '1', week: '1', month: '1', year: '1' });
+            setShowCustomDate(false);
+            setActiveOffsetUnit(null);
             loadCustomTags().then(setCustomTags);
             setTimeout(() => inputRef.current?.focus(), 300);
         }
@@ -113,18 +124,50 @@ export default function TitleModal({
         return tomorrow.toISOString().split('T')[0];
     };
 
-    const setDateOffset = (type) => {
+    const setDateOffset = (type, explicitVal) => {
         const date = new Date();
+        const strVal = explicitVal !== undefined ? explicitVal : offsetValues[type];
+        const val = parseInt(strVal, 10) || 1;
         if (type === 'day') {
-            date.setDate(date.getDate() + 1);
+            date.setDate(date.getDate() + val);
         } else if (type === 'week') {
-            date.setDate(date.getDate() + 7);
+            date.setDate(date.getDate() + 7 * val);
         } else if (type === 'month') {
-            date.setMonth(date.getMonth() + 1);
+            date.setMonth(date.getMonth() + val);
         } else if (type === 'year') {
-            date.setFullYear(date.getFullYear() + 1);
+            date.setFullYear(date.getFullYear() + val);
         }
         setDeliverDate(date.toISOString().split('T')[0]);
+        setActiveOffsetUnit(type);
+        setShowCustomDate(false);
+    };
+
+    const renderOffsetOption = (type, label) => {
+        const isActive = activeOffsetUnit === type && !showCustomDate;
+        return (
+            <TouchableOpacity
+                key={type}
+                style={[styles.offsetOptionBtn, isActive && styles.offsetOptionBtnActive]}
+                onPress={() => setDateOffset(type)}
+                activeOpacity={0.7}
+            >
+                <TextInput
+                    style={[styles.offsetGridInput, isActive && styles.offsetGridInputActive]}
+                    value={offsetValues[type]}
+                    onChangeText={(text) => {
+                        const num = text.replace(/[^0-9]/g, '');
+                        setOffsetValues(prev => ({ ...prev, [type]: num }));
+                        setDateOffset(type, num);
+                    }}
+                    keyboardType="numeric"
+                    maxLength={2}
+                    onFocus={() => setDateOffset(type)}
+                />
+                <Text style={[styles.offsetOptionLabel, isActive && styles.offsetOptionLabelActive]}>
+                    {label}
+                </Text>
+            </TouchableOpacity>
+        );
     };
 
     const isDateSelected = (type) => {
@@ -215,230 +258,264 @@ export default function TitleModal({
             statusBarTranslucent
             onRequestClose={handleCancel}
         >
-            <Pressable style={styles.overlay} onPress={handleCancel}>
-                <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-                    <Text style={styles.title}>
-                        {isEditMode ? 'Modifier votre pensee' : mode === 'message' ? 'Message au futur' : 'Nommer votre pensee'}
-                    </Text>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoidingView}
+            >
+                <View style={styles.overlayBackground} />
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    style={styles.scrollView}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <Pressable style={styles.overlayTouchable} onPress={handleCancel}>
+                        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+                            <Text style={styles.title}>
+                                {isEditMode ? 'Modifier votre pensee' : mode === 'message' ? 'Message au futur' : 'Nommer votre pensee'}
+                            </Text>
 
-                    <TextInput
-                        ref={inputRef}
-                        style={styles.input}
-                        value={title}
-                        onChangeText={setTitle}
-                        placeholder={mode === 'message' ? 'Ex: Rappelle-toi de...' : 'Ex: Réflexion du matin...'}
-                        placeholderTextColor="#A8A29E"
-                        maxLength={100}
-                        selectTextOnFocus
-                        onSubmitEditing={handleConfirm}
-                        returnKeyType="done"
-                    />
+                            <TextInput
+                                ref={inputRef}
+                                style={styles.input}
+                                value={title}
+                                onChangeText={setTitle}
+                                placeholder={mode === 'message' ? 'Ex: Rappelle-toi de...' : 'Ex: Réflexion du matin...'}
+                                placeholderTextColor="#A8A29E"
+                                maxLength={100}
+                                selectTextOnFocus
+                                onSubmitEditing={handleConfirm}
+                                returnKeyType="done"
+                            />
 
-                    {/* Sélecteur de tags/catégories */}
-                    <View style={styles.tagsSection}>
-                        <Text style={styles.tagsLabel}>Étiquettes</Text>
-                        <View style={styles.tagsRow}>
-                            {allTags.map(tag => {
-                                const isActive = selectedTags.includes(tag.id);
-                                const isCustom = tag.id.startsWith('custom_');
-                                return (
-                                    <View key={tag.id}>
-                                        <TouchableOpacity
-                                            style={[styles.tagChip, isActive && styles.tagChipActive]}
-                                            onPress={() => toggleTag(tag.id)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={[styles.tagChipText, isActive && styles.tagChipTextActive]}>
-                                                {tag.emoji} {tag.label}
-                                            </Text>
-                                            {isCustom && (
+                            {/* Sélecteur de tags/catégories */}
+                            <View style={styles.tagsSection}>
+                                <Text style={styles.tagsLabel}>Étiquettes</Text>
+                                <View style={styles.tagsRow}>
+                                    {allTags.map(tag => {
+                                        const isActive = selectedTags.includes(tag.id);
+                                        const isCustom = tag.id.startsWith('custom_');
+                                        return (
+                                            <View key={tag.id}>
                                                 <TouchableOpacity
-                                                    style={[styles.deleteTagBtn, isActive && styles.deleteTagBtnActive]}
-                                                    onPress={() => handleDeleteCustomTag(tag.id)}
-                                                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                                                    style={[styles.tagChip, isActive && styles.tagChipActive]}
+                                                    onPress={() => toggleTag(tag.id)}
+                                                    activeOpacity={0.7}
                                                 >
-                                                    <X size={10} color={isActive ? '#FFFFFF' : '#78716C'} strokeWidth={2.5} />
+                                                    <Text style={[styles.tagChipText, isActive && styles.tagChipTextActive]}>
+                                                        {tag.emoji} {tag.label}
+                                                    </Text>
+                                                    {isCustom && (
+                                                        <TouchableOpacity
+                                                            style={[styles.deleteTagBtn, isActive && styles.deleteTagBtnActive]}
+                                                            onPress={() => handleDeleteCustomTag(tag.id)}
+                                                            hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                                                        >
+                                                            <X size={10} color={isActive ? '#FFFFFF' : '#78716C'} strokeWidth={2.5} />
+                                                        </TouchableOpacity>
+                                                    )}
                                                 </TouchableOpacity>
-                                            )}
+                                            </View>
+                                        );
+                                    })}
+
+                                    {/* Chip "+ Nouveau" intégré dans la ligne de tags */}
+                                    <TouchableOpacity
+                                        style={[styles.tagChip, styles.addTagChip]}
+                                        onPress={() => setShowNewTagForm(!showNewTagForm)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.addTagChipText}>+ Nouveau</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Formulaire de création (Progressive Disclosure) */}
+                                {showNewTagForm && (
+                                    <View style={styles.newTagFormContainer}>
+                                        <View style={styles.newTagRow}>
+                                            <TouchableOpacity style={styles.emojiPreview}>
+                                                <Text style={styles.emojiPreviewText}>{selectedNewEmoji}</Text>
+                                            </TouchableOpacity>
+                                            <TextInput
+                                                style={styles.newTagInput}
+                                                value={newTagText}
+                                                onChangeText={setNewTagText}
+                                                placeholder="Nom du tag..."
+                                                placeholderTextColor="#A8A29E"
+                                                maxLength={30}
+                                                onSubmitEditing={handleAddCustomTag}
+                                                returnKeyType="done"
+                                                autoFocus
+                                            />
+                                            <TouchableOpacity
+                                                style={[styles.newTagButton, !newTagText.trim() && { opacity: 0.4 }]}
+                                                onPress={handleAddCustomTag}
+                                                disabled={!newTagText.trim()}
+                                            >
+                                                <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Grille d'emojis */}
+                                        <View style={styles.emojiGrid}>
+                                            {CUSTOM_TAG_EMOJIS.map(emoji => (
+                                                <TouchableOpacity
+                                                    key={emoji}
+                                                    style={[styles.emojiOption, selectedNewEmoji === emoji && styles.emojiOptionActive]}
+                                                    onPress={() => setSelectedNewEmoji(emoji)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.emojiOptionText}>{emoji}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Sélecteur de date pour les messages */}
+                            {mode === 'message' && (
+                                <View style={styles.dateSection}>
+                                    <Text style={styles.dateLabel}>Se l'envoyer pour dans</Text>
+
+                                    <View style={styles.offsetGrid}>
+                                        {renderOffsetOption('day', 'Jour(s)')}
+                                        {renderOffsetOption('week', 'Semaine(s)')}
+                                        {renderOffsetOption('month', 'Mois')}
+                                        {renderOffsetOption('year', 'An(s)')}
+                                    </View>
+
+                                    <TouchableOpacity
+                                        style={styles.customDateToggleBtn}
+                                        onPress={() => setShowCustomDate(true)}
+                                    >
+                                        <Text style={styles.customDateToggleText}>
+                                            Ou sélectionner une date...
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <Modal
+                                        visible={showCustomDate}
+                                        transparent
+                                        animationType="fade"
+                                        onRequestClose={() => setShowCustomDate(false)}
+                                    >
+                                        <View style={styles.overlayBackground} />
+                                        <Pressable style={styles.overlayTouchable} onPress={() => setShowCustomDate(false)}>
+                                            <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+                                                <View style={styles.dateModalHeader}>
+                                                    <Text style={styles.title}>Choisir une date</Text>
+                                                    <TouchableOpacity onPress={() => setShowCustomDate(false)}>
+                                                        <X size={20} color="#78716C" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                                <CustomDatePicker
+                                                    selectedDate={deliverDate}
+                                                    onSelectDate={(date) => {
+                                                        setDeliverDate(date);
+                                                        setActiveOffsetUnit(null);
+                                                        setShowCustomDate(false);
+                                                    }}
+                                                    minDate={getMinDate()}
+                                                />
+                                            </Pressable>
+                                        </Pressable>
+                                    </Modal>
+                                </View>
+                            )}
+
+                            {showConfirmCancel ? (
+                                <View style={styles.confirmCancelSection}>
+                                    <View style={styles.confirmCancelHeader}>
+                                        <Trash2 size={18} color="#B91C1C" strokeWidth={2} />
+                                        <Text style={styles.confirmCancelText}>Supprimer cet enregistrement ?</Text>
+                                    </View>
+                                    <View style={styles.confirmCancelButtonRow}>
+                                        <TouchableOpacity
+                                            style={styles.cancelButtonDanger}
+                                            onPress={() => setShowConfirmCancel(false)}
+                                        >
+                                            <Text style={styles.cancelTextDanger}>Annuler</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.confirmButtonDanger}
+                                            onPress={handleCancel}
+                                        >
+                                            <Text style={styles.confirmTextDanger}>Supprimer</Text>
                                         </TouchableOpacity>
                                     </View>
-                                );
-                            })}
-
-                            {/* Chip "+ Nouveau" intégré dans la ligne de tags */}
-                            <TouchableOpacity
-                                style={[styles.tagChip, styles.addTagChip]}
-                                onPress={() => setShowNewTagForm(!showNewTagForm)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.addTagChipText}>+ Nouveau</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Formulaire de création (Progressive Disclosure) */}
-                        {showNewTagForm && (
-                            <View style={styles.newTagFormContainer}>
-                                <View style={styles.newTagRow}>
-                                    <TouchableOpacity style={styles.emojiPreview}>
-                                        <Text style={styles.emojiPreviewText}>{selectedNewEmoji}</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.buttonRow}>
+                                    <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                                        <Text style={styles.cancelText}>{isEditMode ? 'Annuler' : 'Supprimer'}</Text>
                                     </TouchableOpacity>
-                                    <TextInput
-                                        style={styles.newTagInput}
-                                        value={newTagText}
-                                        onChangeText={setNewTagText}
-                                        placeholder="Nom du tag..."
-                                        placeholderTextColor="#A8A29E"
-                                        maxLength={30}
-                                        onSubmitEditing={handleAddCustomTag}
-                                        returnKeyType="done"
-                                        autoFocus
-                                    />
+
                                     <TouchableOpacity
-                                        style={[styles.newTagButton, !newTagText.trim() && { opacity: 0.4 }]}
-                                        onPress={handleAddCustomTag}
-                                        disabled={!newTagText.trim()}
+                                        style={[
+                                            styles.confirmButton,
+                                            mode === 'message' && !deliverDate && styles.confirmButtonDisabled
+                                        ]}
+                                        onPress={handleConfirm}
+                                        disabled={mode === 'message' && !deliverDate}
                                     >
-                                        <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
+                                        <Text style={[
+                                            styles.confirmText,
+                                            mode === 'message' && !deliverDate && styles.confirmTextDisabled
+                                        ]}>
+                                            {isEditMode ? 'Sauvegarder' : mode === 'message' ? 'Envoyer' : 'Enregistrer'}
+                                        </Text>
                                     </TouchableOpacity>
                                 </View>
+                            )}
 
-                                {/* Grille d'emojis */}
-                                <View style={styles.emojiGrid}>
-                                    {CUSTOM_TAG_EMOJIS.map(emoji => (
-                                        <TouchableOpacity
-                                            key={emoji}
-                                            style={[styles.emojiOption, selectedNewEmoji === emoji && styles.emojiOptionActive]}
-                                            onPress={() => setSelectedNewEmoji(emoji)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={styles.emojiOptionText}>{emoji}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            </View>
-                        )}
-                    </View>
+                            {isEditMode && (
+                                <TouchableOpacity style={styles.deleteEditButton} onPress={handleDelete}>
+                                    <Trash2 size={14} color="#FFFFFF" strokeWidth={1.8} />
+                                    <Text style={styles.deleteEditButtonText}>Supprimer l'enregistrement</Text>
+                                </TouchableOpacity>
+                            )}
 
-                    {/* Sélecteur de date pour les messages */}
-                    {mode === 'message' && (
-                        <View style={styles.dateSection}>
-                            <Text style={styles.dateLabel}>Se l'envoyer pour dans</Text>
-
-                            {/* Raccourcis de dates */}
-                            <View style={styles.quickDateRow}>
-                                <TouchableOpacity
-                                    style={[styles.quickDateBtn, isDateSelected('day') && styles.quickDateBtnActive]}
-                                    onPress={() => setDateOffset('day')}
-                                >
-                                    <Text style={[styles.quickDateText, isDateSelected('day') && styles.quickDateTextActive]}>
-                                        1 jour
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.quickDateBtn, isDateSelected('week') && styles.quickDateBtnActive]}
-                                    onPress={() => setDateOffset('week')}
-                                >
-                                    <Text style={[styles.quickDateText, isDateSelected('week') && styles.quickDateTextActive]}>
-                                        1 sem
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.quickDateBtn, isDateSelected('month') && styles.quickDateBtnActive]}
-                                    onPress={() => setDateOffset('month')}
-                                >
-                                    <Text style={[styles.quickDateText, isDateSelected('month') && styles.quickDateTextActive]}>
-                                        1 mois
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.quickDateBtn, isDateSelected('year') && styles.quickDateBtnActive]}
-                                    onPress={() => setDateOffset('year')}
-                                >
-                                    <Text style={[styles.quickDateText, isDateSelected('year') && styles.quickDateTextActive]}>
-                                        1 an
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <CustomDatePicker
-                                selectedDate={deliverDate}
-                                onSelectDate={setDeliverDate}
-                                minDate={getMinDate()}
-                            />
-                        </View>
-                    )}
-
-                    {showConfirmCancel ? (
-                        <View style={styles.confirmCancelSection}>
-                            <View style={styles.confirmCancelHeader}>
-                                <Trash2 size={18} color="#B91C1C" strokeWidth={2} />
-                                <Text style={styles.confirmCancelText}>Supprimer cet enregistrement ?</Text>
-                            </View>
-                            <View style={styles.confirmCancelButtonRow}>
-                                <TouchableOpacity
-                                    style={styles.cancelButtonDanger}
-                                    onPress={() => setShowConfirmCancel(false)}
-                                >
-                                    <Text style={styles.cancelTextDanger}>Annuler</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.confirmButtonDanger}
-                                    onPress={handleCancel}
-                                >
-                                    <Text style={styles.confirmTextDanger}>Supprimer</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    ) : (
-                        <View style={styles.buttonRow}>
-                            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                                <Text style={styles.cancelText}>{isEditMode ? 'Annuler' : 'Supprimer'}</Text>
-                            </TouchableOpacity>
-
+                            {/* Lien contextuel pour changer de mode */}
                             <TouchableOpacity
-                                style={[styles.confirmButton, mode === 'message' && !deliverDate && { opacity: 0.4 }]}
-                                onPress={handleConfirm}
-                                disabled={mode === 'message' && !deliverDate}
+                                style={styles.modeSwitchLink}
+                                onPress={() => setMode(mode === 'note' ? 'message' : 'note')}
                             >
-                                <Text style={styles.confirmText}>
-                                    {isEditMode ? 'Sauvegarder' : mode === 'message' ? 'Envoyer' : 'Enregistrer'}
+                                <Text style={styles.modeSwitchText}>
+                                    {mode === 'note'
+                                        ? '🚀 Transformer en message au futur toi'
+                                        : '📝 Enregistrer comme note classique'}
                                 </Text>
                             </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {isEditMode && (
-                        <TouchableOpacity style={styles.deleteEditButton} onPress={handleDelete}>
-                            <Trash2 size={14} color="#FFFFFF" strokeWidth={1.8} />
-                            <Text style={styles.deleteEditButtonText}>Supprimer l'enregistrement</Text>
-                        </TouchableOpacity>
-                    )}
-
-                    {/* Lien contextuel pour changer de mode */}
-                    <TouchableOpacity
-                        style={styles.modeSwitchLink}
-                        onPress={() => setMode(mode === 'note' ? 'message' : 'note')}
-                    >
-                        <Text style={styles.modeSwitchText}>
-                            {mode === 'note'
-                                ? '🚀 Transformer en message au futur toi'
-                                : '📝 Enregistrer comme note classique'}
-                        </Text>
-                    </TouchableOpacity>
-                </Pressable>
-            </Pressable>
+                        </Pressable>
+                    </Pressable>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </Modal >
     );
 }
 
 const styles = StyleSheet.create({
-    overlay: {
+    keyboardAvoidingView: {
+        flex: 1,
+    },
+    overlayBackground: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+    },
+    overlayTouchable: {
+        flexGrow: 1,
         justifyContent: 'flex-start',
         alignItems: 'center',
         padding: 24,
-        paddingTop: 72,
+        paddingTop: Platform.OS === 'web' ? 40 : 72,
+        paddingBottom: 40,
     },
     card: {
         backgroundColor: '#FAF7F2',
@@ -501,8 +578,8 @@ const styles = StyleSheet.create({
     },
     dateLabel: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#78716C',
+        fontWeight: 'bold',
+        color: '#57534E',
         marginBottom: 8,
     },
     quickDateRow: {
@@ -573,6 +650,12 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
     },
+    confirmButtonDisabled: {
+        backgroundColor: '#E7E5E4', // stone-200
+    },
+    confirmTextDisabled: {
+        color: '#A8A29E', // stone-400
+    },
     modeSwitchLink: {
         marginTop: 16,
         alignItems: 'center',
@@ -588,8 +671,8 @@ const styles = StyleSheet.create({
     },
     tagsLabel: {
         fontSize: 13,
-        fontWeight: '600',
-        color: '#78716C',
+        fontWeight: 'bold',
+        color: '#57534E',
         marginBottom: 8,
     },
     tagsRow: {
@@ -776,5 +859,69 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    offsetGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+        gap: 8,
+    },
+    offsetOptionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexBasis: '48%',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E8D5BF',
+        borderRadius: 10,
+        padding: 6,
+    },
+    offsetOptionBtnActive: {
+        backgroundColor: '#F5EADB',
+        borderColor: '#D97706',
+    },
+    offsetGridInput: {
+        backgroundColor: '#F3EFEA',
+        borderRadius: 6,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#451A03',
+        textAlign: 'center',
+        minWidth: 36,
+        marginRight: 8,
+    },
+    offsetGridInputActive: {
+        backgroundColor: '#FFFFFF',
+        color: '#D97706',
+    },
+    offsetOptionLabel: {
+        fontSize: 14,
+        color: '#78350F',
+        fontWeight: '500',
+    },
+    offsetOptionLabelActive: {
+        color: '#D97706',
+        fontWeight: 'bold',
+    },
+    customDateToggleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        marginBottom: 8,
+    },
+    customDateToggleText: {
+        fontSize: 13,
+        color: '#8e847dff',
+        fontWeight: '500',
+    },
+    dateModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
     },
 });

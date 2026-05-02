@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal, RefreshControl } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
@@ -10,7 +11,6 @@ import TagFilterBar from '../components/TagFilterBar';
 import TitleModal from '../components/TitleModal';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
-import { useNavigation } from '@react-navigation/native';
 import { AppContext } from '../contexts/AppContext';
 
 import { getTagInfo } from '../utils/tags';
@@ -22,6 +22,8 @@ import DailyMemoryCard from '../components/history/DailyMemoryCard';
 export default function HistoryScreen() {
     const { session, setDrawerOpen } = useContext(AppContext);
     const navigation = useNavigation();
+    const route = useRoute();
+    const filterType = route.params?.filterType;
     const [recordings, setRecordings] = useState([]);
     const hasInitialSyncRun = useRef(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +31,7 @@ export default function HistoryScreen() {
     // Pagination
     const PAGE_SIZE = 20;
     const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
-    const [dailyMemory, setDailyMemory] = useState(null);
+    const [dailyMemories, setDailyMemories] = useState([]);
     const [isDailyMemorySeen, setIsDailyMemorySeen] = useState(null); // null = en attente de vérification
     // ...
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
@@ -65,16 +67,19 @@ export default function HistoryScreen() {
             });
 
             // Charger la pensée souvenir (si connecté)
-            let dailyPromise = Promise.resolve(null);
+            let dailyPromise = Promise.resolve([]);
             if (session?.user) {
-                dailyPromise = getDailyMemory(session.user.id).then(async (memory) => {
+                const { getDailyMemories } = require('../services/storage');
+                dailyPromise = getDailyMemories(session.user.id).then(async (memories) => {
+                    // Pour simplifier, on considère "vu" si le PREMIER est vu (ou on pourrait gérer par ID)
                     let seen = true;
-                    if (memory) {
+                    if (memories && memories.length > 0) {
+                        const firstMemory = memories[0];
                         const seenId = await getSeenDailyMemoryId(session.user.id);
-                        seen = !!seenId && !!memory.id && String(seenId) === String(memory.id);
+                        seen = !!seenId && !!firstMemory.id && String(seenId) === String(firstMemory.id);
                     }
-                    return { memory, seen };
-                }).catch(() => null);
+                    return { memories, seen };
+                }).catch(() => ({ memories: [], seen: true }));
             }
 
             // Timeout de sécurité : si la pensée prend trop longtemps, on affiche quand même
@@ -89,7 +94,7 @@ export default function HistoryScreen() {
             // Appliquer tout d'un coup
             setRecordings(sortedRecordings);
             if (dailyResult && dailyResult !== 'timeout') {
-                setDailyMemory(dailyResult.memory);
+                setDailyMemories(dailyResult.memories || []);
                 setIsDailyMemorySeen(dailyResult.seen);
             }
             setIsLoading(false);
@@ -98,8 +103,8 @@ export default function HistoryScreen() {
             // Si la pensée a timeout, on la charge en arrière-plan
             if (dailyResult === 'timeout' && session?.user) {
                 dailyPromise.then(result => {
-                    if (result) {
-                        setDailyMemory(result.memory);
+                    if (result && result.memories) {
+                        setDailyMemories(result.memories);
                         setIsDailyMemorySeen(result.seen);
                     }
                 });
@@ -132,6 +137,9 @@ export default function HistoryScreen() {
         try {
             if (session?.user) {
                 await syncAll(session.user.id, true); // isManual = true
+                const { getDailyMemories } = require('../services/storage');
+                const refreshedMemories = await getDailyMemories(session.user.id, true); // forceRefresh
+                setDailyMemories(refreshedMemories || []);
             }
             await loadRecordings();
         } catch (e) {
@@ -153,6 +161,12 @@ export default function HistoryScreen() {
             (!allIds.has(r.parentId) && !allDbIds.has(r.parentId?.toString()))
         );
 
+        const now = new Date();
+        const filteredParents = parents.filter(r => 
+            !r.deletedAt && 
+            (!r.deliverDate || new Date(r.deliverDate) <= now)
+        );
+
         const childrenMap = {};
         recordings.filter(r => r.parentId && !r.deletedAt).forEach(child => {
             // On cherche le parent : soit par ID local, soit par DB ID (pour la synchro cross-device)
@@ -166,22 +180,37 @@ export default function HistoryScreen() {
                 childrenMap[parent.id].push(child);
             }
         });
-        return { parentRecordings: parents.filter(r => !r.deletedAt), childrenByParent: childrenMap };
+        return { parentRecordings: filteredParents, childrenByParent: childrenMap };
     }, [recordings]);
 
     // Extraction des tags uniques
     const availableTags = useMemo(() => {
         const uniqueTagIds = [...new Set(recordings.flatMap(r => r.tags || []))];
-        return uniqueTagIds.map(getTagInfo).filter(Boolean);
+        const tags = uniqueTagIds.map(getTagInfo).filter(Boolean);
+        
+        // Ajouter un filtre spécial pour les messages reçus s'il y en a
+        const hasMessages = recordings.some(r => r.type === 'message' && (!r.deliverDate || new Date(r.deliverDate) <= new Date()));
+        if (hasMessages) {
+            tags.unshift({ id: '_messages_', label: 'Messages reçus', emoji: '📬' });
+        }
+        
+        return tags;
     }, [recordings]);
 
     // Filtrage dynamique
     const filteredParentRecordings = useMemo(() => {
         return parentRecordings.filter(r => {
-            if (!selectedFilterTag) return true; // pas de filtre
+            // Filtre spécial "Messages reçus"
+            if (selectedFilterTag === '_messages_') {
+                return r.type === 'message';
+            }
+            // Filtre par type (ex: depuis le drawer si on l'a gardé)
+            if (filterType && r.type !== filterType) return false;
+            // Filtre par tag classique
+            if (!selectedFilterTag) return true;
             return r.tags?.includes(selectedFilterTag);
         });
-    }, [parentRecordings, selectedFilterTag]);
+    }, [parentRecordings, selectedFilterTag, filterType]);
 
     // Données paginées pour la FlatList (Lazy Loading)
     const paginatedRecordings = useMemo(() => {
@@ -206,9 +235,11 @@ export default function HistoryScreen() {
 
     const applyRecordingUpdateInState = (id, updates) => {
         setRecordings(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
-        if (dailyMemory?.id === id) {
-            setDailyMemory(prev => (prev ? { ...prev, ...updates } : prev));
-        }
+        setDailyMemories(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
+        
+        // Mettre à jour le cache local pour que l'état "ouvert" persiste après un redémarrage
+        const { updateDailyMemoryInCache } = require('../services/storage');
+        updateDailyMemoryInCache(id, updates);
     };
 
     const handleEditCancel = () => {
@@ -259,9 +290,7 @@ export default function HistoryScreen() {
             }
 
             setRecordings(prev => prev.filter(rec => rec.id !== itemToDelete.id));
-            if (dailyMemory?.id === itemToDelete.id) {
-                setDailyMemory(null);
-            }
+            setDailyMemories(prev => prev.filter(rec => rec.id !== itemToDelete.id));
 
             if (session?.user && (itemToDelete.dbId || itemToDelete.remoteUrl)) {
                 const ok = await deleteRecordingFromCloud({
@@ -321,32 +350,70 @@ export default function HistoryScreen() {
         );
     }, [currentTrack?.id, audioPlayerIsPlaying, loadingTrackId, childrenByParent, handleTogglePlay, handleOptions, session?.user]);
 
-    const handleToggleDailyMemory = useCallback(async () => {
-        if (!dailyMemory) return;
-        if (!isDailyMemorySeen && session?.user) {
+    const handleToggleDailyMemory = useCallback(async (memory) => {
+        if (!memory) return;
+        
+        // Marquer comme vu localement
+        const isFirst = dailyMemories[0]?.id === memory.id;
+        if (isFirst && !isDailyMemorySeen && session?.user) {
             setIsDailyMemorySeen(true);
-            await setSeenDailyMemoryId(session.user.id, dailyMemory.id);
+            await setSeenDailyMemoryId(session.user.id, memory.id);
         }
-        audioPlayer.play(dailyMemory);
+
+        // Marquer comme ouvert dans le cloud si c'est un message
+        if (memory.type === 'message' && !memory.opened && session?.user) {
+            const { markMessageAsOpened } = require('../services/cloud');
+            if (memory.dbId) {
+                await markMessageAsOpened(memory.dbId);
+                // Mettre à jour l'objet dans l'état local pour stopper le glow
+                applyRecordingUpdateInState(memory.id, { opened: true });
+            }
+        }
+
+        audioPlayer.play(memory);
         audioPlayer.openModal();
-    }, [dailyMemory, isDailyMemorySeen, session?.user, audioPlayer]);
+    }, [dailyMemories, isDailyMemorySeen, session?.user, audioPlayer]);
 
     const renderListHeader = () => {
         const hasFilters = availableTags.length > 0;
-        if (!dailyMemory && !hasFilters) return null;
+        if (dailyMemories.length === 0 && !hasFilters) return null;
+
+        const messages = dailyMemories.filter(m => m.type === 'message');
+        const notes = dailyMemories.filter(m => m.type === 'note');
 
         return (
             <View>
-                {/* Pensée Souvenir */}
-                {dailyMemory && isDailyMemorySeen !== null && (
-                    <DailyMemoryCard
-                        dailyMemory={dailyMemory}
-                        isOpened={isDailyMemorySeen}
-                        isPlaying={(currentTrack?.id === dailyMemory?.id) && audioPlayerIsPlaying}
-                        onTogglePlay={handleToggleDailyMemory}
-                        isLoading={loadingTrackId === dailyMemory?.id}
-                    />
+                {/* Pensées Souvenirs */}
+                {notes.length > 0 && (
+                    <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir</Text>
                 )}
+                {notes.map((memory, index) => (
+                    <DailyMemoryCard
+                        key={memory.id || `note-${index}`}
+                        dailyMemory={memory}
+                        isOpened={isDailyMemorySeen}
+                        isPlaying={(currentTrack?.id === memory?.id) && audioPlayerIsPlaying}
+                        onTogglePlay={() => handleToggleDailyMemory(memory)}
+                        isLoading={loadingTrackId === memory?.id}
+                    />
+                ))}
+
+                {/* Messages du jour */}
+                {messages.length > 0 && (
+                    <Text style={[styles.dailyMemoryHeaderTitle, styles.dailyMemoryHeaderTitleMessage]}>
+                        Message reçu
+                    </Text>
+                )}
+                {messages.map((memory, index) => (
+                    <DailyMemoryCard
+                        key={memory.id || `msg-${index}`}
+                        dailyMemory={memory}
+                        isOpened={!!memory.opened}
+                        isPlaying={(currentTrack?.id === memory?.id) && audioPlayerIsPlaying}
+                        onTogglePlay={() => handleToggleDailyMemory(memory)}
+                        isLoading={loadingTrackId === memory?.id}
+                    />
+                ))}
 
                 {/* Barre de filtres (Tags) */}
                 <TagFilterBar
@@ -382,7 +449,7 @@ export default function HistoryScreen() {
             ) : (
                 <FlatList
                     data={paginatedRecordings}
-                    extraData={[dailyMemory, isDailyMemorySeen]}
+                    extraData={[dailyMemories, isDailyMemorySeen]}
                     ListHeaderComponent={renderListHeader}
                     renderItem={renderItem}
                     keyExtractor={item => item.id}
@@ -592,5 +659,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#78716C',
+    },
+    dailyMemoryHeaderTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#D97706',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 8,
+        marginTop: 10,
+    },
+    dailyMemoryHeaderTitleMessage: {
+        color: '#B91C1C',
     },
 });

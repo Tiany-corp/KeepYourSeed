@@ -53,7 +53,6 @@ const DailyMemoryCard = memo(({ dailyMemory, isOpened, isPlaying, onTogglePlay, 
 
     return (
         <Animated.View style={[styles.dailyMemorySection, animatedScaleStyle]}>
-            <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir</Text>
             <Pressable
                 onPress={onTogglePlay}
                 onPressIn={handlePressIn}
@@ -63,14 +62,24 @@ const DailyMemoryCard = memo(({ dailyMemory, isOpened, isPlaying, onTogglePlay, 
                 <View style={styles.cardWrapper}>
                     {/* Couche de glow derrière la carte — visible uniquement si non ouvert */}
                     {!isOpened && (
-                        <Animated.View style={[styles.glowLayer, glowStyle]} />
+                        <Animated.View style={[
+                            styles.glowLayer, 
+                            dailyMemory.type === 'message' && styles.glowLayerMessage,
+                            glowStyle
+                        ]} />
                     )}
                     {/* Carte elle-même */}
                     <View style={[
                         styles.dailyMemoryCard,
-                        !isOpened && styles.dailyMemoryCardUnseen
+                        !isOpened && styles.dailyMemoryCardUnseen,
+                        dailyMemory.type === 'message' && !isOpened && styles.dailyMemoryCardMessageUnseen
                     ]}>
-                        <Logo size={28} color="#D97706" variant="outline" style={styles.dailyMemoryLogo} />
+                        <Logo 
+                            size={28} 
+                            color={dailyMemory.type === 'message' ? '#B91C1C' : '#D97706'} 
+                            variant="outline" 
+                            style={styles.dailyMemoryLogo} 
+                        />
                         <View style={styles.itemInfo}>
                             <Text style={styles.itemTitle}>{dailyMemory.title || 'Un souvenir t\'attend'}</Text>
                             <Text style={styles.itemDate}>{formatDateWithTime(dailyMemory.date)}</Text>
@@ -124,6 +133,10 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 4,
     },
+    glowLayerMessage: {
+        backgroundColor: 'rgba(185, 28, 28, 0.3)', // Halo rouge
+        shadowColor: '#B91C1C',
+    },
     dailyMemoryCard: {
         backgroundColor: '#F5EADB',
         padding: 16,
@@ -141,6 +154,13 @@ const styles = StyleSheet.create({
     dailyMemoryCardUnseen: {
         borderColor: '#F59E0B',
         borderWidth: 1.5,
+    },
+    dailyMemoryCardMessageUnseen: {
+        borderColor: '#B91C1C', // Bordure rouge pour les messages
+        borderWidth: 2,
+    },
+    dailyMemoryHeaderTitleMessage: {
+        color: '#B91C1C', // Titre rouge pour les messages
     },
     dailyMemoryLogo: {
         marginRight: 16,

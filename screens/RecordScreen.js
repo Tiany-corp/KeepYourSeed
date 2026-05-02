@@ -159,7 +159,9 @@ export default function RecordScreen() {
 
         // Synchronisation complète silencieuse en arrière-plan (Push + Pull)
         if (session?.user) {
-            syncAll(session.user.id, true).catch(() => {});
+            syncAll(session.user.id, false).then(() => {
+                // Notifier les autres écrans si nécessaire
+            });
         }
 
         showAlert("Sauvegardé", "Ta pensée a été enregistrée.", "success");
