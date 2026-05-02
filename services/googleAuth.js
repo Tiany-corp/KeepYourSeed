@@ -55,10 +55,7 @@ async function extractAndSetSession(url) {
  * with a Linking fallback for Android browsers that don't return properly.
  */
 export async function signInWithGoogle() {
-    // Détection ultra-robuste du Web
-    const isActuallyWeb = Platform.OS === 'web' || typeof window !== 'undefined';
-    
-    if (isActuallyWeb) {
+    if (Platform.OS === 'web') {
         // Web: Support des sous-dossiers (ex: /kys-web-app/)
         const redirectTo = window.location.origin + window.location.pathname;
 
