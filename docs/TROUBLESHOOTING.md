@@ -111,3 +111,41 @@ Passage à une configuration manuelle optimisée dans `useAudioRecorder.js` :
 - **Bitrate** : 64 kbps (au lieu de ~192+ kbps).
 - **Canaux** : Mono (au lieu de Stéréo).
 - **Gain d'espace** : Réduction d'environ 3x à 4x du poids des fichiers sans perte de compréhension vocale.
+
+---
+
+## 🗓️ Système Daily Memory (Pile du haut)
+
+### Problème : Boucle infinie / Blocage au chargement de l'Historique
+**Date** : 2 Mai 2026
+**Symptôme** : L'écran Historique reste figé ou l'application plante lors du chargement des souvenirs.
+#### 🚩 Cause Racine
+Une récursion infinie s'était glissée entre `getDailyMemories` et `getDailyMemory` dans `services/storage.js`. De plus, une dépendance circulaire entre `storage.js` et `cloud.js` empêchait l'initialisation correcte sur certains appareils mobiles.
+#### ✅ Solution Appliquée
+1. Refonte de `getDailyMemories` pour être totalement autonome.
+2. Déplacement de la logique de requête Supabase directement dans `storage.js` (en important uniquement `supabase`) pour casser le cycle d'importation avec `cloud.js`.
+
+### Problème : Messages du jour "invisibles" dans la pile (mais présents dans la liste)
+**Date** : 2 Mai 2026
+**Symptôme** : Un message enregistré pour "Aujourd'hui" apparaît bien dans la liste du bas, mais la catégorie "Message reçu" en haut reste absente ou vide.
+#### 🚩 Cause Racine
+**Décalage horaire (UTC vs Local)**. La requête Supabase utilisait des filtres `gte`/`lte` basés sur `ISOString` (UTC). Un message envoyé à 1h du matin à Paris (UTC+2) était considéré par la base de données comme envoyé la veille à 23h, et donc exclu du filtre "Aujourd'hui".
+#### ✅ Solution Appliquée
+Assouplissement du filtre serveur : l'application récupère désormais tous les messages non ouverts arrivés à échéance, puis effectue un tri précis sur le téléphone en comparant la date avec l'heure locale réelle de l'appareil.
+
+### Problème : État "Ouvert" non persistant après redémarrage
+**Date** : 2 Mai 2026
+**Symptôme** : Ouvrir un message enlève bien son halo lumineux (glow), mais si on ferme et rouvre l'application, le message redevient "brillant" comme s'il n'avait jamais été lu.
+#### 🚩 Cause Racine
+Le contenu de la pile quotidienne est mis en cache dans `AsyncStorage` pour la journée afin de garantir la vitesse. L'action d'ouvrir un message mettait à jour l'affichage (State React) mais ne mettait pas à jour l'objet JSON stocké dans le cache.
+#### ✅ Solution Appliquée
+Création de `updateDailyMemoryInCache` dans `storage.js`. Chaque interaction (ouverture/lecture) met désormais à jour instantanément la copie locale du cache pour que l'état soit préservé tout au long de la journée, même hors-ligne.
+
+### Problème : Ralentissement de l'écran Historique sur Mobile
+**Date** : 2 Mai 2026
+**Symptôme** : Plus l'utilisateur a de messages, plus l'écran Historique met du temps à s'afficher sur téléphone.
+#### 🚩 Cause Racine
+L'application récupérait la totalité des enregistrements locaux (`getRecordings`) **avant** de vérifier si un cache valide existait déjà, provoquant des lectures disque inutiles à chaque ouverture d'écran.
+#### ✅ Solution Appliquée
+Optimisation du flux dans `getDailyMemories` : l'application vérifie d'abord la validité du cache (opération ultra-rapide). Elle ne sollicite le moteur de recherche local et le cloud que si le cache est absent, expiré ou si l'utilisateur force manuellement le rafraîchissement (Pull-to-Refresh).
+
