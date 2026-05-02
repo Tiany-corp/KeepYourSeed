@@ -59,8 +59,8 @@ export async function signInWithGoogle() {
     const isActuallyWeb = Platform.OS === 'web' || typeof window !== 'undefined';
     
     if (isActuallyWeb) {
-        // Web: simple OAuth redirect (root fallback to match Supabase Site URL)
-        const redirectTo = window.location.origin + '/';
+        // Web: Support des sous-dossiers (ex: /kys-web-app/)
+        const redirectTo = window.location.origin + window.location.pathname;
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
