@@ -9,6 +9,7 @@ import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-nativ
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
 import TitleModal from '../components/TitleModal';
+import OptionsMenu from '../components/history/OptionsMenu';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
 import { AppContext } from '../contexts/AppContext';
@@ -33,8 +34,10 @@ export default function HistoryScreen() {
     const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
     const [dailyMemories, setDailyMemories] = useState([]);
     const [isDailyMemorySeen, setIsDailyMemorySeen] = useState(null); // null = en attente de vérification
-    // ...
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
+    const [optionsVisible, setOptionsVisible] = useState(false);
+    const [optionsPosition, setOptionsPosition] = useState(null);
+    const [selectedRecording, setSelectedRecording] = useState(null);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [editingRecording, setEditingRecording] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -233,6 +236,12 @@ export default function HistoryScreen() {
         setShowEditModal(true);
     };
 
+    const handleOptions = (item, position) => {
+        setSelectedRecording(item);
+        setOptionsPosition(position);
+        setOptionsVisible(true);
+    };
+
     const applyRecordingUpdateInState = (id, updates) => {
         setRecordings(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
         setDailyMemories(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
@@ -327,10 +336,6 @@ export default function HistoryScreen() {
         toggleAudio(item);
     }, [toggleAudio]);
 
-    const handleOptions = useCallback((item) => {
-        setSelectedOptionsItem(item);
-    }, []);
-
     const renderItem = useCallback(({ item }) => {
         const isItemPlaying = currentTrack?.id === item.id;
         const isLoading = loadingTrackId === item.id;
@@ -348,7 +353,7 @@ export default function HistoryScreen() {
                 isLoading={isLoading}
             />
         );
-    }, [currentTrack?.id, audioPlayerIsPlaying, loadingTrackId, childrenByParent, handleTogglePlay, handleOptions, session?.user]);
+    }, [currentTrack?.id, audioPlayerIsPlaying, loadingTrackId, childrenByParent, handleTogglePlay, session?.user]);
 
     const handleToggleDailyMemory = useCallback(async (memory) => {
         if (!memory) return;
@@ -478,71 +483,18 @@ export default function HistoryScreen() {
                 />
             )}
 
-            {/* Modale d'options (...) */}
-            <Modal
-                visible={!!selectedOptionsItem}
-                transparent
-                animationType="none"
-                onRequestClose={() => setSelectedOptionsItem(null)}
-            >
-                <TouchableOpacity
-                    style={styles.optionsOverlay}
-                    activeOpacity={1}
-                    onPress={() => setSelectedOptionsItem(null)}
-                >
-                    <Animated.View
-                        entering={() => {
-                            'worklet';
-                            return {
-                                initialValues: { transform: [{ translateY: 300 }] },
-                                animations: { transform: [{ translateY: withTiming(0, { duration: 350 }) }] }
-                            };
-                        }}
-                        style={styles.optionsMenuContainer}
-                    >
-                        <View style={styles.optionsMenuHeader}>
-                            <Text style={styles.optionsMenuTitle} numberOfLines={1}>
-                                {selectedOptionsItem?.title || 'Enregistrement'}
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity style={styles.optionItem} onPress={() => {
-                            const item = selectedOptionsItem;
-                            setSelectedOptionsItem(null);
-                            handlePin(item);
-                        }}>
-                            <Pin size={20} color="#78350F" strokeWidth={1.5} fill={selectedOptionsItem?.pinned ? '#78350F' : 'transparent'} />
-                            <Text style={styles.optionText}>{selectedOptionsItem?.pinned ? 'Détacher cette pensée' : 'Épingler en haut'}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.optionItem} onPress={() => {
-                            const item = selectedOptionsItem;
-                            setSelectedOptionsItem(null);
-                            handleEdit(item);
-                        }}>
-                            <Pencil size={20} color="#78350F" strokeWidth={1.5} />
-                            <Text style={styles.optionText}>Modifier</Text>
-                        </TouchableOpacity>
-
-
-
-                        <View style={styles.optionDivider} />
-
-                        <TouchableOpacity style={styles.optionItem} onPress={() => {
-                            const item = selectedOptionsItem;
-                            setSelectedOptionsItem(null);
-                            handleDeleteItem(item);
-                        }}>
-                            <Trash2 size={20} color="#DC2626" strokeWidth={1.5} />
-                            <Text style={[styles.optionText, { color: '#DC2626' }]}>Supprimer l'enregistrement</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.optionCancelBtn} onPress={() => setSelectedOptionsItem(null)}>
-                            <Text style={styles.optionCancelText}>Annuler</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                </TouchableOpacity>
-            </Modal>
+            <OptionsMenu 
+                isVisible={optionsVisible}
+                onClose={() => setOptionsVisible(false)}
+                position={optionsPosition}
+                onEdit={() => handleEdit(selectedRecording)}
+                onDelete={() => {
+                    handleDeleteItem(selectedRecording);
+                }}
+                onShare={() => {
+                    showAlert('Partage', 'Fonctionnalité bientôt disponible !', 'info');
+                }}
+            />
 
             <TitleModal
                 visible={showEditModal}

@@ -1,4 +1,4 @@
-import React, { memo, useEffect } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -29,6 +29,15 @@ const RecordingItem = memo(({
     onRestore,
     onDeletePermanent
 }) => {
+    const optionsRef = useRef(null);
+
+    const handleOptionsPress = () => {
+        if (optionsRef.current) {
+            optionsRef.current.measure((x, y, width, height, pageX, pageY) => {
+                onOptions(item, { x, y, width, height, pageX, pageY });
+            });
+        }
+    };
 
     const renderTags = (tags) => {
         if (!tags || tags.length === 0) return null;
@@ -111,8 +120,9 @@ const RecordingItem = memo(({
 
                 {!isTrashMode ? (
                     <Pressable
+                        ref={optionsRef}
                         style={styles.optionsButton}
-                        onPress={() => onOptions(item)}
+                        onPress={handleOptionsPress}
                         onPressIn={handlePressIn}
                         onPressOut={handlePressOut}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
