@@ -21,9 +21,16 @@ export const uploadRecordingToCloud = async (recordingId, localUri, userId = 'pu
         const fileName = `${userId}/${timestamp}.${fileExt}`;
 
         const fileDataToUpload = preparedFile.file || preparedFile;
+        
+        // Détermination du type MIME correct
+        let contentType = 'audio/mp4'; // Par défaut pour .m4a
+        if (fileExt === 'wav') contentType = 'audio/wav';
+        if (fileExt === 'aac') contentType = 'audio/aac';
+        if (fileExt === 'ogg') contentType = 'audio/ogg';
+
         const uploadOptions = {
             upsert: false,
-            contentType: 'audio/m4a'
+            contentType: contentType
         };
 
         let { data, error } = await supabase.storage

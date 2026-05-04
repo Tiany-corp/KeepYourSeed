@@ -26,12 +26,17 @@ export const prepareAudioForUpload = async (uri) => {
 
             const response = await fetch(fetchUri);
             const blob = await response.blob();
-            const file = new File([blob], 'recording.m4a', { type: 'audio/m4a' });
+            
+            // Détection de l'extension depuis l'URI
+            const ext = uri.split('.').pop().split('?')[0] || 'm4a';
+            const mimeType = ext === 'wav' ? 'audio/wav' : 'audio/mp4';
+
+            const file = new File([blob], `recording.${ext}`, { type: mimeType });
 
             return {
-                type: 'audio/m4a',
+                type: mimeType,
                 file: file,
-                extension: 'm4a',
+                extension: ext,
             };
         } catch (error) {
             console.error('Error preparing audio blob for web upload:', error);
@@ -52,10 +57,14 @@ export const prepareAudioForUpload = async (uri) => {
                 bytes[i] = binaryString.charCodeAt(i);
             }
 
+            // Détection de l'extension depuis l'URI
+            const ext = uri.split('.').pop() || 'm4a';
+            const mimeType = ext === 'wav' ? 'audio/wav' : 'audio/mp4';
+
             return {
-                type: 'audio/m4a',
+                type: mimeType,
                 file: bytes.buffer,   // ArrayBuffer : données binaires brutes
-                extension: 'm4a',
+                extension: ext,
             };
         } catch (error) {
             console.error('Error preparing audio for mobile upload:', error);

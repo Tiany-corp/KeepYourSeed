@@ -14,9 +14,9 @@ export default function useAudioRecorder() {
         sampleRate: 44100,
         numberOfChannels: 1,
         extension: '.m4a',
-        // Sur Android, on peut essayer de demander un encodage plus moderne
+        // Réglages de compatibilité maximale
         androidAudioEncoder: 'aac',
-        androidOutputFormat: 'mpeg4',
+        androidOutputFormat: 'aac_adts',
     });
 
     // CONFIGURATION DU MODE AUDIO (Le secret pour éviter le son métallique)
