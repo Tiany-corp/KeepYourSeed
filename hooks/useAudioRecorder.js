@@ -9,36 +9,11 @@ import { saveAudioBlobWeb } from '../services/storage';
  */
 export default function useAudioRecorder() {
     // Le recorder interne de expo-audio
-    const recorder = useExpoAudioRecorder({
-        bitrate: 128000,
-        sampleRate: 44100,
-        numberOfChannels: 1,
-        extension: '.m4a',
-        // Réglages de compatibilité maximale
-        androidAudioEncoder: 'aac',
-        androidOutputFormat: 'aac_adts',
-    });
-
-    // CONFIGURATION DU MODE AUDIO (Le secret pour éviter le son métallique)
-    useEffect(() => {
-        const setupAudio = async () => {
-            try {
-                await AudioModule.setAudioModeAsync({
-                    shouldRouteThroughEarpiece: false,
-                    allowsRecordingIOS: true,
-                    interruptionModeIOS: 'doNotMix',
-                    playsInSilentModeIOS: true,
-                    staysActiveInBackground: false,
-                    interruptionModeAndroid: 'doNotMix',
-                    shouldDuckAndroid: true,
-                    playThroughEarpieceAndroid: false,
-                });
-            } catch (e) {
-                console.error("Erreur config AudioMode:", e);
-            }
-        };
-        setupAudio();
-    }, []);
+    const recorder = useExpoAudioRecorder(
+        Platform.OS === 'web' ? {
+            isMeteringEnabled: true,
+        } : RecordingPresets.HIGH_QUALITY
+    );
     
     // État local pour le pont de compatibilité avec l'ancienne UI
     const [isRecording, setIsRecording] = useState(false);
