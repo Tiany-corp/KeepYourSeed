@@ -9,11 +9,10 @@ import { saveAudioBlobWeb } from '../services/storage';
  */
 export default function useAudioRecorder() {
     // Le recorder interne de expo-audio
-    const recorder = useExpoAudioRecorder(
-        Platform.OS === 'web' ? {
-            isMeteringEnabled: true,
-        } : RecordingPresets.HIGH_QUALITY
-    );
+    const recorder = useExpoAudioRecorder({
+        ...RecordingPresets.HIGH_QUALITY,
+        isMeteringEnabled: true,
+    });
     
     // État local pour le pont de compatibilité avec l'ancienne UI
     const [isRecording, setIsRecording] = useState(false);

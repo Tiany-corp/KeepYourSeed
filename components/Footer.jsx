@@ -17,9 +17,9 @@ export default function Footer({ session, isRecording, streakCount = 0 }) {
                 <Text style={styles.footerText}>Continue comme ça !</Text>
             </View>
             {session?.user ? (
-                <Text style={styles.footerEmail}>{session.user.email}</Text>
+                <Text style={styles.footerEmail}>{session.user.email} <Text style={{fontSize: 10, opacity: 0.5}}>(V1.1)</Text></Text>
             ) : (
-                <Text style={styles.footerEmail}>Non connecté</Text>
+                <Text style={styles.footerEmail}>Non connecté <Text style={{fontSize: 10, opacity: 0.5}}>(V1.1)</Text></Text>
             )}
         </View>
     );
