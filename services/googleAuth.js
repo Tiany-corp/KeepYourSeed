@@ -70,6 +70,7 @@ export async function signInWithGoogle() {
         // Native: open browser for auth, then capture tokens
         const redirectUrl = AuthSession.makeRedirectUri({
             scheme: 'keepyourseed',
+            path: 'google-auth',
         });
         
         console.log('🔑 [GoogleAuth] Native Redirect URL:', redirectUrl);
