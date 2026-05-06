@@ -21,16 +21,20 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onShare }
 
     if (!isVisible || !position) return null;
 
-    // Calcul de la position pour éviter que le menu sorte de l'écran
+    // Positionnement à gauche du bouton
     const menuWidth = 180;
     const menuHeight = 160;
     
-    let top = position.pageY + 30;
-    let left = position.pageX - menuWidth + 30;
+    // On place le menu à gauche (pageX) moins sa largeur, avec une petite marge
+    let left = position.pageX - menuWidth - 10;
+    // On centre verticalement par rapport au bouton
+    let top = position.pageY + (position.height / 2) - (menuHeight / 2);
 
-    // Ajustements si trop près des bords
-    if (left < 10) left = 10;
-    if (top + menuHeight > SCREEN_HEIGHT - 50) top = position.pageY - menuHeight - 10;
+    // Sécurité : si ça sort de l'écran à gauche, on le remet à droite
+    if (left < 10) left = position.pageX + position.width + 10;
+    // Sécurité : si ça sort en haut ou en bas
+    if (top < 10) top = 10;
+    if (top + menuHeight > SCREEN_HEIGHT - 50) top = SCREEN_HEIGHT - menuHeight - 50;
 
     return (
         <Modal transparent visible={isVisible} animationType="none" onRequestClose={onClose}>
