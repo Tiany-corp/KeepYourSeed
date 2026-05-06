@@ -20,7 +20,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const navigation = useNavigation();
     const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100, formattedSize: '0 Mo' });
     const [cloudUsage, setCloudUsage] = useState(0); // en octets
-    const CLOUD_QUOTA = 50 * 1024 * 1024; // 50 Mo en octets
+    const CLOUD_QUOTA = 30 * 1024 * 1024; // 30 Mo en octets
 
     const loadStorageStats = async () => {
         const recordings = await getRecordings();
@@ -230,7 +230,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                         <Cloud size={18} color="#78350F" style={{ marginRight: 8 }} />
                                         <Text style={styles.statsLabel}>Usage Cloud</Text>
                                     </View>
-                                    <Text style={styles.statsValue}>{formatSize(cloudUsage)} / 50 Mo</Text>
+                                    <Text style={styles.statsValue}>{formatSize(cloudUsage)} / 30 Mo</Text>
                                 </View>
                                 
                                 <View style={styles.progressBarBg}>

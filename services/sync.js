@@ -220,8 +220,8 @@ const pushLocalChanges = async (userId) => {
     let count = 0;
     let hasChanged = false;
 
-    // --- VÉRIFICATION DU QUOTA CLOUD (Limite 50 Mo) ---
-    const MAX_QUOTA_BYTES = 50 * 1024 * 1024; // 50 Mo (aligné avec l'UI)
+    // --- VÉRIFICATION DU QUOTA CLOUD (Limite 30 Mo) ---
+    const MAX_QUOTA_BYTES = 30 * 1024 * 1024; // 30 Mo (aligné avec l'UI)
     let currentUsage = await fetchTotalCloudUsage(userId);
     let quotaReached = currentUsage >= MAX_QUOTA_BYTES;
 
