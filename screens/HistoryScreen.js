@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'r
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal, RefreshControl } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
-import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
+import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId, getAutoSyncPreference } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
@@ -136,6 +136,39 @@ export default function HistoryScreen() {
 
     // Pull-to-refresh : sync manuelle (bypass cooldown) puis rechargement local
     const handleRefresh = useCallback(async () => {
+        if (session?.user) {
+            // Si la synchro auto est désactivée, on demande confirmation avant de sync
+            const autoSyncEnabled = await getAutoSyncPreference();
+            
+            if (!autoSyncEnabled) {
+                Alert.alert(
+                    "Synchronisation manuelle",
+                    "La synchronisation automatique est désactivée. Voulez-vous envoyer et récupérer vos pensées sur le cloud maintenant ?",
+                    [
+                        { text: "Annuler", style: "cancel", onPress: () => setRefreshing(false) },
+                        { 
+                            text: "Confirmer", 
+                            onPress: async () => {
+                                setRefreshing(true);
+                                try {
+                                    await syncAll(session.user.id, true);
+                                    const { getDailyMemories } = require('../services/storage');
+                                    const refreshedMemories = await getDailyMemories(session.user.id, true);
+                                    setDailyMemories(refreshedMemories || []);
+                                    await loadRecordings();
+                                } catch (e) {
+                                    console.error('Manual sync failed:', e);
+                                } finally {
+                                    setRefreshing(false);
+                                }
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+        }
+
         setRefreshing(true);
         try {
             if (session?.user) {

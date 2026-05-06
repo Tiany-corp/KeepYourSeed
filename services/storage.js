@@ -461,6 +461,17 @@ export const setWifiOnlyPreference = async (enabled) => {
     try { await universalStorage.saveData('@wifi_only_sync', enabled); } catch (e) { console.warn('Failed to set wifi preference', e); }
 };
 
+export const getAutoSyncPreference = async () => {
+    try {
+        const value = await universalStorage.getData('@auto_sync_enabled');
+        // Par défaut activé (true) si jamais la clé n'existe pas encore
+        return value === null || value === undefined ? true : value === true;
+    } catch (e) { return true; }
+};
+export const setAutoSyncPreference = async (enabled) => {
+    try { await universalStorage.saveData('@auto_sync_enabled', enabled); } catch (e) { console.warn('Failed to set auto sync preference', e); }
+};
+
 export const getChildRecordings = async (parentId) => {
     try {
         const all = await getRecordings();

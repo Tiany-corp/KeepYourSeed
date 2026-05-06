@@ -26,6 +26,16 @@ export const syncAll = async (userId, isManual = false) => {
     try {
         if (!userId) return { success: false, pushed: 0, pulled: 0 };
 
+        // Si la synchro auto est désactivée et que ce n'est pas un sync manuel, on skip
+        if (!isManual) {
+            const { getAutoSyncPreference } = require('./storage');
+            const autoSyncEnabled = await getAutoSyncPreference();
+            if (!autoSyncEnabled) {
+                console.log('syncAll ignoré : synchro auto désactivée');
+                return { success: false, pushed: 0, pulled: 0, status: 'auto-sync-disabled' };
+            }
+        }
+
         // Verrou anti-doublons : si un sync est déjà en cours, on skip
         if (_isSyncing) {
             console.log('syncAll ignoré : synchronisation déjà en cours');

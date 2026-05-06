@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Sw
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
-import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud } from 'lucide-react-native';
+import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff } from 'lucide-react-native';
 import { fetchTotalCloudUsage } from '../services/cloud';
 import Logo from './Logo';
 
@@ -16,6 +16,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const [isRendered, setIsRendered] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [wifiOnly, setWifiOnly] = useState(false);
+    const [autoSync, setAutoSync] = useState(true);
     const { showAlert } = useAlert();
     const navigation = useNavigation();
     const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100, formattedSize: '0 Mo' });
@@ -53,6 +54,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
             (async () => {
                 const pref = await getWifiOnlyPreference();
                 setWifiOnly(pref);
+                const autoSyncPref = await getAutoSyncPreference();
+                setAutoSync(autoSyncPref);
             })();
         }
     }, [visible]);
@@ -221,40 +224,44 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
                         
-                        {/* Nouveau : Info de stockage CLOUD */}
-                        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-                            <Text style={styles.sectionTitle}>Stockage Cloud (Bêta)</Text>
-                            <View style={styles.statsContainer}>
-                                <View style={styles.statsRow}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Cloud size={18} color="#78350F" style={{ marginRight: 8 }} />
-                                        <Text style={styles.statsLabel}>Usage Cloud</Text>
+                        {/* Info de stockage CLOUD */}
+                        <View style={{ paddingVertical: 14, paddingHorizontal: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                <Cloud size={20} color="#78350F" style={[styles.menuIcon, { marginTop: 2 }]} />
+                                <View style={{ flex: 1 }}>
+                                    {/* Ligne 1 : Titre et Chiffres */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <Text style={[styles.menuItemText, { fontSize: 15 }]}>Stockage Cloud</Text>
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: (cloudUsage / CLOUD_QUOTA) > 0.9 ? '#991B1B' : '#78350F' }}>
+                                            {formatSize(cloudUsage)} <Text style={{ color: '#A8A29E', fontWeight: '500' }}>/ 30 Mo</Text>
+                                        </Text>
                                     </View>
-                                    <Text style={styles.statsValue}>{formatSize(cloudUsage)} / 30 Mo</Text>
-                                </View>
-                                
-                                <View style={styles.progressBarBg}>
-                                    <View 
-                                        style={[
-                                            styles.progressBarFill, 
-                                            { 
+                                    
+                                    {/* Ligne 2 : La barre */}
+                                    <View style={{ height: 6, backgroundColor: '#E8D5BF', borderRadius: 3, overflow: 'hidden' }}>
+                                        <View 
+                                            style={{ 
+                                                height: '100%', 
                                                 width: `${Math.min((cloudUsage / CLOUD_QUOTA) * 100, 100)}%`,
-                                                backgroundColor: (cloudUsage / CLOUD_QUOTA) > 0.9 ? '#991B1B' : '#D4A574'
-                                            }
-                                        ]} 
-                                    />
-                                </View>
-                                
-                                <View style={styles.statsFooter}>
-                                    <Text style={styles.statsSublabel}>
-                                        {(cloudUsage / CLOUD_QUOTA) > 0.9 
-                                            ? "⚠️ Quota presque atteint" 
-                                            : "Sauvegarde sécurisée"}
-                                    </Text>
+                                                backgroundColor: (cloudUsage / CLOUD_QUOTA) > 0.9 ? '#DC2626' : '#78350F',
+                                                borderRadius: 3
+                                            }} 
+                                        />
+                                    </View>
+
+                                    {/* Ligne 3 : Alerte dynamique selon le quota */}
+                                    {cloudUsage >= CLOUD_QUOTA ? (
+                                        <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 6, fontWeight: '700' }}>
+                                            ❌ Quota atteint. Vos prochains audios seront sauvegardés uniquement sur ce téléphone.
+                                        </Text>
+                                    ) : (cloudUsage / CLOUD_QUOTA) > 0.9 ? (
+                                        <Text style={{ fontSize: 11, color: '#D97706', marginTop: 6, fontWeight: '500' }}>
+                                            ⚠️ Quota presque atteint, pensez à faire du tri.
+                                        </Text>
+                                    ) : null}
                                 </View>
                             </View>
                         </View>
-                        
                         {/* Info de stockage simplifiée */}
                         <View style={{ paddingVertical: 16, paddingHorizontal: 20 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -321,6 +328,22 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 }}
                                 trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
                                 thumbColor={wifiOnly ? '#78350F' : '#F5F5F4'}
+                            />
+                        </View>
+
+                        <View style={[styles.menuItem, { paddingVertical: 8, justifyContent: 'space-between' }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <CloudOff size={20} color="#78350F" style={styles.menuIcon} />
+                                <Text style={styles.menuItemText}>Synchro auto</Text>
+                            </View>
+                            <Switch
+                                value={autoSync}
+                                onValueChange={async (value) => {
+                                    setAutoSync(value);
+                                    await setAutoSyncPreference(value);
+                                }}
+                                trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
+                                thumbColor={autoSync ? '#78350F' : '#F5F5F4'}
                             />
                         </View>
 
