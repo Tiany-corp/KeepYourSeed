@@ -12,7 +12,7 @@ async function computeHash(uri) {
     try {
         if (Platform.OS === 'web') {
             const audioId = uri.replace('indexeddb://', '');
-            const blob = await get(`audio_file_${audioId}`); 
+            const blob = await get(`audio_file_${audioId}`);
             if (!blob) return null;
             const arrayBuffer = await blob.arrayBuffer();
             const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -99,7 +99,7 @@ const cacheSupabaseAudioLocally = async (recordings) => {
 
     try {
         const { getSignedAudioUrl } = require('./cloud');
-        
+
         // On ne traite que ceux qui ont besoin d'être téléchargés
         const toDownload = recordings
             .filter(rec => rec.remoteUrl && !rec.localUri)
@@ -113,7 +113,7 @@ const cacheSupabaseAudioLocally = async (recordings) => {
         const downloadOne = async (rec) => {
             try {
                 const { url: signedUrl, error } = await getSignedAudioUrl(rec.remoteUrl);
-                
+
                 if (error === 'NOT_FOUND') {
                     if (rec.localUri) {
                         await updateRecording(rec.id, { remoteUrl: null, status: 'pending' });
@@ -122,7 +122,7 @@ const cacheSupabaseAudioLocally = async (recordings) => {
                     }
                     return;
                 }
-                
+
                 if (!signedUrl) return;
 
                 if (Platform.OS === 'web') {
@@ -169,13 +169,13 @@ export const calculateStorageSize = async (recordings) => {
     // On fait ça en parallèle par petits lots pour ne pas bloquer
     const CONCURRENCY = 10;
     const itemsWithLocal = recordings.filter(r => r.localUri);
-    
+
     for (let i = 0; i < itemsWithLocal.length; i += CONCURRENCY) {
         const chunk = itemsWithLocal.slice(i, i + CONCURRENCY);
         const sizes = await Promise.all(chunk.map(r => universalStorage.getAudioSize(r.localUri)));
         totalBytes += sizes.reduce((acc, s) => acc + s, 0);
     }
-    
+
     return totalBytes;
 };
 
@@ -209,7 +209,7 @@ export const getAudioSource = async (recording) => {
         console.warn(`Blob introuvable pour "${recording.title}" (indexeddb key manquante)`);
         return null;
     }
-    
+
     if (Platform.OS !== 'web') {
         const fileInfo = await FileSystem.getInfoAsync(recording.localUri);
         if (fileInfo.exists) return { uri: recording.localUri };
@@ -259,9 +259,9 @@ export const markAsKeepLocalOnly = async (id) => {
     try {
         const recordings = await getRecordings();
         const updatedRecordings = recordings.map(rec =>
-            rec.id === id ? { 
-                ...rec, 
-                keepLocalOnly: true, 
+            rec.id === id ? {
+                ...rec,
+                keepLocalOnly: true,
                 dbId: null, // On coupe le lien cloud
                 remoteUrl: null,
                 status: 'local_only' // Nouveau statut informatif
@@ -327,7 +327,7 @@ export const permanentlyDeleteRecording = async (id) => {
     try {
         const recordings = await getRecordings();
         const recToDelete = recordings.find(r => r.id === id);
-        
+
         if (recToDelete && recToDelete.localUri) {
             if (Platform.OS === 'web' && recToDelete.localUri.startsWith('indexeddb://')) {
                 const audioId = recToDelete.localUri.replace('indexeddb://', '');
@@ -338,7 +338,7 @@ export const permanentlyDeleteRecording = async (id) => {
                 } catch (e) { console.warn('File delete failed', e.message); }
             }
         }
-        
+
         const updatedRecordings = recordings.filter(rec => rec.id !== id);
         await universalStorage.saveData(STORAGE_KEY, updatedRecordings);
         return updatedRecordings;
@@ -452,13 +452,13 @@ export const setPinnedThought = async (recording) => { try { await universalStor
 export const clearPinnedThought = async () => { try { await universalStorage.removeData(PINNED_THOUGHT_KEY); } catch (e) { console.warn('Failed to clear pinned thought', e); } };
 
 export const getWifiOnlyPreference = async () => {
-  try {
-    const value = await universalStorage.getData('@wifi_only_sync');
-    return value === true;
-  } catch (e) { return false; }
+    try {
+        const value = await universalStorage.getData('@wifi_only_sync');
+        return value === true;
+    } catch (e) { return false; }
 };
 export const setWifiOnlyPreference = async (enabled) => {
-  try { await universalStorage.saveData('@wifi_only_sync', enabled); } catch (e) { console.warn('Failed to set wifi preference', e); }
+    try { await universalStorage.saveData('@wifi_only_sync', enabled); } catch (e) { console.warn('Failed to set wifi preference', e); }
 };
 
 export const getChildRecordings = async (parentId) => {
@@ -491,7 +491,7 @@ export const updateDailyMemoryInCache = async (id, updates) => {
         const todayKey = getTodayKey();
         const cached = await universalStorage.getData(todayKey);
         if (cached && Array.isArray(cached)) {
-            const updatedCache = cached.map(memory => 
+            const updatedCache = cached.map(memory =>
                 memory.id === id ? { ...memory, ...updates } : memory
             );
             await universalStorage.saveData(todayKey, updatedCache);
@@ -506,21 +506,21 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
         const todayKey = getTodayKey();
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        
+
         let cached = forceRefresh ? null : await universalStorage.getData(todayKey);
-        
+
         // 1. Validation du cache (Plus d'appel lourd ici)
         if (cached && Array.isArray(cached) && !forceRefresh) {
             const isCacheValid = cached.every(item => {
-                if (item.type !== 'message') return true; 
+                if (item.type !== 'message') return true;
                 return item.deliverDate && item.deliverDate.split('T')[0] === todayStr;
             });
 
             if (isCacheValid) {
                 const allLocal = await getRecordings();
                 return cached.map(memory => {
-                    const localMatch = allLocal.find(r => 
-                        (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) || 
+                    const localMatch = allLocal.find(r =>
+                        (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) ||
                         (r.dbId && memory.id === `cloud_${r.dbId}`) ||
                         (r.id === memory.id)
                     );
@@ -533,7 +533,7 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
         const results = [];
 
         // 2. La pensée souvenir du jour (Rituel local) - TOUJOURS EN PREMIER
-        const notes = allLocal.filter(r => 
+        const notes = allLocal.filter(r =>
             !r.deletedAt && r.type === 'note' && (!r.deliverDate || new Date(r.deliverDate) <= now)
         );
         if (notes.length > 0) {
@@ -585,10 +585,10 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
         }
 
         // 4. Messages du jour (Local - pour ceux pas encore synchronisés)
-        const localMessages = allLocal.filter(r => 
-            r.type === 'message' && 
-            !r.deletedAt && 
-            r.deliverDate && 
+        const localMessages = allLocal.filter(r =>
+            r.type === 'message' &&
+            !r.deletedAt &&
+            r.deliverDate &&
             r.deliverDate.split('T')[0] === todayStr
         );
         localMessages.forEach(msg => {
@@ -599,8 +599,8 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
 
         // 5. Uniformisation et sauvegarde
         const finalResults = results.map(memory => {
-            const localMatch = allLocal.find(r => 
-                (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) || 
+            const localMatch = allLocal.find(r =>
+                (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) ||
                 (r.dbId && memory.id === `cloud_${r.dbId}`) ||
                 (r.id === memory.id)
             );

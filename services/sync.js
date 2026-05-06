@@ -205,7 +205,7 @@ export const getOrphanedCloudItems = async (userId) => {
  * Traitement en lot (Batch) pour éviter les sauvegardes répétées du gros tableau JSON.
  */
 const pushLocalChanges = async (userId) => {
-    const { updateRecordingMetadataInDatabase, deleteRecordingFromCloud, uploadRecordingToCloud, saveRecordingToDatabase } = require('./cloud');
+    const { updateRecordingMetadataInDatabase, deleteRecordingFromCloud, uploadRecordingToCloud, saveRecordingToDatabase, fetchTotalCloudUsage } = require('./cloud');
     let localRecordings = await getRecordings();
     
     // On inclut 'error' pour retenter automatiquement les envois qui ont échoué par le passé
@@ -220,6 +220,11 @@ const pushLocalChanges = async (userId) => {
     let count = 0;
     let hasChanged = false;
 
+    // --- VÉRIFICATION DU QUOTA CLOUD (Limite 50 Mo) ---
+    const MAX_QUOTA_BYTES = 50 * 1024 * 1024; // 50 Mo (aligné avec l'UI)
+    let currentUsage = await fetchTotalCloudUsage(userId);
+    let quotaReached = currentUsage >= MAX_QUOTA_BYTES;
+
     // On travaille sur une copie fraîche pour éviter les effets de bord
     const workingList = [...localRecordings];
 
@@ -232,6 +237,20 @@ const pushLocalChanges = async (userId) => {
             const isUpdate = rec.status === 'pending_update' || (rec.status === 'error' && rec.dbId);
 
             if (isCreation) {
+                // Si le quota est atteint, on annule l'upload et on force le fichier à rester en local
+                if (quotaReached) {
+                    console.log(`[Quota] Limite de 30 Mo atteinte. ${rec.title} restera en local.`);
+                    workingList[idx] = { 
+                        ...workingList[idx], 
+                        keepLocalOnly: true, 
+                        dbId: null, 
+                        remoteUrl: null, 
+                        status: 'local_only' 
+                    };
+                    hasChanged = true;
+                    continue; // On passe au suivant sans uploader
+                }
+
                 const remoteUrl = await uploadRecordingToCloud(rec.id, rec.localUri, userId);
                 if (remoteUrl) {
                     // RÉSOLUTION DU PARENT : Si on a un parentId local, on cherche son dbId Cloud
@@ -252,6 +271,12 @@ const pushLocalChanges = async (userId) => {
                         workingList[idx] = { ...workingList[idx], status: 'synced', dbId: actualDbId, remoteUrl: remoteUrl };
                         count++;
                         hasChanged = true;
+                        
+                        // Estimation rapide pour ne pas dépasser le quota pendant cette même boucle
+                        // High Quality = ~1 Mo par minute
+                        const estimatedSize = rec.duration ? (rec.duration / 60) * 1024 * 1024 : 1024 * 1024;
+                        currentUsage += estimatedSize;
+                        if (currentUsage >= MAX_QUOTA_BYTES) quotaReached = true;
                     }
                 }
             } else if (rec.status === 'pending_update') {
