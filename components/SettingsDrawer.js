@@ -4,7 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud } from 'lucide-react-native';
+import { fetchTotalCloudUsage } from '../services/cloud';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -18,6 +19,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const { showAlert } = useAlert();
     const navigation = useNavigation();
     const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100, formattedSize: '0 Mo' });
+    const [cloudUsage, setCloudUsage] = useState(0); // en octets
+    const CLOUD_QUOTA = 50 * 1024 * 1024; // 50 Mo en octets
 
     const loadStorageStats = async () => {
         const recordings = await getRecordings();
@@ -35,6 +38,12 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         const missingMo = ((totalMissingDurationMs / 60000) * 0.5).toFixed(1);
         
         setStorageStats({ local, total, percent, formattedSize, missingMo });
+
+        // Charger aussi l'usage Cloud réel depuis Supabase
+        if (session?.user?.id) {
+            const usage = await fetchTotalCloudUsage(session.user.id);
+            setCloudUsage(usage);
+        }
     };
 
     // Load preferences and stats on mount or when visible
@@ -211,6 +220,40 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Menu items — seulement si connecté */}
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
+                        
+                        {/* Nouveau : Info de stockage CLOUD */}
+                        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+                            <Text style={styles.sectionTitle}>Stockage Cloud (Bêta)</Text>
+                            <View style={styles.statsContainer}>
+                                <View style={styles.statsRow}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Cloud size={18} color="#78350F" style={{ marginRight: 8 }} />
+                                        <Text style={styles.statsLabel}>Usage Cloud</Text>
+                                    </View>
+                                    <Text style={styles.statsValue}>{formatSize(cloudUsage)} / 50 Mo</Text>
+                                </View>
+                                
+                                <View style={styles.progressBarBg}>
+                                    <View 
+                                        style={[
+                                            styles.progressBarFill, 
+                                            { 
+                                                width: `${Math.min((cloudUsage / CLOUD_QUOTA) * 100, 100)}%`,
+                                                backgroundColor: (cloudUsage / CLOUD_QUOTA) > 0.9 ? '#991B1B' : '#D4A574'
+                                            }
+                                        ]} 
+                                    />
+                                </View>
+                                
+                                <View style={styles.statsFooter}>
+                                    <Text style={styles.statsSublabel}>
+                                        {(cloudUsage / CLOUD_QUOTA) > 0.9 
+                                            ? "⚠️ Quota presque atteint" 
+                                            : "Sauvegarde sécurisée"}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
                         
                         {/* Info de stockage simplifiée */}
                         <View style={{ paddingVertical: 16, paddingHorizontal: 20 }}>

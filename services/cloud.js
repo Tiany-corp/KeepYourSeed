@@ -524,4 +524,24 @@ export const markMessageAsOpened = async (dbId) => {
         console.error('Failed to mark message as opened:', e);
     }
 };
+
+/**
+ * Récupère la consommation de stockage d'un utilisateur spécifique.
+ * @param {string} userId - UUID de l'utilisateur
+ * @returns {Promise<number>} - Taille totale en octets
+ */
+export const fetchTotalCloudUsage = async (userId) => {
+    try {
+        if (!userId) return 0;
+        const { data, error } = await supabase.rpc('get_user_storage_usage', { p_user_id: userId });
+        if (error) {
+            console.error('RPC Error (Usage):', error.message);
+            return 0;
+        }
+        return data || 0;
+    } catch (e) {
+        console.error('Failed to fetch cloud usage:', e);
+        return 0;
+    }
+};
 
