@@ -23,7 +23,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const navigation = useNavigation();
     const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100, formattedSize: '0 Mo' });
     const [cloudUsage, setCloudUsage] = useState(0); // en octets
-    const [cloudQuota, setCloudQuotaState] = useState(30 * 1024 * 1024);
+    const [cloudQuota, setCloudQuotaState] = useState(30 * 1024 * 1024); // 30 Mo par défaut
     const [secretClicks, setSecretClicks] = useState(0);
 
     const loadStorageStats = async () => {
@@ -339,18 +339,6 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
                             </Text>
                             {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
-                            onPress={handleRepairSync}
-                            disabled={isRepairing}
-                        >
-                            <Wrench size={20} color="#059669" style={styles.menuIcon} />
-                            <Text style={styles.menuItemText}>
-                                {isRepairing ? 'Réparation...' : 'Réparer la synchronisation'}
-                            </Text>
-                            {isRepairing && <ActivityIndicator size="small" color="#059669" style={{ marginLeft: 10 }} />}
                         </TouchableOpacity>
 
                         <TouchableOpacity 

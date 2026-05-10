@@ -5,7 +5,7 @@ import Animated, {
     useAnimatedStyle,
     withSpring
 } from 'react-native-reanimated';
-import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2 } from 'lucide-react-native';
+import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle } from 'lucide-react-native';
 import Logo from '../Logo';
 import AnimatedPlayButton from '../AnimatedPlayButton';
 import { getTagInfo } from '../../utils/tags';
@@ -100,9 +100,12 @@ const RecordingItem = memo(({
 
                             {/* Indicateur de synchro (caché en mode corbeille pour plus de clarté) */}
                             {sessionUser && !isTrashMode && (
-                                <View style={{ marginLeft: 6 }}>
+                                <View style={styles.statusIcons}>
+                                    {item.status === 'error' && (
+                                        <AlertCircle size={14} color="#EF4444" style={{ marginRight: 4 }} />
+                                    )}
                                     {item.dbId ? (
-                                        <Cloud size={14} color="#10B981" opacity={0.6} />
+                                        <Cloud size={14} color={item.status === 'error' ? "#EF4444" : "#10B981"} opacity={0.6} />
                                     ) : (
                                         <CloudOff size={14} color="#78716C" opacity={0.4} />
                                     )}
@@ -283,6 +286,11 @@ const styles = StyleSheet.create({
     childSquareActive: {
         backgroundColor: '#78350F',
         borderColor: '#78350F',
+    },
+    statusIcons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 6,
     },
 });
 
