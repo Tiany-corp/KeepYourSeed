@@ -15,6 +15,7 @@ import { Trash2, Plus, X } from 'lucide-react-native';
 import CustomDatePicker from './CustomDatePicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get, set } from 'idb-keyval';
+import { AVAILABLE_TAGS, loadCustomTagsCache } from '../utils/tags';
 
 const CUSTOM_TAGS_KEY = '@custom_tags_v1';
 
@@ -23,16 +24,6 @@ const CUSTOM_TAG_EMOJIS = [
     '🏆', '💎', '🕊️', '🌙', '⚡', '🎨', '📌', '🔑',
 ];
 
-export const AVAILABLE_TAGS = [
-    { id: 'enseignement', label: 'Enseignement', emoji: '🌱' },
-    { id: 'gratitude', label: 'Gratitude', emoji: '💛' },
-    { id: 'idee', label: 'Idée', emoji: '💡' },
-    { id: 'reflexion', label: 'Réflexion', emoji: '🧠' },
-    { id: 'souvenir', label: 'Souvenir', emoji: '🌿' },
-    { id: 'priere', label: 'Prière exaucée', emoji: '🙏' },
-    { id: 'objectif', label: 'Objectif', emoji: '🎯' },
-    { id: 'temoignage', label: 'Témoignage', emoji: '💬' },
-];
 
 // --- Persistence des tags custom ---
 const loadCustomTags = async () => {
@@ -208,6 +199,7 @@ export default function TitleModal({
         const updated = [...customTags, newTag];
         setCustomTags(updated);
         persistCustomTags(updated);
+        loadCustomTagsCache(); // Mettre à jour le cache global instantanément
         setSelectedTags(prev => [...prev, id]);
         setNewTagText('');
         setSelectedNewEmoji(CUSTOM_TAG_EMOJIS[0]);
@@ -220,6 +212,7 @@ export default function TitleModal({
         // t c'est l'élément courant qu'on est en train d'observer dans le tableau et tagId c'est le tag qui a été séléctionné par l'utilisateur
         setCustomTags(updated);
         persistCustomTags(updated);
+        loadCustomTagsCache(); // Mettre à jour le cache global
         setSelectedTags(prev => prev.filter(t => t !== tagId));
     };
 

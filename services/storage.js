@@ -472,6 +472,19 @@ export const setAutoSyncPreference = async (enabled) => {
     try { await universalStorage.saveData('@auto_sync_enabled', enabled); } catch (e) { console.warn('Failed to set auto sync preference', e); }
 };
 
+export const getCloudQuota = async () => {
+    try {
+        const quota = await universalStorage.getData('@cloud_quota_limit');
+        return quota ? parseInt(quota) : 30 * 1024 * 1024; // 30 Mo par défaut
+    } catch (e) { return 30 * 1024 * 1024; }
+};
+
+export const setCloudQuota = async (bytes) => {
+    try {
+        await universalStorage.saveData('@cloud_quota_limit', bytes);
+    } catch (e) { console.warn('Failed to set cloud quota', e); }
+};
+
 export const getChildRecordings = async (parentId) => {
     try {
         const all = await getRecordings();

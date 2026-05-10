@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Sw
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
-import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
+import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
 import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff } from 'lucide-react-native';
 import { fetchTotalCloudUsage } from '../services/cloud';
 import Logo from './Logo';
@@ -21,7 +21,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const navigation = useNavigation();
     const [storageStats, setStorageStats] = useState({ local: 0, total: 0, percent: 100, formattedSize: '0 Mo' });
     const [cloudUsage, setCloudUsage] = useState(0); // en octets
-    const CLOUD_QUOTA = 30 * 1024 * 1024; // 30 Mo en octets
+    const [cloudQuota, setCloudQuotaState] = useState(30 * 1024 * 1024);
+    const [secretClicks, setSecretClicks] = useState(0);
 
     const loadStorageStats = async () => {
         const recordings = await getRecordings();
@@ -56,9 +57,23 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 setWifiOnly(pref);
                 const autoSyncPref = await getAutoSyncPreference();
                 setAutoSync(autoSyncPref);
+                const currentQuota = await getCloudQuota();
+                setCloudQuotaState(currentQuota);
             })();
         }
     }, [visible]);
+
+    const handleSecretClick = async () => {
+        const next = secretClicks + 1;
+        setSecretClicks(next);
+        if (next === 10) {
+            const EXTENDED_QUOTA = 500 * 1024 * 1024; // 500 Mo
+            await setCloudQuota(EXTENDED_QUOTA);
+            setCloudQuotaState(EXTENDED_QUOTA);
+            showAlert('🔓 Quota Étendu', 'Mode développeur activé : Quota cloud passé à 500 Mo !', 'success');
+            setSecretClicks(0);
+        }
+    };
 
     useEffect(() => {
         if (visible) {
@@ -232,8 +247,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     {/* Ligne 1 : Titre et Chiffres */}
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                         <Text style={[styles.menuItemText, { fontSize: 15 }]}>Stockage Cloud</Text>
-                                        <Text style={{ fontSize: 12, fontWeight: '700', color: (cloudUsage / CLOUD_QUOTA) > 0.9 ? '#991B1B' : '#78350F' }}>
-                                            {formatSize(cloudUsage)} <Text style={{ color: '#A8A29E', fontWeight: '500' }}>/ 30 Mo</Text>
+                                        <Text style={{ fontSize: 12, fontWeight: '600', color: (cloudUsage / cloudQuota) > 0.9 ? '#991B1B' : '#A8A29E' }}>
+                                            {formatSize(cloudUsage)} / {formatSize(cloudQuota)}
                                         </Text>
                                     </View>
                                     
@@ -242,19 +257,19 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                         <View 
                                             style={{ 
                                                 height: '100%', 
-                                                width: `${Math.min((cloudUsage / CLOUD_QUOTA) * 100, 100)}%`,
-                                                backgroundColor: (cloudUsage / CLOUD_QUOTA) > 0.9 ? '#DC2626' : '#78350F',
+                                                width: `${Math.min((cloudUsage / cloudQuota) * 100, 100)}%`,
+                                                backgroundColor: (cloudUsage / cloudQuota) > 0.9 ? '#DC2626' : '#78350F',
                                                 borderRadius: 3
                                             }} 
                                         />
                                     </View>
 
                                     {/* Ligne 3 : Alerte dynamique selon le quota */}
-                                    {cloudUsage >= CLOUD_QUOTA ? (
+                                    {cloudUsage >= cloudQuota ? (
                                         <Text style={{ fontSize: 11, color: '#DC2626', marginTop: 6, fontWeight: '700' }}>
                                             ❌ Quota atteint. Vos prochains audios seront sauvegardés uniquement sur ce téléphone.
                                         </Text>
-                                    ) : (cloudUsage / CLOUD_QUOTA) > 0.9 ? (
+                                    ) : (cloudUsage / cloudQuota) > 0.9 ? (
                                         <Text style={{ fontSize: 11, color: '#D97706', marginTop: 6, fontWeight: '500' }}>
                                             ⚠️ Quota presque atteint, pensez à faire du tri.
                                         </Text>
@@ -376,11 +391,15 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     </View>
                 )}
 
-                {/* Footer */}
-                <View style={styles.footer}>
+                {/* Footer avec interaction cachée */}
+                <TouchableOpacity 
+                    style={styles.footer} 
+                    onPress={handleSecretClick} 
+                    activeOpacity={0.8}
+                >
                     <Logo size={24} style={styles.footerLogo} />
-                    <Text style={styles.footerText}>KeepYourSeed v1.0</Text>
-                </View>
+                    <Text style={styles.footerText}>KeepYourSeed v1.1</Text>
+                </TouchableOpacity>
             </Animated.View>
         </View>
     );

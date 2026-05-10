@@ -222,7 +222,8 @@ const pushLocalChanges = async (userId) => {
     const toSync = localRecordings.filter(r => 
         r.status === 'pending' || 
         r.status === 'pending_update' || 
-        r.status === 'error'
+        r.status === 'error' ||
+        r.status === 'local_only'
     );
     
     if (toSync.length === 0) return 0;
@@ -230,8 +231,9 @@ const pushLocalChanges = async (userId) => {
     let count = 0;
     let hasChanged = false;
 
-    // --- VÉRIFICATION DU QUOTA CLOUD (Limite 30 Mo) ---
-    const MAX_QUOTA_BYTES = 30 * 1024 * 1024; // 30 Mo (aligné avec l'UI)
+    // --- VÉRIFICATION DU QUOTA CLOUD (Limite dynamique) ---
+    const { getCloudQuota } = require('./storage');
+    const MAX_QUOTA_BYTES = await getCloudQuota();
     let currentUsage = await fetchTotalCloudUsage(userId);
     let quotaReached = currentUsage >= MAX_QUOTA_BYTES;
 
@@ -243,7 +245,7 @@ const pushLocalChanges = async (userId) => {
             const idx = workingList.findIndex(r => r.id === rec.id);
             if (idx === -1) continue;
 
-            const isCreation = rec.status === 'pending' || (rec.status === 'error' && !rec.dbId);
+            const isCreation = rec.status === 'pending' || rec.status === 'local_only' || (rec.status === 'error' && !rec.dbId);
             const isUpdate = rec.status === 'pending_update' || (rec.status === 'error' && rec.dbId);
 
             if (isCreation) {
@@ -278,7 +280,13 @@ const pushLocalChanges = async (userId) => {
                     if (dbRecord) {
                         // Extraire le vrai UUID (saveRecordingToDatabase retourne l'objet complet)
                         const actualDbId = typeof dbRecord === 'object' ? dbRecord.id : dbRecord;
-                        workingList[idx] = { ...workingList[idx], status: 'synced', dbId: actualDbId, remoteUrl: remoteUrl };
+                        workingList[idx] = { 
+                            ...workingList[idx], 
+                            status: 'synced', 
+                            dbId: actualDbId, 
+                            remoteUrl: remoteUrl,
+                            keepLocalOnly: false 
+                        };
                         count++;
                         hasChanged = true;
                         
@@ -394,6 +402,7 @@ const pullCloudRecordings = async (userId, canDownloadAudio = true) => {
                         deletedAt: cloudRec.deletedAt,
                         parentId: cloudRec.parentId,
                         remoteUrl: cloudRec.remoteUrl || existing.remoteUrl,
+                        status: 'synced',
                     });
                     updatedCount++;
                 } else if (existing.deletedAt !== cloudRec.deletedAt) {
@@ -401,7 +410,7 @@ const pullCloudRecordings = async (userId, canDownloadAudio = true) => {
                     updatedCount++;
                 } else if (!existing.dbId && cloudRec.dbId) {
                     // Au minimum, on récupère toujours le dbId
-                    resultMap.set(localId, { ...existing, dbId: cloudRec.dbId, remoteUrl: cloudRec.remoteUrl || existing.remoteUrl });
+                    resultMap.set(localId, { ...existing, dbId: cloudRec.dbId, remoteUrl: cloudRec.remoteUrl || existing.remoteUrl, status: 'synced' });
                 }
             } else {
                 // PAS DE MATCH → Nouvel élément

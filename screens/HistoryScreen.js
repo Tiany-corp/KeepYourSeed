@@ -14,7 +14,7 @@ import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
 import { AppContext } from '../contexts/AppContext';
 
-import { getTagInfo } from '../utils/tags';
+import { getTagInfo, loadCustomTagsCache } from '../utils/tags';
 import { formatDateWithTime } from '../utils/date';
 import RecordingItem from '../components/history/RecordingItem';
 import HistorySkeleton from '../components/history/HistorySkeleton';
@@ -64,6 +64,7 @@ export default function HistoryScreen() {
 
     useEffect(() => {
         const initialize = async () => {
+            await loadCustomTagsCache();
             // Charger les vocaux (toujours disponible)
             const recordingsPromise = getRecordings().then(localData => {
                 return dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));

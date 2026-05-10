@@ -4,7 +4,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { getRecordings, restoreRecording, permanentlyDeleteRecording, markAsKeepLocalOnly } from '../services/storage';
 import { restoreRecordingFromCloud, permanentlyDeleteFromCloud, fetchTrashRecordings } from '../services/cloud';
 import { purgeHardDeletedCloudItems, getOrphanedCloudItems } from '../services/sync';
-import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, RefreshCcw, CheckSquare, Square, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, CloudOff, CheckSquare, Square, ShieldCheck } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import RecordingItem from '../components/history/RecordingItem';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
@@ -211,7 +211,7 @@ export default function TrashScreen({ navigation }) {
                             {isCheckingOrphans ? (
                                 <ActivityIndicator size="small" color="#78716C" />
                             ) : (
-                                <RefreshCcw size={18} color="#78716C" />
+                                <CloudOff size={18} color="#78716C" />
                             )}
                         </TouchableOpacity>
                         {recordings.length > 0 && (

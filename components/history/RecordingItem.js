@@ -85,12 +85,12 @@ const RecordingItem = memo(({
                     onPressOut={handlePressOut}
                 >
                     <View style={[styles.playButtonIcon, (isItemPlaying || isLoading) && styles.playButtonIconActive]}>
-                        <AnimatedPlayButton 
+                        <AnimatedPlayButton
                             key={item.id}
-                            isPlaying={isItemPlaying && audioPlayerIsPlaying} 
-                            size={18} 
-                            color="#FFFFFF" 
-                            strokeWidth={1.5} 
+                            isPlaying={isItemPlaying && audioPlayerIsPlaying}
+                            size={18}
+                            color="#FFFFFF"
+                            strokeWidth={1.5}
                         />
                     </View>
                     <View style={styles.itemInfo}>
@@ -101,7 +101,7 @@ const RecordingItem = memo(({
                             {/* Indicateur de synchro (caché en mode corbeille pour plus de clarté) */}
                             {sessionUser && !isTrashMode && (
                                 <View style={{ marginLeft: 6 }}>
-                                    {item.status === 'synced' ? (
+                                    {item.dbId ? (
                                         <Cloud size={14} color="#10B981" opacity={0.6} />
                                     ) : (
                                         <CloudOff size={14} color="#78716C" opacity={0.4} />
@@ -131,14 +131,14 @@ const RecordingItem = memo(({
                     </Pressable>
                 ) : (
                     <View style={styles.trashActions}>
-                        <TouchableOpacity 
-                            style={[styles.trashActionBtn, { backgroundColor: '#E7E5E4' }]} 
+                        <TouchableOpacity
+                            style={[styles.trashActionBtn, { backgroundColor: '#E7E5E4' }]}
                             onPress={() => onRestore(item)}
                         >
                             <RotateCcw size={18} color="#78350F" />
                         </TouchableOpacity>
-                        <TouchableOpacity 
-                            style={[styles.trashActionBtn, { backgroundColor: '#FEE2E2' }]} 
+                        <TouchableOpacity
+                            style={[styles.trashActionBtn, { backgroundColor: '#FEE2E2' }]}
                             onPress={() => onDeletePermanent(item)}
                         >
                             <Trash2 size={18} color="#B91C1C" />
