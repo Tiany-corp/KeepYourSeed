@@ -525,8 +525,8 @@ export default function HistoryScreen() {
                 onDelete={() => {
                     handleDeleteItem(selectedRecording);
                 }}
-                onShare={() => {
-                    showAlert('Partage', 'Fonctionnalité bientôt disponible !', 'info');
+                onPin={() => {
+                    handlePin(selectedRecording);
                 }}
             />
 

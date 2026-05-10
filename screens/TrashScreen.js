@@ -4,12 +4,13 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { getRecordings, restoreRecording, permanentlyDeleteRecording, markAsKeepLocalOnly } from '../services/storage';
 import { restoreRecordingFromCloud, permanentlyDeleteFromCloud, fetchTrashRecordings } from '../services/cloud';
 import { purgeHardDeletedCloudItems, getOrphanedCloudItems } from '../services/sync';
-import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, CloudOff, CheckSquare, Square, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, RotateCcw, Trash2, ShieldAlert, CloudOff, CheckSquare, Square, ShieldCheck, RefreshCcw } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import RecordingItem from '../components/history/RecordingItem';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
 import { AppContext } from '../contexts/AppContext';
+import { formatSecondsDuration } from '../utils/date';
 
 export default function TrashScreen({ navigation }) {
     const { session } = useContext(AppContext);
@@ -21,6 +22,8 @@ export default function TrashScreen({ navigation }) {
     const [isCheckingOrphans, setIsCheckingOrphans] = useState(false);
     const [showOrphansModal, setShowOrphansModal] = useState(false);
     const [selectedOrphans, setSelectedOrphans] = useState(new Set());
+    const [debugInfo, setDebugInfo] = useState(null);
+    const [orphanError, setOrphanError] = useState(null);
 
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
@@ -45,6 +48,11 @@ export default function TrashScreen({ navigation }) {
         const result = await getOrphanedCloudItems(session.user.id);
         if (result.success) {
             setOrphans(result.orphans);
+            setDebugInfo(result.debug);
+            setOrphanError(null);
+        } else {
+            setOrphanError(result.error || "Impossible de vérifier le Cloud");
+            setOrphans([]);
         }
         setIsCheckingOrphans(false);
     }, [session?.user?.id]);
@@ -200,6 +208,25 @@ export default function TrashScreen({ navigation }) {
                 rightContent={
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <TouchableOpacity
+                            onPress={() => {
+                                loadTrash();
+                                checkOrphans();
+                            }}
+                            disabled={isLoading || isCheckingOrphans}
+                            style={[
+                                styles.emptyTrashBtn,
+                                { backgroundColor: '#F5F5F5', marginRight: 12 },
+                                (isLoading || isCheckingOrphans) && { opacity: 0.4 }
+                            ]}
+                        >
+                            {(isLoading || isCheckingOrphans) ? (
+                                <ActivityIndicator size="small" color="#78716C" />
+                            ) : (
+                                <RefreshCcw size={18} color="#78716C" />
+                            )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                             onPress={openOrphansModal}
                             disabled={orphans.length === 0 || isCheckingOrphans}
                             style={[
@@ -265,7 +292,16 @@ export default function TrashScreen({ navigation }) {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Nettoyage Cloud</Text>
-                            <Text style={styles.modalSubtitle}>Ces fichiers n'existent plus sur ton Cloud mais sont toujours sur ton téléphone. Clique sur "Purger" si tu veux aussi les supprimer sur ton téléphone.</Text>
+                                {orphanError ? (
+                                    <Text style={[styles.modalSubtitle, { color: '#B91C1C', fontWeight: 'bold' }]}>
+                                        ⚠️ {orphanError}. Vérification impossible.
+                                    </Text>
+                                ) : (
+                                    <Text style={styles.modalSubtitle}>
+                                        {orphans.length} fichiers locaux semblent absents du Cloud.
+                                        {debugInfo && ` (Cloud: ${debugInfo.cloudCount} | Local: ${debugInfo.localWithDbIdCount})`}
+                                    </Text>
+                                )}
                         </View>
 
                         <ScrollView style={styles.modalList}>
@@ -282,7 +318,11 @@ export default function TrashScreen({ navigation }) {
                                     )}
                                     <View style={styles.orphanInfo}>
                                         <Text style={styles.orphanTitle} numberOfLines={1}>{item.title}</Text>
-                                        <Text style={styles.orphanDate}>{new Date(item.date).toLocaleDateString()}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Text style={styles.orphanDate}>{new Date(item.date).toLocaleDateString()}</Text>
+                                            <Text style={styles.orphanDuration}> • {formatSecondsDuration(item.duration)}</Text>
+                                        </View>
+                                        <Text style={styles.orphanDbId}>ID Cloud: {item.dbId}</Text>
                                     </View>
                                     <TouchableOpacity 
                                         style={styles.keepBtn} 
@@ -427,6 +467,17 @@ const styles = StyleSheet.create({
     orphanDate: {
         fontSize: 12,
         color: '#A8A29E',
+    },
+    orphanDuration: {
+        fontSize: 12,
+        color: '#78716C',
+        fontWeight: '500',
+    },
+    orphanDbId: {
+        fontSize: 10,
+        color: '#D4D4D8',
+        marginTop: 2,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
     keepBtn: {
         flexDirection: 'row',

@@ -117,6 +117,21 @@ export const saveRecordingToDatabase = async (userId, title, audioUrl, duration,
             insertData.parent_id = parentId;
         }
 
+        // ANTI-DOUBLONS : Vérifier si une note identique existe déjà pour cet utilisateur
+        const { data: existing, error: searchError } = await supabase
+            .from('recordings')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('title', title)
+            .eq('duration_seconds', duration)
+            .is('deleted_at', null)
+            .limit(1);
+
+        if (!searchError && existing && existing.length > 0) {
+            console.log('Duplicate found, using existing cloud recording:', existing[0].id);
+            return existing[0];
+        }
+
         const { data, error } = await supabase
             .from('recordings')
             .insert([insertData])
@@ -143,6 +158,7 @@ export const saveRecordingToDatabase = async (userId, title, audioUrl, duration,
  * @returns {Promise<Array>} - Liste de recordings au format app
  */
 export const fetchCloudRecordings = async (userId) => {
+    console.log(`[CloudFetch] Fetching recordings for user: ${userId}`);
     try {
         const { data, error } = await supabase
             .from('recordings')
@@ -153,7 +169,7 @@ export const fetchCloudRecordings = async (userId) => {
 
         if (error) {
             console.error('Supabase Fetch Error:', error);
-            return [];
+            return null; // Retourner null au lieu de [] pour signaler une erreur de lecture
         }
 
         // Convertir le format Supabase → format app
@@ -176,7 +192,7 @@ export const fetchCloudRecordings = async (userId) => {
 
     } catch (e) {
         console.error('Failed to fetch cloud recordings:', e);
-        return [];
+        return null;
     }
 };
 

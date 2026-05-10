@@ -4,8 +4,9 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench } from 'lucide-react-native';
 import { fetchTotalCloudUsage } from '../services/cloud';
+import { syncAll, forcePushAllLocalNotes } from '../services/sync';
 import Logo from './Logo';
 
 const DRAWER_WIDTH = 280;
@@ -15,6 +16,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const overlayOpacity = useRef(new Animated.Value(0)).current;
     const [isRendered, setIsRendered] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isRepairing, setIsRepairing] = useState(false);
     const [wifiOnly, setWifiOnly] = useState(false);
     const [autoSync, setAutoSync] = useState(true);
     const { showAlert } = useAlert();
@@ -142,6 +144,23 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
             showAlert('Erreur', 'Un problème est survenu lors de la synchronisation.', 'error');
         } finally {
             setIsSyncing(false);
+        }
+    };
+
+    const handleRepairSync = async () => {
+        if (!session?.user?.id || isRepairing) return;
+        setIsRepairing(true);
+        try {
+            const result = await forcePushAllLocalNotes(session.user.id);
+            if (result.success) {
+                showAlert('Réparation terminée', `${result.repaired} notes ont été préparées et ${result.pushed} envoyées.`, 'success');
+            } else {
+                showAlert('Erreur', 'La réparation a échoué.', 'error');
+            }
+        } catch (e) {
+            showAlert('Erreur', 'Une erreur est survenue.', 'error');
+        } finally {
+            setIsRepairing(false);
         }
     };
 
@@ -320,6 +339,18 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
                             </Text>
                             {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={handleRepairSync}
+                            disabled={isRepairing}
+                        >
+                            <Wrench size={20} color="#059669" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>
+                                {isRepairing ? 'Réparation...' : 'Réparer la synchronisation'}
+                            </Text>
+                            {isRepairing && <ActivityIndicator size="small" color="#059669" style={{ marginLeft: 10 }} />}
                         </TouchableOpacity>
 
                         <TouchableOpacity 

@@ -20,8 +20,10 @@ Ces fonctionnalités constituent le cœur de l'application.
 ### Persistance & Cloud
 - [x] **Local-First** : Stockage asynchrone ultra-réactif (AsyncStorage / IndexedDB).
 - [x] **Cloud Sync (Supabase)** : Sauvegarde automatique des audios et métadonnées.
-- [x] **Sync Hybride** : Métadonnées prioritaires (4G) et audios intelligents (WiFi/Manuel).
+- [x] **Nettoyage Cloud Intelligent** : Système de détection des "orphelins" (notes présentes localement avec un `dbId` mais absentes du serveur).
+- [x] **Protection "Local-Only"** : Les nouvelles notes sans ID Cloud sont protégées et n'apparaissent jamais dans la purge. Possibilité de forcer la conservation locale d'un fichier orphelin.
 - [x] **Dédoublonage & Sanitisation** : Nettoyage automatique des doublons et réparation des données corrompues.
+- [x] **Réparation de Synchro** : Outil de "force push" pour renvoyer massivement les données locales vers le cloud en cas de perte de données serveur.
 
 
 ### Capsule Temporelle (Messages au futur)

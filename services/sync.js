@@ -109,21 +109,26 @@ export const forcePushAllLocalNotes = async (userId) => {
         const localRecordings = await getRecordings();
         let repairCount = 0;
         
-        // 1. Réparation des statuts (faux 'synced' ou erreurs persistantes)
+        // 1. Réparation des statuts (faux 'synced', erreurs, ou perte de données cloud)
         const repaired = localRecordings.map(rec => {
             const isFalseSynced = !rec.dbId && rec.status === 'synced';
             const isStuckError = !rec.dbId && rec.status === 'error';
             
-            if (isFalseSynced || isStuckError) {
+            // NOUVEAU : Si la note a un ID mais qu'on veut forcer sa resynchro (ex: perte cloud)
+            // On peut détecter ici si elle est orpheline ou simplement tout forcer si demandé.
+            const isPotentialOrphan = rec.dbId && rec.status === 'synced'; 
+
+            if (isFalseSynced || isStuckError || isPotentialOrphan) {
                 repairCount++;
-                return { ...rec, status: 'pending' };
+                // On retire le dbId car il n'est plus valide sur le serveur
+                return { ...rec, status: 'pending', dbId: null, remoteUrl: null };
             }
             return rec;
         });
 
         if (repairCount > 0) {
             await saveRawRecordings(repaired);
-            console.log(`[Sync] ${repairCount} notes locales bloquées ont été repassées en 'pending'.`);
+            console.log(`[Sync] ${repairCount} notes locales ont été réinitialisées pour un nouvel envoi.`);
         }
 
         // 2. Lancement du push normal
@@ -191,19 +196,33 @@ export const getOrphanedCloudItems = async (userId) => {
     try {
         const { fetchCloudRecordings } = require('./cloud');
         const cloudRecordings = await fetchCloudRecordings(userId);
+        if (cloudRecordings === null) return { success: false, orphans: [], error: "Erreur de connexion au Cloud" };
         if (!cloudRecordings) return { success: false, orphans: [] };
 
         const localRecordings = await getRecordings();
-        const cloudDbIds = new Set(cloudRecordings.map(c => c.dbId).filter(Boolean));
+        const localWithDbId = localRecordings.filter(r => r.dbId);
+        
+        // On force la conversion en String pour éviter les problèmes de type (Number vs String)
+        const cloudDbIds = new Set(cloudRecordings.map(c => String(c.dbId)).filter(Boolean));
 
-        // Un orphelin est une note qui a un dbId (donc censée être sur le cloud) 
-        // mais n'y est plus, ET qui n'a pas été marquée comme "garder en local uniquement".
-        const orphans = localRecordings.filter(loc => 
-            loc.dbId && 
-            !cloudDbIds.has(loc.dbId) && 
-            !loc.keepLocalOnly
-        );
-        return { success: true, orphans };
+        console.log(`[OrphanCheck] User: ${userId}`);
+        console.log(`[OrphanCheck] Cloud count: ${cloudRecordings.length}`);
+        console.log(`[OrphanCheck] Local with DBID count: ${localWithDbId.length}`);
+
+        const orphans = localRecordings.filter(loc => {
+            if (!loc.dbId || loc.keepLocalOnly) return false;
+            const isMissing = !cloudDbIds.has(String(loc.dbId));
+            return isMissing;
+        });
+        
+        return { 
+            success: true, 
+            orphans,
+            debug: {
+                cloudCount: cloudRecordings.length,
+                localWithDbIdCount: localWithDbId.length
+            }
+        };
     } catch (e) {
         console.error("Erreur get orphans:", e);
         return { success: false, orphans: [] };
@@ -446,9 +465,9 @@ const pullCloudRecordings = async (userId, canDownloadAudio = true) => {
         merged.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         // Orphelins : items locaux avec un dbId qui n'est plus dans le cloud
-        const cloudDbIds = new Set(cloudRecordings.map(c => c.dbId).filter(Boolean));
+        const cloudDbIdsSet = new Set(cloudRecordings.map(c => String(c.dbId)).filter(Boolean));
         const orphansCount = merged.filter(loc =>
-            loc.dbId && !cloudDbIds.has(loc.dbId) && !loc.keepLocalOnly
+            loc.dbId && !cloudDbIdsSet.has(String(loc.dbId)) && !loc.keepLocalOnly
         ).length;
 
         // Sauvegarder si quelque chose a changé
