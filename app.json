@@ -46,7 +46,16 @@
       "lang": "fr",
       "name": "KeepYourSeed",
       "shortName": "KYS",
-      "themeColor": "#78350F"
+      "themeColor": "#78350F",
+      "config": {
+        "pwa": {
+          "manifest": {
+            "start_url": "./",
+            "display": "standalone",
+            "orientation": "portrait"
+          }
+        }
+      }
     },
     "experiments": {
       "baseUrl": "/kys-web-app"

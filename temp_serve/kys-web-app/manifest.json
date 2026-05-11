@@ -1,0 +1,21 @@
+{
+  "name": "KeepYourSeed",
+  "short_name": "KYS",
+  "description": "Conserve tes pensées comme des graines précieuses.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#78350F",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
