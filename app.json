@@ -37,7 +37,16 @@
       "package": "com.tianyr.KeepYourSeed"
     },
     "web": {
-      "favicon": "./assets/oragnicKYS.png"
+      "favicon": "./assets/oragnicKYS.png",
+      "bundler": "metro",
+      "output": "static",
+      "backgroundColor": "#FAF7F2",
+      "description": "Conserve tes pensées comme des graines précieuses.",
+      "display": "standalone",
+      "lang": "fr",
+      "name": "KeepYourSeed",
+      "shortName": "KYS",
+      "themeColor": "#78350F"
     },
     "experiments": {
       "baseUrl": "/kys-web-app"
