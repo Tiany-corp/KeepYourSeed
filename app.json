@@ -39,7 +39,7 @@
     "web": {
       "favicon": "./assets/oragnicKYS.png",
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "backgroundColor": "#FAF7F2",
       "description": "Conserve tes pensées comme des graines précieuses.",
       "display": "standalone",
