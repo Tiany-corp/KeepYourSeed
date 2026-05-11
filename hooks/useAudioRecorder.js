@@ -16,7 +16,7 @@ export default function useAudioRecorder() {
         // Options spécifiques pour booster le Web
         web: {
             mimeType: 'audio/webm;codecs=opus',
-            bitsPerSecond: 128000, // 128 kbps pour une excellente qualité voix
+            bitsPerSecond: 64000, // 64 kbps : excellent compromis qualité/poids avec Opus
         }
     });
     
