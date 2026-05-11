@@ -9,9 +9,15 @@ import { saveAudioBlobWeb } from '../services/storage';
  */
 export default function useAudioRecorder() {
     // Le recorder interne de expo-audio
+    // Configuration optimisée pour la qualité
     const recorder = useExpoAudioRecorder({
         ...RecordingPresets.HIGH_QUALITY,
         isMeteringEnabled: true,
+        // Options spécifiques pour booster le Web
+        web: {
+            mimeType: 'audio/webm;codecs=opus',
+            bitsPerSecond: 128000, // 128 kbps pour une excellente qualité voix
+        }
     });
     
     // État local pour le pont de compatibilité avec l'ancienne UI
