@@ -49,13 +49,14 @@ class ErrorBoundary extends Component {
 
 function AppContent() {
   const [session, setSession] = useState(null);
-  const [guestMode, setGuestMode] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [streakCount, setStreakCount] = useState(0);
 
   useEffect(() => {
     let authSubscription;
 
+    // Récupération de la session en tâche de fond (silencieuse)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
@@ -65,11 +66,13 @@ function AppContent() {
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      // Si l'utilisateur se connecte, quitter le mode invité
-      if (session) setGuestMode(false);
     });
 
     authSubscription = data?.subscription;
+
+    // Pré-calculer la streak globale dès le démarrage pour éviter le délai visuel
+    const { getCurrentStreak } = require('./services/storage');
+    getCurrentStreak().then(setStreakCount);
 
     return () => {
       if (authSubscription) authSubscription.unsubscribe();
@@ -83,6 +86,9 @@ function AppContent() {
         syncAll(session.user.id).then(result => {
           if (result.success && (result.pushed > 0 || result.pulled > 0)) {
             setRefreshKey(k => k + 1);
+            // Recalculer la streak après la synchro
+            const { getCurrentStreak } = require('./services/storage');
+            getCurrentStreak().then(setStreakCount);
           }
         });
       }
@@ -101,33 +107,43 @@ function AppContent() {
     return () => subscription.remove();
   }, [session?.user?.id]);
 
-  const isAuthenticated = session || guestMode;
+  const updateStreak = async () => {
+    const { getCurrentStreak } = require('./services/storage');
+    const newStreak = await getCurrentStreak();
+    setStreakCount(newStreak);
+    return newStreak;
+  };
 
   return (
-    <AppContext.Provider value={{ session, guestMode, setGuestMode, setDrawerOpen, setRefreshKey }}>
+    <AppContext.Provider value={{ session, guestMode: !session, setGuestMode: () => {}, setDrawerOpen, setRefreshKey, streakCount, updateStreak }}>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName={isAuthenticated ? "Record" : "Auth"}
+          initialRouteName="Record"
           screenOptions={{ headerShown: false, animation: 'none' }}
         >
-          {isAuthenticated ? (
-            <>
-              <Stack.Screen name="Record" component={RecordScreen} />
-              <Stack.Screen name="History">
-                {(props) => <HistoryScreen {...props} key={refreshKey} />}
-              </Stack.Screen>
-              <Stack.Screen name="Trash" component={TrashScreen} />
-            </>
-          ) : (
-            <Stack.Screen name="Auth">
-              {(props) => <AuthScreen {...props} onGoBack={() => setGuestMode(true)} />}
-            </Stack.Screen>
-          )}
+          <Stack.Screen name="Record" component={RecordScreen} />
+          <Stack.Screen name="History">
+            {(props) => <HistoryScreen {...props} key={refreshKey} />}
+          </Stack.Screen>
+          <Stack.Screen name="Trash" component={TrashScreen} />
+          <Stack.Screen name="Auth">
+            {(props) => (
+              <AuthScreen
+                {...props}
+                onGoBack={() => props.navigation.navigate('Record')}
+              />
+            )}
+          </Stack.Screen>
         </Stack.Navigator>
 
         {/* Mini player bar global — persiste entre les écrans */}
         <AudioPlayer />
-        <SettingsDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} session={session} onDataCleared={() => setRefreshKey(k => k + 1)} onGoToAuth={() => setGuestMode(false)} />
+        <SettingsDrawer
+          visible={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          session={session}
+          onDataCleared={() => setRefreshKey(k => k + 1)}
+        />
         <StatusBar style="auto" />
       </NavigationContainer>
     </AppContext.Provider>

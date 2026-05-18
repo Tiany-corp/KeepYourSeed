@@ -21,7 +21,7 @@ export const uploadRecordingToCloud = async (recordingId, localUri, userId = 'pu
         const fileName = `${userId}/${timestamp}.${fileExt}`;
 
         const fileDataToUpload = preparedFile.file || preparedFile;
-        
+
         // Détermination du type MIME correct
         let contentType = 'audio/mp4'; // Par défaut pour .m4a
         if (fileExt === 'wav') contentType = 'audio/wav';
@@ -560,4 +560,4 @@ export const fetchTotalCloudUsage = async (userId) => {
         return 0;
     }
 };
-
+

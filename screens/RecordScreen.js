@@ -3,7 +3,7 @@ import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpaci
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { AppContext } from '../contexts/AppContext';
 import useAudioRecorder from '../hooks/useAudioRecorder';
-import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getCurrentStreak, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
+import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 import { syncAll } from '../services/sync';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
@@ -18,7 +18,7 @@ import Footer from '../components/Footer';
 import PinnedThought from '../components/PinnedThought';
 
 export default function RecordScreen() {
-    const { session, setDrawerOpen } = useContext(AppContext);
+    const { session, setDrawerOpen, streakCount, updateStreak } = useContext(AppContext);
     const navigation = useNavigation();
     
     const { isRecording, duration, startRecording, stopRecording, formatDuration } = useAudioRecorder();
@@ -31,7 +31,6 @@ export default function RecordScreen() {
     const [showTitleModal, setShowTitleModal] = useState(false);
     const [pendingRecording, setPendingRecording] = useState(null);
     const [recordingMode, setRecordingMode] = useState('note'); // 'note' | 'message'
-    const [streakCount, setStreakCount] = useState(0);
 
     // --- Pensée épinglée ---
     const [pinnedThought, setPinnedThoughtState] = useState(null);
@@ -42,10 +41,11 @@ export default function RecordScreen() {
     const isFetchingMemory = useRef(false);
 
     useEffect(() => {
-        if (session?.user && !isFetchingMemory.current) {
+        if (!isFetchingMemory.current) {
             isFetchingMemory.current = true;
             setIsMemoryLoading(true);
-            getDailyMemory(session.user.id).then(memory => {
+            const userId = session?.user?.id || null;
+            getDailyMemory(userId).then(memory => {
                 setDailyMemory(memory);
                 setIsMemoryLoading(false);
                 isFetchingMemory.current = false;
@@ -53,12 +53,7 @@ export default function RecordScreen() {
                 setIsMemoryLoading(false);
                 isFetchingMemory.current = false;
             });
-        } else if (!session?.user) {
-            setIsMemoryLoading(false);
         }
-
-        // Charger la streak actuelle
-        getCurrentStreak().then(setStreakCount);
     }, [session]);
 
     useEffect(() => {
@@ -85,18 +80,20 @@ export default function RecordScreen() {
     useFocusEffect(
         useCallback(() => {
             getPinnedThought().then(setPinnedThoughtState);
-            getCurrentStreak().then(setStreakCount);
             
-            if (session?.user && !isFetchingMemory.current) {
+            if (!isFetchingMemory.current) {
                 isFetchingMemory.current = true;
-                getDailyMemory(session.user.id).then(async (memory) => {
+                const userId = session?.user?.id || null;
+                getDailyMemory(userId).then(async (memory) => {
                     setDailyMemory(memory);
                     isFetchingMemory.current = false;
                     
                     // Rafraîchir aussi le statut "vu" pour le badge
                     if (memory) {
-                        const seenId = await getSeenDailyMemoryId(session.user.id);
+                        const seenId = await getSeenDailyMemoryId(userId);
                         setHasUnseenMemory(!seenId || String(seenId) !== String(memory.id));
+                    } else {
+                        setHasUnseenMemory(false);
                     }
                 }).catch(() => {
                     isFetchingMemory.current = false;
@@ -155,7 +152,7 @@ export default function RecordScreen() {
         await saveRecording(newRecording);
 
         // Mettre à jour la streak dynamiquement après un nouvel enregistrement
-        getCurrentStreak().then(setStreakCount);
+        updateStreak();
 
         // Synchronisation complète silencieuse en arrière-plan (Push + Pull)
         if (session?.user) {

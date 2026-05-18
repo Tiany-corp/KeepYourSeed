@@ -149,3 +149,21 @@ L'application récupérait la totalité des enregistrements locaux (`getRecordin
 #### ✅ Solution Appliquée
 Optimisation du flux dans `getDailyMemories` : l'application vérifie d'abord la validité du cache (opération ultra-rapide). Elle ne sollicite le moteur de recherche local et le cloud que si le cache est absent, expiré ou si l'utilisateur force manuellement le rafraîchissement (Pull-to-Refresh).
 
+---
+
+## 🚀 Déploiement & Mises à jour (EAS)
+
+### Problème : Mise à jour invisible sur l'APK Android après `eas update`
+**Date** : 11 Mai 2026
+**Symptôme** : Malgré une commande `eas update` réussie, l'application installée sur le téléphone (APK) ne reçoit pas les modifications et reste sur l'ancienne version.
+
+#### 🚩 Cause Racine
+**Conflit de canaux (Channels/Branches)**. Par défaut, `eas update` envoie les modifications sur la branche `main`. Si l'APK a été construit avec un profil (ex: `preview`) qui écoute un canal spécifique (ex: `preview`), il ignorera les mises à jour envoyées sur `main`. L'APK et la mise à jour doivent être sur la même "longueur d'onde".
+
+#### ✅ Solution Appliquée
+1. **Identifier le canal** : Vérifier dans `eas.json` quel canal est utilisé par le profil de build (ex: `"channel": "preview"`).
+2. **Cibler la bonne branche** : Forcer la mise à jour sur la branche correspondante au canal de l'APK :
+   ```bash
+   eas update --branch preview --message "Description du changement"
+   ```
+3. **Double relance** : Sur le téléphone, il est parfois nécessaire de fermer et rouvrir l'application **deux fois** (une fois pour télécharger, une fois pour appliquer).

@@ -70,21 +70,19 @@ export default function HistoryScreen() {
                 return dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
             });
 
-            // Charger la pensée souvenir (si connecté)
-            let dailyPromise = Promise.resolve([]);
-            if (session?.user) {
-                const { getDailyMemories } = require('../services/storage');
-                dailyPromise = getDailyMemories(session.user.id).then(async (memories) => {
-                    // Pour simplifier, on considère "vu" si le PREMIER est vu (ou on pourrait gérer par ID)
-                    let seen = true;
-                    if (memories && memories.length > 0) {
-                        const firstMemory = memories[0];
-                        const seenId = await getSeenDailyMemoryId(session.user.id);
-                        seen = !!seenId && !!firstMemory.id && String(seenId) === String(firstMemory.id);
-                    }
-                    return { memories, seen };
-                }).catch(() => ({ memories: [], seen: true }));
-            }
+            // Charger la pensée souvenir (pour tous les utilisateurs)
+            const { getDailyMemories } = require('../services/storage');
+            const userId = session?.user?.id || null;
+            const dailyPromise = getDailyMemories(userId).then(async (memories) => {
+                // Pour simplifier, on considère "vu" si le PREMIER est vu (ou on pourrait gérer par ID)
+                let seen = true;
+                if (memories && memories.length > 0) {
+                    const firstMemory = memories[0];
+                    const seenId = await getSeenDailyMemoryId(userId);
+                    seen = !!seenId && !!firstMemory.id && String(seenId) === String(firstMemory.id);
+                }
+                return { memories, seen };
+            }).catch(() => ({ memories: [], seen: true }));
 
             // Timeout de sécurité : si la pensée prend trop longtemps, on affiche quand même
             const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('timeout'), 2000));
@@ -105,7 +103,7 @@ export default function HistoryScreen() {
             setIsInitialLoad(false);
 
             // Si la pensée a timeout, on la charge en arrière-plan
-            if (dailyResult === 'timeout' && session?.user) {
+            if (dailyResult === 'timeout') {
                 dailyPromise.then(result => {
                     if (result && result.memories) {
                         setDailyMemories(result.memories);
@@ -114,7 +112,7 @@ export default function HistoryScreen() {
                 });
             }
 
-            // Sync silencieuse
+            // Sync silencieuse (uniquement si connecté)
             if (session?.user && !hasInitialSyncRun.current) {
                 hasInitialSyncRun.current = true;
                 syncAll(session.user.id, false).then(result => {
@@ -137,7 +135,8 @@ export default function HistoryScreen() {
 
     // Pull-to-refresh : sync manuelle (bypass cooldown) puis rechargement local
     const handleRefresh = useCallback(async () => {
-        if (session?.user) {
+        const userId = session?.user?.id || null;
+        if (userId) {
             // Si la synchro auto est désactivée, on demande confirmation avant de sync
             const autoSyncEnabled = await getAutoSyncPreference();
             
@@ -152,9 +151,9 @@ export default function HistoryScreen() {
                             onPress: async () => {
                                 setRefreshing(true);
                                 try {
-                                    await syncAll(session.user.id, true);
+                                    await syncAll(userId, true);
                                     const { getDailyMemories } = require('../services/storage');
-                                    const refreshedMemories = await getDailyMemories(session.user.id, true);
+                                    const refreshedMemories = await getDailyMemories(userId, true);
                                     setDailyMemories(refreshedMemories || []);
                                     await loadRecordings();
                                 } catch (e) {
@@ -172,12 +171,12 @@ export default function HistoryScreen() {
 
         setRefreshing(true);
         try {
-            if (session?.user) {
-                await syncAll(session.user.id, true); // isManual = true
-                const { getDailyMemories } = require('../services/storage');
-                const refreshedMemories = await getDailyMemories(session.user.id, true); // forceRefresh
-                setDailyMemories(refreshedMemories || []);
+            if (userId) {
+                await syncAll(userId, true); // isManual = true
             }
+            const { getDailyMemories } = require('../services/storage');
+            const refreshedMemories = await getDailyMemories(userId, true); // forceRefresh
+            setDailyMemories(refreshedMemories || []);
             await loadRecordings();
         } catch (e) {
             console.error('Pull-to-refresh failed:', e);

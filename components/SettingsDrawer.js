@@ -396,14 +396,14 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
 
                         <TouchableOpacity
                             style={styles.authButton}
-                            onPress={() => { onClose(); if (onGoToAuth) onGoToAuth('login'); }}
+                            onPress={() => { onClose(); navigation.navigate('Auth', { initialMode: 'login' }); }}
                         >
                             <Text style={styles.authButtonText}>Se connecter</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={[styles.authButton, styles.authButtonOutline]}
-                            onPress={() => { onClose(); if (onGoToAuth) onGoToAuth('signup'); }}
+                            onPress={() => { onClose(); navigation.navigate('Auth', { initialMode: 'signup' }); }}
                         >
                             <Text style={styles.authButtonOutlineText}>Créer un compte</Text>
                         </TouchableOpacity>
