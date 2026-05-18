@@ -417,7 +417,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     activeOpacity={0.8}
                 >
                     <Logo size={24} style={styles.footerLogo} />
-                    <Text style={styles.footerText}>KeepYourSeed v1.1</Text>
+                    <Text style={styles.footerText}>KeepYourSeed v1.2</Text>
                 </TouchableOpacity>
             </Animated.View>
         </View>
