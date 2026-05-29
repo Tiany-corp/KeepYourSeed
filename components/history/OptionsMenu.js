@@ -1,10 +1,10 @@
 import React from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View, Text, Animated, Dimensions, Pressable } from 'react-native';
-import { Edit2, Trash2, Pin, X } from 'lucide-react-native';
+import { Edit2, Trash2, Pin, X, Share2 } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin }) => {
+const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, onShare }) => {
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
     React.useEffect(() => {
@@ -48,6 +48,11 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin }) 
                     <TouchableOpacity style={styles.menuItem} onPress={() => { onEdit(); onClose(); }}>
                         <Edit2 size={18} color="#78350F" />
                         <Text style={styles.menuText}>Modifier</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { onShare(); onClose(); }}>
+                        <Share2 size={18} color="#78350F" />
+                        <Text style={styles.menuText}>Partager</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.menuItem} onPress={() => { onPin(); onClose(); }}>
