@@ -2,12 +2,11 @@ import { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'r
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal, RefreshControl } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
-import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId, getAutoSyncPreference, getAudioSource } from '../services/storage';
-import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud, getSignedAudioUrl } from '../services/cloud';
+import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId, getAutoSyncPreference } from '../services/storage';
+import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import { shareAudio } from '../utils/share';
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
 import TitleModal from '../components/TitleModal';
@@ -266,53 +265,7 @@ export default function HistoryScreen() {
     };
 
     const handleShare = async (item) => {
-        if (!item) return;
-
-        // Sur le web, le partage de fichiers locaux n'est pas supporté
-        if (Platform.OS === 'web') {
-            showAlert('Non disponible', 'Le partage est disponible uniquement sur l\'application mobile.', 'info');
-            return;
-        }
-
-        try {
-            // Vérifier si le partage est dispo sur cet appareil
-            const isAvailable = await Sharing.isAvailableAsync();
-            if (!isAvailable) {
-                showAlert('Non disponible', 'Le partage n\'est pas disponible sur cet appareil.', 'info');
-                return;
-            }
-
-            let fileUri = item.localUri;
-
-            // Si pas de fichier local mais un fichier cloud, le télécharger temporairement
-            if (!fileUri && item.remoteUrl) {
-                const { url, error } = await getSignedAudioUrl(item.remoteUrl);
-                if (error || !url) {
-                    showAlert('Erreur', 'Impossible de récupérer le fichier audio.', 'error');
-                    return;
-                }
-                // Télécharger dans le cache temporaire
-                const ext = item.remoteUrl.split('.').pop() || 'm4a';
-                const tmpPath = `${FileSystem.cacheDirectory}share_${item.id}.${ext}`;
-                const download = await FileSystem.downloadAsync(url, tmpPath);
-                fileUri = download.uri;
-            }
-
-            if (!fileUri) {
-                showAlert('Fichier introuvable', 'Cet audio n\'est pas encore disponible en local.', 'info');
-                return;
-            }
-
-            // Ouvrir la feuille de partage native (WhatsApp, iMessage, Mail, etc.)
-            await Sharing.shareAsync(fileUri, {
-                mimeType: 'audio/mp4',
-                dialogTitle: `Partager "${item.title}"`,
-                UTI: 'public.mpeg-4-audio',
-            });
-        } catch (error) {
-            console.error('Erreur de partage:', error);
-            showAlert('Erreur', 'Le partage a échoué.', 'error');
-        }
+        await shareAudio(item, showAlert);
     };
 
     // Fonctionnalité d'édition (Placeholder pour la logique future)
