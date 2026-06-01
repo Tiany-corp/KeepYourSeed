@@ -265,8 +265,8 @@ export default function HistoryScreen() {
         showAlert('Épinglée', `"${item.title}" est maintenant sur ton accueil.`, 'success');
     };
 
-    const handleShare = async (item) => {
-        await shareAudio(item, showAlert, preloadedShareData);
+    const handleShare = (item) => {
+        shareAudio(item, showAlert, preloadedShareData);
     };
 
     // Fonctionnalité d'édition (Placeholder pour la logique future)

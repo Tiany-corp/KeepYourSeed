@@ -50,7 +50,10 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
                         <Text style={styles.menuText}>Modifier</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { onShare(); onClose(); }}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { 
+                        onShare(); 
+                        setTimeout(onClose, 150); 
+                    }}>
                         <Share2 size={18} color="#78350F" />
                         <Text style={styles.menuText}>Partager</Text>
                     </TouchableOpacity>
