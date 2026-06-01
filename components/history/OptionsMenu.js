@@ -24,7 +24,7 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
     // Positionnement à gauche du bouton
     const menuWidth = 180;
     const menuHeight = 160;
-    
+
     // On place le menu à gauche (pageX) moins sa largeur, avec une petite marge
     let left = position.pageX - menuWidth - 10;
     // On centre verticalement par rapport au bouton
@@ -39,12 +39,17 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
     return (
         <Modal transparent visible={isVisible} animationType="none" onRequestClose={onClose}>
             <Pressable style={styles.overlay} onPress={onClose}>
-                <Animated.View 
+                <Animated.View
                     style={[
-                        styles.menuContainer, 
+                        styles.menuContainer,
                         { top, left, opacity: fadeAnim, transform: [{ scale: fadeAnim }] }
                     ]}
                 >
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { onPin(); onClose(); }}>
+                        <Pin size={18} color="#78350F" />
+                        <Text style={styles.menuText}>Épingler</Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity style={styles.menuItem} onPress={() => { onEdit(); onClose(); }}>
                         <Edit2 size={18} color="#78350F" />
                         <Text style={styles.menuText}>Modifier</Text>
@@ -55,10 +60,7 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
                         <Text style={styles.menuText}>Partager</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { onPin(); onClose(); }}>
-                        <Pin size={18} color="#78350F" />
-                        <Text style={styles.menuText}>Épingler</Text>
-                    </TouchableOpacity>
+
 
                     <View style={styles.separator} />
 
