@@ -6,7 +6,7 @@ import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, delet
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
 import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
-import { shareAudio, prepareShareData } from '../utils/share';
+import { shareAudio } from '../utils/share';
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
 import TitleModal from '../components/TitleModal';
@@ -43,7 +43,6 @@ export default function HistoryScreen() {
     const [editingRecording, setEditingRecording] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedOptionsItem, setSelectedOptionsItem] = useState(null);
-    const [preloadedShareData, setPreloadedShareData] = useState(null);
 
     const audioPlayer = useAudioPlayer();
     const {
@@ -265,8 +264,8 @@ export default function HistoryScreen() {
         showAlert('Épinglée', `"${item.title}" est maintenant sur ton accueil.`, 'success');
     };
 
-    const handleShare = (item) => {
-        shareAudio(item, showAlert, preloadedShareData);
+    const handleShare = async (item) => {
+        await shareAudio(item, showAlert);
     };
 
     // Fonctionnalité d'édition (Placeholder pour la logique future)
@@ -279,14 +278,6 @@ export default function HistoryScreen() {
         setSelectedRecording(item);
         setOptionsPosition(position);
         setOptionsVisible(true);
-
-        // Pré-charger les ressources de partage de manière asynchrone en arrière-plan
-        setPreloadedShareData(null);
-        prepareShareData(item).then(data => {
-            setPreloadedShareData(data);
-        }).catch(err => {
-            console.warn("Échec du pré-chargement du partage :", err);
-        });
     };
 
     const applyRecordingUpdateInState = (id, updates) => {

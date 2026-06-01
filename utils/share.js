@@ -5,35 +5,29 @@ import { getAudioSource } from '../services/storage';
 import { getSignedAudioUrl } from '../services/cloud';
 
 /**
- * Prépare et pré-charge les ressources nécessaires au partage (Blobs, fichiers, signatures).
- * Appelée en arrière-plan à l'ouverture du menu d'options pour contourner les restrictions asynchrones.
+ * Service universel de partage audio (Web & Mobile).
  * 
- * @param {Object} item - L'enregistrement audio à préparer.
- * @returns {Promise<{file: File|null, urlToShare: string|null, downloadUrl: string|null}>}
+ * @param {Object} item - L'enregistrement audio à partager.
+ * @param {Function} showAlert - Fonction showAlert issue de AlertContext pour notifier l'utilisateur.
  */
-export const prepareShareData = async (item) => {
-    if (!item) return { file: null, urlToShare: null, downloadUrl: null };
+export const shareAudio = async (item, showAlert) => {
+    if (!item) return;
 
-    let file = null;
-    let blob = null;
-    let blobUrl = null;
-    let signedUrl = null;
-
-    try {
-        if (Platform.OS === 'web') {
-            // 1. Récupération du Blob local IndexedDB
+    // --- LOGIQUE DE PARTAGE WEB ---
+    if (Platform.OS === 'web') {
+        let blob = null;
+        let blobUrl = null;
+        let signedUrl = null;
+        try {
+            // 1. Essayer de récupérer le Blob local (IndexedDB)
             const source = await getAudioSource(item);
             if (source && source.uri) {
                 blobUrl = source.uri;
-                try {
-                    const res = await fetch(source.uri);
-                    blob = await res.blob();
-                } catch (e) {
-                    console.warn("Échec du fetch du Blob local :", e);
-                }
+                const res = await fetch(source.uri);
+                blob = await res.blob();
             }
 
-            // 2. Si pas en local, récupération via Supabase
+            // 2. Si pas en local, essayer de le récupérer via Supabase (sécurisé contre les erreurs CORS)
             if (!blob && item.remoteUrl) {
                 try {
                     const { url, error } = await getSignedAudioUrl(item.remoteUrl);
@@ -45,121 +39,16 @@ export const prepareShareData = async (item) => {
                         }
                     }
                 } catch (fetchErr) {
-                    console.warn("Échec silencieux de la récupération du Blob Supabase en tâche de fond :", fetchErr);
+                    console.warn("Échec silencieux de la récupération du Blob Supabase (CORS ou réseau) :", fetchErr);
                 }
             }
 
-            // 3. Création du fichier physique
+            // 3. Préparer le fichier physique pour le partage
+            let file = null;
             if (blob) {
                 file = new File([blob], `${item.title || 'pensee'}.m4a`, { type: 'audio/mp4' });
             }
 
-            // 4. Détermination du lien de partage (Supabase ou URL locale statique)
-            let urlToShare = signedUrl;
-            if (!urlToShare && item.remoteUrl) {
-                if (item.remoteUrl.startsWith('public/') || item.remoteUrl.startsWith('http')) {
-                    urlToShare = item.remoteUrl;
-                } else {
-                    const resUrl = await getSignedAudioUrl(item.remoteUrl);
-                    urlToShare = resUrl.url;
-                }
-            }
-
-            // 5. Détermination du lien de téléchargement
-            let downloadUrl = blobUrl || signedUrl;
-            if (!downloadUrl && item.remoteUrl) {
-                if (item.remoteUrl.startsWith('public/') || item.remoteUrl.startsWith('http')) {
-                    downloadUrl = item.remoteUrl;
-                } else {
-                    const res = await getSignedAudioUrl(item.remoteUrl);
-                    downloadUrl = res.url;
-                }
-            }
-
-            return { file, urlToShare, downloadUrl };
-        }
-    } catch (e) {
-        console.warn("Erreur prepareShareData :", e);
-    }
-
-    return { file: null, urlToShare: null, downloadUrl: null };
-};
-
-/**
- * Service universel de partage audio (Web & Mobile).
- * Déclenche le partage natif système si possible (Web & Mobile), sinon télécharge le fichier.
- * 
- * @param {Object} item - L'enregistrement audio à partager.
- * @param {Function} showAlert - Fonction showAlert issue de AlertContext pour notifier l'utilisateur.
- * @param {Object|null} preloadedData - Données pré-chargées générées de manière synchrone par prepareShareData.
- */
-export const shareAudio = async (item, showAlert, preloadedData = null) => {
-    if (!item) return;
-
-    // --- LOGIQUE DE PARTAGE WEB ---
-    if (Platform.OS === 'web') {
-        let file = preloadedData?.file || null;
-        let urlToShare = preloadedData?.urlToShare || null;
-        let downloadUrl = preloadedData?.downloadUrl || null;
-
-        // Si l'utilisateur clique si vite que le préchargement n'est pas encore fini (Fallback)
-        if (!preloadedData) {
-            let blob = null;
-            let blobUrl = null;
-            let signedUrl = null;
-            try {
-                const source = await getAudioSource(item);
-                if (source && source.uri) {
-                    blobUrl = source.uri;
-                    const res = await fetch(source.uri);
-                    blob = await res.blob();
-                }
-
-                if (!blob && item.remoteUrl) {
-                    try {
-                        const { url, error } = await getSignedAudioUrl(item.remoteUrl);
-                        if (!error && url) {
-                            signedUrl = url;
-                            const res = await fetch(url);
-                            if (res.ok) {
-                                blob = await res.blob();
-                            }
-                        }
-                    } catch (fetchErr) {
-                        console.warn("Échec de la récupération du Blob Supabase en direct :", fetchErr);
-                    }
-                }
-
-                if (blob) {
-                    file = new File([blob], `${item.title || 'pensee'}.m4a`, { type: 'audio/mp4' });
-                }
-
-                urlToShare = signedUrl;
-                if (!urlToShare && item.remoteUrl) {
-                    if (item.remoteUrl.startsWith('public/') || item.remoteUrl.startsWith('http')) {
-                        urlToShare = item.remoteUrl;
-                    } else {
-                        const resUrl = await getSignedAudioUrl(item.remoteUrl);
-                        urlToShare = resUrl.url;
-                    }
-                }
-
-                downloadUrl = blobUrl || signedUrl;
-                if (!downloadUrl && item.remoteUrl) {
-                    if (item.remoteUrl.startsWith('public/') || item.remoteUrl.startsWith('http')) {
-                        downloadUrl = item.remoteUrl;
-                    } else {
-                        const res = await getSignedAudioUrl(item.remoteUrl);
-                        downloadUrl = res.url;
-                    }
-                }
-            } catch (err) {
-                console.error("Échec de la préparation à la volée :", err);
-            }
-        }
-
-        // --- EXÉCUTION DU PARTAGE DE MANIÈRE 100% SYNCHRONE (SI DÉJÀ EN MÉMOIRE) ---
-        try {
             // --- Stratégie 1 : Partage du fichier physique via Web Share API ---
             if (navigator.share && file && navigator.canShare && navigator.canShare({ files: [file] })) {
                 try {
@@ -176,29 +65,52 @@ export const shareAudio = async (item, showAlert, preloadedData = null) => {
                         return;
                     }
                     console.warn('Échec stratégie 1 (partage fichier physique) :', shareErr.message || shareErr);
+                    // On ne lève pas d'erreur globale, on laisse les stratégies suivantes prendre le relais
                 }
             }
 
             // --- Stratégie 2 : Partage du lien cloud Supabase via Web Share API ---
-            if (navigator.share && urlToShare) {
-                try {
-                    await navigator.share({
-                        title: item.title,
-                        text: `Écoute ma pensée : ${item.title}`,
-                        url: urlToShare
-                    });
-                    showAlert('Partagé', 'Lien de partage envoyé !', 'success');
-                    return;
-                } catch (shareErr) {
-                    if (shareErr.name === 'AbortError') {
-                        console.log('Partage annulé par l\'utilisateur.');
-                        return;
+            if (navigator.share && (signedUrl || item.remoteUrl)) {
+                let urlToShare = signedUrl;
+                if (!urlToShare && item.remoteUrl) {
+                    if (item.remoteUrl.startsWith('public/') || item.remoteUrl.startsWith('http')) {
+                        urlToShare = item.remoteUrl;
+                    } else {
+                        const resUrl = await getSignedAudioUrl(item.remoteUrl);
+                        urlToShare = resUrl.url;
                     }
-                    console.warn('Échec stratégie 2 (partage lien) :', shareErr.message || shareErr);
+                }
+                if (urlToShare) {
+                    try {
+                        await navigator.share({
+                            title: item.title,
+                            text: `Écoute ma pensée : ${item.title}`,
+                            url: urlToShare
+                        });
+                        showAlert('Partagé', 'Lien de partage envoyé !', 'success');
+                        return;
+                    } catch (shareErr) {
+                        if (shareErr.name === 'AbortError') {
+                            console.log('Partage annulé par l\'utilisateur.');
+                            return;
+                        }
+                        console.warn('Échec stratégie 2 (partage lien) :', shareErr.message || shareErr);
+                        // On continue vers le fallback ultime
+                    }
                 }
             }
 
             // --- Stratégie 3 (Fallback ultime) : Téléchargement direct du fichier ---
+            let downloadUrl = blobUrl || signedUrl;
+            if (!downloadUrl && item.remoteUrl) {
+                if (item.remoteUrl.startsWith('public/') || item.remoteUrl.startsWith('http')) {
+                    downloadUrl = item.remoteUrl;
+                } else {
+                    const res = await getSignedAudioUrl(item.remoteUrl);
+                    downloadUrl = res.url;
+                }
+            }
+
             if (downloadUrl) {
                 const a = document.createElement('a');
                 a.href = downloadUrl;
@@ -219,6 +131,7 @@ export const shareAudio = async (item, showAlert, preloadedData = null) => {
 
     // --- LOGIQUE DE PARTAGE MOBILE NATIVE ---
     try {
+        // Vérifier si le partage est dispo sur cet appareil (Mobile)
         const isAvailable = await Sharing.isAvailableAsync();
         if (!isAvailable) {
             showAlert('Non disponible', 'Le partage n\'est pas disponible sur cet appareil.', 'info');
@@ -227,12 +140,14 @@ export const shareAudio = async (item, showAlert, preloadedData = null) => {
 
         let fileUri = item.localUri;
 
+        // Si pas de fichier local mais un fichier cloud, le télécharger temporairement
         if (!fileUri && item.remoteUrl) {
             const { url, error } = await getSignedAudioUrl(item.remoteUrl);
             if (error || !url) {
                 showAlert('Erreur', 'Impossible de récupérer le fichier audio.', 'error');
                 return;
             }
+            // Télécharger dans le cache temporaire
             const ext = item.remoteUrl.split('.').pop() || 'm4a';
             const tmpPath = `${FileSystem.cacheDirectory}share_${item.id}.${ext}`;
             const download = await FileSystem.downloadAsync(url, tmpPath);
@@ -244,6 +159,7 @@ export const shareAudio = async (item, showAlert, preloadedData = null) => {
             return;
         }
 
+        // Ouvrir la feuille de partage native (WhatsApp, iMessage, Mail, etc.)
         await Sharing.shareAsync(fileUri, {
             mimeType: 'audio/mp4',
             dialogTitle: `Partager "${item.title}"`,
