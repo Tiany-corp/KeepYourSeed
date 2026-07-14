@@ -47,11 +47,16 @@ class ErrorBoundary extends Component {
   }
 }
 
+import { usePushNotifications } from './hooks/usePushNotifications';
+
 function AppContent() {
   const [session, setSession] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [streakCount, setStreakCount] = useState(0);
+
+  // Initialisation des notifications push
+  usePushNotifications(session);
 
   useEffect(() => {
     let authSubscription;

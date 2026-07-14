@@ -4,7 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
 import { fetchTotalCloudUsage } from '../services/cloud';
 import { syncAll, forcePushAllLocalNotes } from '../services/sync';
 import Logo from './Logo';
@@ -382,6 +383,32 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         </View>
 
                         <View style={[styles.separator, { marginVertical: 16 }]} />
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={async () => {
+                                console.log("Bouton test notification cliqué !");
+                                showAlert('Test lancé', 'La notification devrait apparaître dans 2 secondes...', 'info');
+                                onClose();
+                                try {
+                                    await Notifications.scheduleNotificationAsync({
+                                        content: {
+                                            title: "🔔 Test réussi !",
+                                            body: "Les notifications locales fonctionnent sur cet appareil.",
+                                            sound: true,
+                                        },
+                                        trigger: null, // Déclenchement immédiat
+                                    });
+                                    console.log("Notification programmée avec succès");
+                                } catch (e) {
+                                    console.error("Erreur programmation notification locale :", e);
+                                    showAlert('Erreur', 'Impossible de programmer la notification.', 'error');
+                                }
+                            }}
+                        >
+                            <Bell size={20} color="#78350F" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Tester une notification</Text>
+                        </TouchableOpacity>
 
                         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
                             <LogOut size={20} color="#991B1B" style={styles.menuIcon} />

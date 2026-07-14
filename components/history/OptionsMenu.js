@@ -60,8 +60,6 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
                         <Text style={styles.menuText}>Partager</Text>
                     </TouchableOpacity>
 
-
-
                     <View style={styles.separator} />
 
                     <TouchableOpacity style={[styles.menuItem, styles.deleteItem]} onPress={() => { onDelete(); onClose(); }}>

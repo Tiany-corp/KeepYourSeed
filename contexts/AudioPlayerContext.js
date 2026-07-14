@@ -35,7 +35,9 @@ export function AudioPlayerProvider({ children }) {
     // Synchronisation simple de l'état isPlaying depuis l'objet player
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
+    const durationRef = useRef(0);
     const [position, setPosition] = useState(0);
+    const positionRef = useRef(0);
     
     // Ref pour contrer la latence du bridge (Optimistic UI ultra robuste)
     const intentionalPlay = useRef(false);
@@ -65,14 +67,19 @@ export function AudioPlayerProvider({ children }) {
             
             // Met à jour la durée (quand elle est disponible) : expo-audio renvoie des SECONDES, on repasse en MS
             if (status.isLoaded && status.duration) {
-                setDuration(Math.floor(status.duration * 1000));
+                const newDuration = Math.floor(status.duration * 1000);
+                setDuration(prev => Math.abs(prev - newDuration) > 50 ? newDuration : prev);
+                durationRef.current = newDuration;
             }
-            setPosition(Math.floor((status.currentTime || 0) * 1000));
+            const newPos = Math.floor((status.currentTime || 0) * 1000);
+            setPosition(newPos);
+            positionRef.current = newPos;
             
             if (status.didJustFinish) {
                 intentionalPlay.current = false;
                 setIsPlaying(false);
                 setPosition(0);
+                positionRef.current = 0;
             }
         });
 
@@ -139,12 +146,12 @@ export function AudioPlayerProvider({ children }) {
             pause();
         } else {
             // Si fini, remettre au début
-            if (position >= duration && duration > 0) {
+            if (positionRef.current >= durationRef.current && durationRef.current > 0) {
                 player.seekTo(0);
             }
             player.play();
         }
-    }, [currentTrack, player, play, pause, position, duration]);
+    }, [currentTrack, player, play, pause]);
 
     const stop = useCallback(() => {
         // Mettre à jour les états JS *avant* la commande native au cas où elle throw (Android)

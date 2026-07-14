@@ -493,7 +493,7 @@ export default function HistoryScreen() {
                 <FlatList
                     data={paginatedRecordings}
                     extraData={[dailyMemories, isDailyMemorySeen]}
-                    ListHeaderComponent={renderListHeader}
+                    ListHeaderComponent={renderListHeader()}
                     renderItem={renderItem}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}
