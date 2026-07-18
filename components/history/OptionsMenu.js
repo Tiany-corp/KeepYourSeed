@@ -4,7 +4,7 @@ import { Edit2, Trash2, Pin, X, Share2 } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, onShare }) => {
+const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, onShare, onGraft, isGrafted, onUngraft }) => {
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
     React.useEffect(() => {
@@ -23,7 +23,7 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
 
     // Positionnement à gauche du bouton
     const menuWidth = 180;
-    const menuHeight = 160;
+    const menuHeight = 200;
 
     // On place le menu à gauche (pageX) moins sa largeur, avec une petite marge
     let left = position.pageX - menuWidth - 10;
@@ -49,6 +49,18 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
                         <Pin size={18} color="#78350F" />
                         <Text style={styles.menuText}>Épingler</Text>
                     </TouchableOpacity>
+
+                    {isGrafted ? (
+                        <TouchableOpacity style={styles.menuItem} onPress={() => { onUngraft(); onClose(); }}>
+                            <Share2 size={18} color="#B91C1C" style={{ transform: [{ rotate: '90deg' }] }} />
+                            <Text style={styles.menuText}>Dégreffer</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={styles.menuItem} onPress={() => { onGraft(); onClose(); }}>
+                            <Share2 size={18} color="#78350F" style={{ transform: [{ rotate: '90deg' }] }} />
+                            <Text style={styles.menuText}>Greffer</Text>
+                        </TouchableOpacity>
+                    )}
 
                     <TouchableOpacity style={styles.menuItem} onPress={() => { onEdit(); onClose(); }}>
                         <Edit2 size={18} color="#78350F" />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
-import { ChevronDown, Check } from 'lucide-react-native';
+import { ChevronDown, Check, Search } from 'lucide-react-native';
 
 /**
  * Barre de filtrage avec un bouton déroulant (dropdown) pour sélectionner un thème.
@@ -9,8 +9,9 @@ import { ChevronDown, Check } from 'lucide-react-native';
  * - availableTags (Array) : Liste des tags extraits {id, label, emoji}
  * - selectedTag (String) : L'ID du tag actuellement sélectionné, ou null si "Tous"
  * - onSelectTag (fn) : Callback invoqué au clic sur un tag (passe l'id ou null)
+ * - onSearchPress (fn) : Callback invoqué au clic sur la loupe de recherche
  */
-const TagFilterBar = React.memo(({ availableTags, selectedTag, onSelectTag }) => {
+const TagFilterBar = React.memo(({ availableTags, selectedTag, onSelectTag, onSearchPress }) => {
     const [modalVisible, setModalVisible] = useState(false);
     const hasTags = availableTags && availableTags.length > 0;
     const selectedTagObject = selectedTag && hasTags ? availableTags.find(t => t.id === selectedTag) : null;
@@ -20,15 +21,21 @@ const TagFilterBar = React.memo(({ availableTags, selectedTag, onSelectTag }) =>
         <View style={styles.filterContainer}>
             <Text style={styles.historyTitle}>Historique</Text>
 
-            {hasTags && (
-                <TouchableOpacity
-                    style={styles.dropdownButton}
-                    onPress={() => setModalVisible(true)}
-                >
-                    <Text style={styles.dropdownButtonText}>{buttonText}</Text>
-                    <ChevronDown size={16} color="#78350F" style={styles.dropdownIcon} />
+            <View style={styles.actionsContainer}>
+                <TouchableOpacity onPress={onSearchPress} style={styles.searchButton}>
+                    <Search size={16} color="#78350F" />
                 </TouchableOpacity>
-            )}
+
+                {hasTags && (
+                    <TouchableOpacity
+                        style={styles.dropdownButton}
+                        onPress={() => setModalVisible(true)}
+                    >
+                        <Text style={styles.dropdownButtonText}>{buttonText}</Text>
+                        <ChevronDown size={16} color="#78350F" style={styles.dropdownIcon} />
+                    </TouchableOpacity>
+                )}
+            </View>
 
             <Modal
                 visible={modalVisible}
@@ -85,6 +92,21 @@ const styles = StyleSheet.create({
         color: '#78350F', // Marron principal de l'app
         textTransform: 'uppercase',
         letterSpacing: 0.5,
+    },
+    searchButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F5F0E8',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#D4A574',
+        marginRight: 8,
+    },
+    actionsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     dropdownButton: {
         flexDirection: 'row',

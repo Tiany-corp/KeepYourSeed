@@ -5,7 +5,7 @@ import Animated, {
     useAnimatedStyle,
     withSpring
 } from 'react-native-reanimated';
-import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle } from 'lucide-react-native';
+import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle, Share2 } from 'lucide-react-native';
 import Logo from '../Logo';
 import AnimatedPlayButton from '../AnimatedPlayButton';
 import { getTagInfo } from '../../utils/tags';
@@ -96,6 +96,9 @@ const RecordingItem = memo(({
                     <View style={styles.itemInfo}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                             {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
+                            {childrenRecords && childrenRecords.length > 0 && (
+                                <Share2 size={12} color="#10B981" style={{ marginRight: 6, transform: [{ rotate: '90deg' }] }} />
+                            )}
                             <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
 
                             {/* Indicateur de synchro (caché en mode corbeille pour plus de clarté) */}

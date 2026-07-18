@@ -317,6 +317,13 @@ const pushLocalChanges = async (userId) => {
                     }
                 }
             } else if (rec.status === 'pending_update') {
+                let resolvedParentId = rec.parentId;
+                // Si le parentId est un ID local (commence par cloud_ ou n'est pas un UUID), on cherche son dbId
+                if (rec.parentId && String(rec.parentId).startsWith('cloud_')) {
+                    const parent = workingList.find(r => r.id === rec.parentId);
+                    resolvedParentId = parent ? parent.dbId : null;
+                }
+
                 let ok = false;
                 if (rec.deletedAt) {
                     ok = await deleteRecordingFromCloud({ userId, recording: rec });
@@ -328,7 +335,7 @@ const pushLocalChanges = async (userId) => {
                         type: rec.type,
                         deliverDate: rec.deliverDate,
                         tags: rec.tags,
-                        parentId: rec.parentId // Déjà un dbId s'il vient du Cloud, ou un id local si pas encore résolu
+                        parentId: resolvedParentId
                     });
                 }
 

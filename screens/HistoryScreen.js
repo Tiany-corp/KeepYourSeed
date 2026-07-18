@@ -5,7 +5,7 @@ import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
 import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId, getAutoSyncPreference } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
-import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin } from 'lucide-react-native';
+import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin, Search } from 'lucide-react-native';
 import { shareAudio } from '../utils/share';
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
@@ -20,7 +20,8 @@ import { formatDateWithTime } from '../utils/date';
 import RecordingItem from '../components/history/RecordingItem';
 import HistorySkeleton from '../components/history/HistorySkeleton';
 import DailyMemoryCard from '../components/history/DailyMemoryCard';
-
+import TreeSelectionModal from '../components/TreeSelectionModal';
+import SearchModal from '../components/SearchModal';
 export default function HistoryScreen() {
     const { session, setDrawerOpen } = useContext(AppContext);
     const navigation = useNavigation();
@@ -43,7 +44,9 @@ export default function HistoryScreen() {
     const [editingRecording, setEditingRecording] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedOptionsItem, setSelectedOptionsItem] = useState(null);
-
+    const [treeModalVisible, setTreeModalVisible] = useState(false);
+    const [searchModalVisible, setSearchModalVisible] = useState(false);
+    const [graftingRecording, setGraftingRecording] = useState(null);
     const audioPlayer = useAudioPlayer();
     const {
         currentTrack,
@@ -140,15 +143,15 @@ export default function HistoryScreen() {
         if (userId) {
             // Si la synchro auto est désactivée, on demande confirmation avant de sync
             const autoSyncEnabled = await getAutoSyncPreference();
-            
+
             if (!autoSyncEnabled) {
                 Alert.alert(
                     "Synchronisation manuelle",
                     "La synchronisation automatique est désactivée. Voulez-vous envoyer et récupérer vos pensées sur le cloud maintenant ?",
                     [
                         { text: "Annuler", style: "cancel", onPress: () => setRefreshing(false) },
-                        { 
-                            text: "Confirmer", 
+                        {
+                            text: "Confirmer",
                             onPress: async () => {
                                 setRefreshing(true);
                                 try {
@@ -193,14 +196,13 @@ export default function HistoryScreen() {
         const allIds = new Set(recordings.map(r => r.id));
         const allDbIds = new Set(recordings.map(r => r.dbId?.toString()).filter(Boolean));
 
-        const parents = recordings.filter(r =>
-            !r.parentId ||
-            (!allIds.has(r.parentId) && !allDbIds.has(r.parentId?.toString()))
-        );
+        // On inclut tous les enregistrements pour qu'ils apparaissent dans la vue normale.
+        // Ceux qui ont un parentId apparaîtront AUSSI sous forme de graine dans le composant de leur parent.
+        const parents = recordings;
 
         const now = new Date();
-        const filteredParents = parents.filter(r => 
-            !r.deletedAt && 
+        const filteredParents = parents.filter(r =>
+            !r.deletedAt &&
             (!r.deliverDate || new Date(r.deliverDate) <= now)
         );
 
@@ -224,13 +226,13 @@ export default function HistoryScreen() {
     const availableTags = useMemo(() => {
         const uniqueTagIds = [...new Set(recordings.flatMap(r => r.tags || []))];
         const tags = uniqueTagIds.map(getTagInfo).filter(Boolean);
-        
+
         // Ajouter un filtre spécial pour les messages reçus s'il y en a
         const hasMessages = recordings.some(r => r.type === 'message' && (!r.deliverDate || new Date(r.deliverDate) <= new Date()));
         if (hasMessages) {
             tags.unshift({ id: '_messages_', label: 'Messages reçus', emoji: '📬' });
         }
-        
+
         return tags;
     }, [recordings]);
 
@@ -283,7 +285,7 @@ export default function HistoryScreen() {
     const applyRecordingUpdateInState = (id, updates) => {
         setRecordings(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
         setDailyMemories(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
-        
+
         // Mettre à jour le cache local pour que l'état "ouvert" persiste après un redémarrage
         const { updateDailyMemoryInCache } = require('../services/storage');
         updateDailyMemoryInCache(id, updates);
@@ -369,6 +371,48 @@ export default function HistoryScreen() {
         }
     };
 
+    const handleGraftInit = (recording) => {
+        setGraftingRecording(recording);
+        setTreeModalVisible(true);
+    };
+
+    const handleTreeSelected = async (parentId) => {
+        if (!graftingRecording) return;
+        try {
+            const updates = { parentId, status: 'pending_update', updatedAt: new Date().toISOString() };
+            await updateRecording(graftingRecording.id, updates);
+            applyRecordingUpdateInState(graftingRecording.id, updates);
+
+            showAlert('Succès', 'Pensée greffée avec succès.', 'success');
+
+            if (session?.user) {
+                syncAll(session.user.id, true).catch(e => console.log('Silent sync failed after graft', e));
+            }
+        } catch (error) {
+            console.error('Graft failed:', error);
+            showAlert('Erreur', 'Impossible de greffer l\'enregistrement.', 'error');
+        } finally {
+            setGraftingRecording(null);
+        }
+    };
+
+    const handleUngraft = async (recording) => {
+        try {
+            const updates = { parentId: null, status: 'pending_update', updatedAt: new Date().toISOString() };
+            await updateRecording(recording.id, updates);
+            applyRecordingUpdateInState(recording.id, updates);
+            
+            showAlert('Succès', 'Pensée dégreffée avec succès.', 'success');
+            
+            if (session?.user) {
+                syncAll(session.user.id, true).catch(e => console.log('Silent sync failed after ungraft', e));
+            }
+        } catch (error) {
+            console.error('Ungraft failed:', error);
+            showAlert('Erreur', 'Impossible de dégreffer l\'enregistrement.', 'error');
+        }
+    };
+
     // Callbacks stables pour RecordingItem
     const handleTogglePlay = useCallback((item) => {
         toggleAudio(item);
@@ -395,7 +439,7 @@ export default function HistoryScreen() {
 
     const handleToggleDailyMemory = useCallback(async (memory) => {
         if (!memory) return;
-        
+
         // Marquer comme vu localement
         const isFirst = dailyMemories[0]?.id === memory.id;
         if (isFirst && !isDailyMemorySeen && session?.user) {
@@ -463,6 +507,7 @@ export default function HistoryScreen() {
                     availableTags={availableTags}
                     selectedTag={selectedFilterTag}
                     onSelectTag={setSelectedFilterTag}
+                    onSearchPress={() => setSearchModalVisible(true)}
                 />
             </View>
         );
@@ -521,7 +566,7 @@ export default function HistoryScreen() {
                 />
             )}
 
-            <OptionsMenu 
+            <OptionsMenu
                 isVisible={optionsVisible}
                 onClose={() => setOptionsVisible(false)}
                 position={optionsPosition}
@@ -533,6 +578,24 @@ export default function HistoryScreen() {
                     handlePin(selectedRecording);
                 }}
                 onShare={() => handleShare(selectedRecording)}
+                onGraft={() => handleGraftInit(selectedRecording)}
+                isGrafted={!!selectedRecording?.parentId}
+                onUngraft={() => handleUngraft(selectedRecording)}
+            />
+
+            <TreeSelectionModal
+                visible={treeModalVisible}
+                onClose={() => { setTreeModalVisible(false); setGraftingRecording(null); }}
+                onSelectTree={handleTreeSelected}
+                excludeId={graftingRecording?.id}
+            />
+
+            <SearchModal
+                visible={searchModalVisible}
+                onClose={() => setSearchModalVisible(false)}
+                onSelectAudio={(audio) => {
+                    handleTogglePlay(audio);
+                }}
             />
 
             <TitleModal
