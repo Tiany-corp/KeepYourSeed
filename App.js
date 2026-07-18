@@ -11,6 +11,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import TrashScreen from './screens/TrashScreen';
 import AuthScreen from './screens/AuthScreen';
 import GardenScreen from './screens/GardenScreen';
+import TreeDetailScreen from './screens/TreeDetailScreen';
 import SettingsDrawer from './components/SettingsDrawer';
 import AudioPlayer from './components/AudioPlayer';
 import { AppContext } from './contexts/AppContext';
@@ -132,6 +133,7 @@ function AppContent() {
             {(props) => <HistoryScreen {...props} key={refreshKey} />}
           </Stack.Screen>
           <Stack.Screen name="Garden" component={GardenScreen} />
+          <Stack.Screen name="TreeDetail" component={TreeDetailScreen} options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="Trash" component={TrashScreen} />
           <Stack.Screen name="Auth">
             {(props) => (

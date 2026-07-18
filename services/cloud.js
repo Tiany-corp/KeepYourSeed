@@ -95,7 +95,7 @@ export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
  * @param {string|null} deliverDate - ISO date for message delivery (null for notes)
  * @returns {Promise<Object|null>} - The inserted record or null if failed
  */
-export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], originalDate = null, parentId = null) => {
+export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], originalDate = null, parentId = null, graftType = null) => {
     try {
         const insertData = {
             user_id: userId,
@@ -116,6 +116,10 @@ export const saveRecordingToDatabase = async (userId, title, audioUrl, duration,
         if (parentId) {
             insertData.parent_id = parentId;
         }
+        if (graftType) {
+            insertData['graftType'] = graftType;
+        }
+        insertData['waterCount'] = 0;
 
         // ANTI-DOUBLONS : Vérifier si une note identique existe déjà pour cet utilisateur
         const { data: existing, error: searchError } = await supabase
@@ -188,6 +192,8 @@ export const fetchCloudRecordings = async (userId) => {
             tags: row.tags || [],
             deletedAt: row.deleted_at || null,
             parentId: row.parent_id || null,
+            graftType: row.graftType || null,
+            waterCount: row.waterCount || 0,
         }));
 
     } catch (e) {
@@ -220,6 +226,8 @@ export const updateRecordingMetadataInDatabase = async ({
             parent_id: parentId || null,
             updated_at: new Date().toISOString(), // Important pour le LWW
         };
+        if (recording.graftType !== undefined) updates['graftType'] = recording.graftType;
+        if (recording.waterCount !== undefined) updates['waterCount'] = recording.waterCount;
 
         let query = supabase.from('recordings').update(updates).eq('user_id', userId);
         if (recording.dbId) {

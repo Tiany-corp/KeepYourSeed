@@ -285,10 +285,10 @@ const pushLocalChanges = async (userId) => {
                 const remoteUrl = await uploadRecordingToCloud(rec.id, rec.localUri, userId);
                 if (remoteUrl) {
                     // RÉSOLUTION DU PARENT : Si on a un parentId local, on cherche son dbId Cloud
-                    let cloudParentId = null;
-                    if (rec.parentId) {
+                    let cloudParentId = rec.parentId;
+                    if (rec.parentId && (String(rec.parentId).startsWith('cloud_') || !String(rec.parentId).includes('-'))) {
                         const parent = workingList.find(r => r.id === rec.parentId);
-                        cloudParentId = parent ? parent.dbId : null;
+                        cloudParentId = parent ? (parent.dbId || null) : null;
                     }
 
                     const dbRecord = await saveRecordingToDatabase(
@@ -318,10 +318,10 @@ const pushLocalChanges = async (userId) => {
                 }
             } else if (rec.status === 'pending_update') {
                 let resolvedParentId = rec.parentId;
-                // Si le parentId est un ID local (commence par cloud_ ou n'est pas un UUID), on cherche son dbId
-                if (rec.parentId && String(rec.parentId).startsWith('cloud_')) {
+                // Si le parentId est un ID local (commence par cloud_ ou n'est pas un UUID = pas de tiret)
+                if (rec.parentId && (String(rec.parentId).startsWith('cloud_') || !String(rec.parentId).includes('-'))) {
                     const parent = workingList.find(r => r.id === rec.parentId);
-                    resolvedParentId = parent ? parent.dbId : null;
+                    resolvedParentId = parent ? (parent.dbId || null) : null;
                 }
 
                 let ok = false;
@@ -427,6 +427,8 @@ const pullCloudRecordings = async (userId, canDownloadAudio = true) => {
                         date: cloudRec.date,
                         deletedAt: cloudRec.deletedAt,
                         parentId: cloudRec.parentId,
+                        graftType: cloudRec.graftType,
+                        waterCount: cloudRec.waterCount,
                         remoteUrl: cloudRec.remoteUrl || existing.remoteUrl,
                         status: 'synced',
                     });

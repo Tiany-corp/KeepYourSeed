@@ -74,6 +74,7 @@ export default function GardenScreen() {
             <TreeCard 
                 tree={item} 
                 leaves={leaves} 
+                onPress={() => navigation.navigate('TreeDetail', { tree: item })}
                 onPlay={() => handlePlayTree(item)} 
             />
         );

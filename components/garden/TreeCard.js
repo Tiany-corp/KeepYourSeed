@@ -4,11 +4,11 @@ import { Share2, Play } from 'lucide-react-native';
 import { formatDateWithTime } from '../../utils/date';
 import Logo from '../Logo';
 
-export default function TreeCard({ tree, leaves, onPlay }) {
+export default function TreeCard({ tree, leaves, onPress, onPlay }) {
     const leafCount = leaves ? leaves.length : 0;
     
     return (
-        <TouchableOpacity style={styles.card} onPress={onPlay}>
+        <TouchableOpacity style={styles.card} onPress={onPress}>
             <View style={styles.headerRow}>
                 <Logo size={24} color="#15803d" variant="outline" />
                 <View style={styles.leafBadge}>
@@ -24,9 +24,9 @@ export default function TreeCard({ tree, leaves, onPlay }) {
                 <Text style={styles.date}>{formatDateWithTime(tree.date)}</Text>
             </View>
             
-            <View style={styles.playButton}>
+            <TouchableOpacity style={styles.playButton} onPress={onPlay}>
                 <Play size={16} color="#15803d" fill="#15803d" />
-            </View>
+            </TouchableOpacity>
         </TouchableOpacity>
     );
 }

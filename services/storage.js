@@ -670,3 +670,34 @@ export const getCurrentStreak = async () => {
         return streak;
     } catch (e) { return 0; }
 };
+
+/**
+ * Arrose un arbre. Si l'enregistrement passé est une feuille, on arrose son tronc parent.
+ * Si c'est un tronc, on l'arrose directement.
+ */
+export const waterTree = async (recording) => {
+    try {
+        if (!recording) return;
+        const targetId = recording.parentId || recording.id;
+        
+        const recordings = await getRecordings();
+        let target = recordings.find(r => r.id === targetId);
+        
+        if (!target) {
+            // Tentative de résolution via dbId
+            target = recordings.find(r => r.dbId && r.dbId.toString() === String(targetId));
+        }
+
+        if (target) {
+            const currentCount = target.waterCount || 0;
+            // On met à jour l'audio cible avec le nouveau waterCount et on le passe en pending_update pour forcer la synchro
+            const updatedRecordings = recordings.map(rec =>
+                rec.id === target.id ? { ...rec, waterCount: currentCount + 1, status: 'pending_update' } : rec
+            );
+            await universalStorage.saveData(STORAGE_KEY, updatedRecordings);
+            console.log(`💧 Arbre "${target.title}" arrosé ! (waterCount: ${currentCount + 1})`);
+        }
+    } catch (e) {
+        console.error("Erreur lors de l'arrosage :", e);
+    }
+};

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createAudioPlayer } from 'expo-audio';
-import { getAudioSource } from '../services/storage';
+import { getAudioSource, waterTree } from '../services/storage';
 
 // --- Contexte global du lecteur audio ---
 const AudioPlayerContext = createContext(null);
@@ -101,6 +101,9 @@ export function AudioPlayerProvider({ children }) {
         intentionalPlay.current = true;
         setIsPlaying(true);
         setCurrentTrack(recording);
+        
+        // 💧 Arrosage organique de l'arbre
+        waterTree(recording);
 
         if (currentTrack?.id === recording.id) {
             player.play();

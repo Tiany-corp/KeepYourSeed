@@ -376,10 +376,10 @@ export default function HistoryScreen() {
         setTreeModalVisible(true);
     };
 
-    const handleTreeSelected = async (parentId) => {
+    const handleTreeSelected = async (parentId, graftType) => {
         if (!graftingRecording) return;
         try {
-            const updates = { parentId, status: 'pending_update', updatedAt: new Date().toISOString() };
+            const updates = { parentId, graftType, status: 'pending_update', updatedAt: new Date().toISOString() };
             await updateRecording(graftingRecording.id, updates);
             applyRecordingUpdateInState(graftingRecording.id, updates);
 
@@ -398,7 +398,7 @@ export default function HistoryScreen() {
 
     const handleUngraft = async (recording) => {
         try {
-            const updates = { parentId: null, status: 'pending_update', updatedAt: new Date().toISOString() };
+            const updates = { parentId: null, graftType: null, status: 'pending_update', updatedAt: new Date().toISOString() };
             await updateRecording(recording.id, updates);
             applyRecordingUpdateInState(recording.id, updates);
             
