@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell, Send } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell, Send, Trees } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { fetchTotalCloudUsage } from '../services/cloud';
 import { syncAll, forcePushAllLocalNotes } from '../services/sync';
@@ -340,6 +340,14 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
                             </Text>
                             {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={() => { onClose(); navigation.navigate('Garden'); }}
+                        >
+                            <Trees size={20} color="#15803d" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Mon Jardin</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 

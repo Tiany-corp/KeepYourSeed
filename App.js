@@ -10,6 +10,7 @@ import RecordScreen from './screens/RecordScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import TrashScreen from './screens/TrashScreen';
 import AuthScreen from './screens/AuthScreen';
+import GardenScreen from './screens/GardenScreen';
 import SettingsDrawer from './components/SettingsDrawer';
 import AudioPlayer from './components/AudioPlayer';
 import { AppContext } from './contexts/AppContext';
@@ -130,6 +131,7 @@ function AppContent() {
           <Stack.Screen name="History">
             {(props) => <HistoryScreen {...props} key={refreshKey} />}
           </Stack.Screen>
+          <Stack.Screen name="Garden" component={GardenScreen} />
           <Stack.Screen name="Trash" component={TrashScreen} />
           <Stack.Screen name="Auth">
             {(props) => (
