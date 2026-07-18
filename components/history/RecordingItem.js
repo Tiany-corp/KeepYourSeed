@@ -163,7 +163,7 @@ const RecordingItem = memo(({
                                 onPressIn={handlePressIn}
                                 onPressOut={handlePressOut}
                             >
-                                <Logo size={18} color={isChildPlaying ? '#FFFFFF' : '#78350F'} variant="outline" />
+                                <Logo size={26} color={isChildPlaying ? '#FFFFFF' : '#78350F'} variant="outline" />
                             </Pressable>
                         );
                     })}

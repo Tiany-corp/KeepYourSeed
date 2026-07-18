@@ -75,7 +75,7 @@ const DailyMemoryCard = memo(({ dailyMemory, isOpened, isPlaying, onTogglePlay, 
                         dailyMemory.type === 'message' && !isOpened && styles.dailyMemoryCardMessageUnseen
                     ]}>
                         <Logo 
-                            size={28} 
+                            size={36} 
                             color={dailyMemory.type === 'message' ? '#B91C1C' : '#D97706'} 
                             variant="outline" 
                             style={styles.dailyMemoryLogo} 

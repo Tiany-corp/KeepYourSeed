@@ -27,7 +27,7 @@ const ConsolidationCard = React.memo(({ parent, onLongPress, onDismiss, isRecord
                 activeOpacity={0.8}
             >
                 <View style={styles.logoWrapper}>
-                    <Logo size={24} color={isRecording ? '#B91C1C' : '#D97706'} variant="outline" />
+                    <Logo size={32} color={isRecording ? '#B91C1C' : '#D97706'} variant="outline" />
                 </View>
 
                 <View style={styles.info}>

@@ -21,7 +21,7 @@ export default function MemoryCard({ dailyMemory, isMemoryLoading, onOpenPlayer 
             style={styles.iconButton}
         >
             <View style={styles.logoWrapper}>
-                <Logo size={24} color="#D97706" variant="outline" />
+                <Logo size={32} color="#D97706" variant="outline" />
             </View>
 
             {/* Notification badge */}

@@ -35,7 +35,7 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
     return (
         <View style={styles.container}>
             <View style={styles.card}>
-                <Logo size={100} style={styles.logo} />
+                <Logo size={140} style={styles.logo} />
                 <Text style={styles.title}>Se connecter</Text>
 
                 <View style={styles.inputContainer}>

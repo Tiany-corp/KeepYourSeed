@@ -16,7 +16,7 @@ export default function TermsScreen({ onBack }) {
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.introSection}>
-                    <Logo size={60} style={styles.logo} />
+                    <Logo size={80} style={styles.logo} />
                     <Text style={styles.appName}>KeepYourSeed</Text>
                     <Text style={styles.version}>Version Bêta 1.2</Text>
                 </View>

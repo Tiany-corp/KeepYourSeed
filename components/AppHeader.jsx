@@ -32,7 +32,7 @@ export default function AppHeader({ // Mon composant app header recoit en propri
             )}
 
             <View style={styles.headerTitleContainer}>
-                {showLogo && <Logo size={24} />}
+                {showLogo && <Logo size={15} />}
                 {typeof title === 'string' ? (
                     <Text style={styles.headerTitleText}>{title}</Text>
                 ) : (
@@ -54,7 +54,7 @@ export default function AppHeader({ // Mon composant app header recoit en propri
 }
 
 const styles = StyleSheet.create({
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#D4A574', backgroundColor: '#FAF7F2' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 50, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#D4A574', backgroundColor: '#FAF7F2' },
     iconButton: { padding: 8 },
     headerTitleContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
     headerTitleText: { fontSize: 20, fontWeight: '700', color: '#78350F', letterSpacing: -0.5 }

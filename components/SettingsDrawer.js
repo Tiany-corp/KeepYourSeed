@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell, Send } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { fetchTotalCloudUsage } from '../services/cloud';
 import { syncAll, forcePushAllLocalNotes } from '../services/sync';
@@ -388,7 +388,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             style={styles.menuItem} 
                             onPress={async () => {
                                 console.log("Bouton test notification cliqué !");
-                                showAlert('Test lancé', 'La notification devrait apparaître dans 2 secondes...', 'info');
+                                showAlert('Test lancé', 'La notification devrait apparaître immédiatement...', 'info');
                                 onClose();
                                 try {
                                     await Notifications.scheduleNotificationAsync({
@@ -407,7 +407,34 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             }}
                         >
                             <Bell size={20} color="#78350F" style={styles.menuIcon} />
-                            <Text style={styles.menuItemText}>Tester une notification</Text>
+                            <Text style={styles.menuItemText}>Tester notification locale</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.menuItem} 
+                            onPress={async () => {
+                                console.log("Bouton test push distant cliqué !");
+                                showAlert('Envoi en cours...', 'Contact du serveur Supabase...', 'info');
+                                onClose();
+                                try {
+                                    const { data, error } = await supabase.functions.invoke('send-push', {
+                                        body: { trigger: 'manual' }
+                                    });
+                                    if (error) throw new Error(error.message);
+                                    console.log("Réponse serveur :", data);
+                                    if (data?.success) {
+                                        console.log("Le serveur a bien envoyé le push à Expo.");
+                                    } else {
+                                        showAlert('Erreur Serveur', data?.error || 'Erreur inconnue', 'error');
+                                    }
+                                } catch (e) {
+                                    console.error("Erreur appel fonction send-push :", e);
+                                    showAlert('Erreur', 'Impossible de contacter le serveur distant.', 'error');
+                                }
+                            }}
+                        >
+                            <Send size={20} color="#78350F" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Tester Push distant</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
@@ -443,7 +470,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     onPress={handleSecretClick} 
                     activeOpacity={0.8}
                 >
-                    <Logo size={24} style={styles.footerLogo} />
+                    <Logo size={36} style={styles.footerLogo} />
                     <Text style={styles.footerText}>KeepYourSeed v1.2</Text>
                 </TouchableOpacity>
             </Animated.View>

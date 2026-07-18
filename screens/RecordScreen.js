@@ -190,7 +190,7 @@ export default function RecordScreen() {
     // Couleur marron (#78350F) pour équilibrer avec le menu hamburger à gauche
     const HistoryButton = (
         <TouchableOpacity onPress={handleGoToHistory} style={styles.historyButton}>
-            <Logo size={28} color="#78350F" variant="outline" />
+            <Logo size={32} color="#78350F" variant="outline" />
             {hasUnseenMemory && !isMemoryLoading && (
                 <View style={styles.historyBadge}>
                     <Text style={styles.historyBadgeText}>1</Text>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- 
+    Logo KeepYourSeed - Version Vectorisée
+    Ce fichier a été créé manuellement pour avoir des calques propres, 
+    idéal pour l'animation (ex: animer la graine ou la feuille séparément).
+  -->
+
+  <!-- Fond (peut être masqué pour avoir un fond transparent) -->
+  <rect id="background" width="512" height="512" fill="#f5f3ec" />
+
+  <!-- Forme principale de la feuille verte -->
+  <path id="leaf" 
+        d="M 166 450 
+           C 100 350 115 220 200 145 
+           C 260 92 340 68 395 62 
+           C 385 130 380 240 345 325 
+           C 305 422 225 455 188 448 Z" 
+        fill="#4c8a20" />
+
+  <!-- Nervure centrale blanche -->
+  <path id="vein" 
+        d="M 178 448 
+           Q 245 280 340 135 
+           Q 220 295 158 446 
+           Z" 
+        fill="#f5f3ec" />
+
+  <!-- Graine marron -->
+  <path id="seed" 
+        d="M 285 315 
+           C 305 310 320 325 315 340 
+           C 310 355 290 365 275 355 
+           C 260 345 265 320 285 315 Z" 
+        fill="#a68a68" />
+</svg>

@@ -48,7 +48,7 @@ export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack })
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.card}>
-                <Logo size={80} style={styles.logo} />
+                <Logo size={120} style={styles.logo} />
                 <Text style={styles.title}>Créer un compte</Text>
 
                 <View style={styles.inputContainer}>
