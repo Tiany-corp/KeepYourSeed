@@ -6,7 +6,7 @@ import Logo from '../Logo';
 
 export default function TreeCard({ tree, leaves, onPress, onPlay }) {
     const leafCount = leaves ? leaves.length : 0;
-    
+
     return (
         <TouchableOpacity style={styles.card} onPress={onPress}>
             <View style={styles.headerRow}>
@@ -16,14 +16,14 @@ export default function TreeCard({ tree, leaves, onPress, onPlay }) {
                     <Text style={styles.leafText}>{leafCount}</Text>
                 </View>
             </View>
-            
+
             <View style={styles.infoContainer}>
                 <Text style={styles.title} numberOfLines={2}>
                     {tree.title || 'Arbre sans nom'}
                 </Text>
                 <Text style={styles.date}>{formatDateWithTime(tree.date)}</Text>
             </View>
-            
+
             <TouchableOpacity style={styles.playButton} onPress={onPlay}>
                 <Play size={16} color="#15803d" fill="#15803d" />
             </TouchableOpacity>

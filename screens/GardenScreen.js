@@ -13,7 +13,7 @@ export default function GardenScreen() {
     const isFocused = useIsFocused();
     const audioPlayer = useAudioPlayer();
     const { setDrawerOpen } = useContext(AppContext);
-    
+
     const [trees, setTrees] = useState([]);
     const [childrenMap, setChildrenMap] = useState({});
     const [loading, setLoading] = useState(true);
@@ -28,11 +28,11 @@ export default function GardenScreen() {
         setLoading(true);
         try {
             const allRecordings = await getRecordings();
-            
+
             // Build the relationship map
             const map = {};
             const activeRecordings = allRecordings.filter(r => !r.deletedAt);
-            
+
             activeRecordings.forEach(r => {
                 if (r.parentId) {
                     const parentId = String(r.parentId);
@@ -49,7 +49,7 @@ export default function GardenScreen() {
             // "Trees" are recordings that have at least one child
             const treeIds = Object.keys(map);
             const treeRecordings = activeRecordings.filter(r => treeIds.includes(r.id));
-            
+
             // Sort by date descending
             treeRecordings.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -71,11 +71,11 @@ export default function GardenScreen() {
     const renderTree = ({ item }) => {
         const leaves = childrenMap[item.id] || [];
         return (
-            <TreeCard 
-                tree={item} 
-                leaves={leaves} 
+            <TreeCard
+                tree={item}
+                leaves={leaves}
                 onPress={() => navigation.navigate('TreeDetail', { tree: item })}
-                onPlay={() => handlePlayTree(item)} 
+                onPlay={() => handlePlayTree(item)}
             />
         );
     };
@@ -101,7 +101,7 @@ export default function GardenScreen() {
 
             <View style={styles.content}>
                 <Text style={styles.description}>
-                    Voici votre jardin. Chaque arbre représente une idée principale qui s'est ramifiée avec plusieurs pensées (feuilles).
+                    Voici votre jardin. Chaque arbre représente une idée principale qui à été nourrit avec plusieurs pensées.
                 </Text>
 
                 {loading ? (
@@ -141,10 +141,15 @@ const styles = StyleSheet.create({
     backButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 4,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#F5F0E8',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#D4A574',
     },
     backButtonText: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '600',
         color: '#78350F',
     },

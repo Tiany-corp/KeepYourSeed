@@ -11,7 +11,7 @@ import {
     ScrollView,
     KeyboardAvoidingView,
 } from 'react-native';
-import { Trash2, Plus, X } from 'lucide-react-native';
+import { Trash2, Plus, X, Network, GitMerge, Apple } from 'lucide-react-native';
 import CustomDatePicker from './CustomDatePicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get, set } from 'idb-keyval';
@@ -70,7 +70,9 @@ export default function TitleModal({
     recordingDuration = 0,
     onConfirm,
     onCancel,
-    onDelete
+    onDelete,
+    showGraftType = false,
+    defaultGraftType = 'leaf'
 }) {
     const [title, setTitle] = useState('');
     const [mode, setMode] = useState('note');
@@ -81,6 +83,7 @@ export default function TitleModal({
     const [selectedNewEmoji, setSelectedNewEmoji] = useState(CUSTOM_TAG_EMOJIS[0]);
     const [showNewTagForm, setShowNewTagForm] = useState(false);
     const [showConfirmCancel, setShowConfirmCancel] = useState(false);
+    const [graftType, setGraftType] = useState(defaultGraftType);
 
     // Nouveaux états pour le sélecteur de date
     const [offsetValues, setOffsetValues] = useState({ day: '1', week: '1', month: '1', year: '1' });
@@ -100,6 +103,7 @@ export default function TitleModal({
             setSelectedNewEmoji(CUSTOM_TAG_EMOJIS[0]);
             setShowNewTagForm(false);
             setShowConfirmCancel(false);
+            setGraftType(defaultGraftType);
             setOffsetValues({ day: '1', week: '1', month: '1', year: '1' });
             setShowCustomDate(false);
             setActiveOffsetUnit(null);
@@ -207,9 +211,7 @@ export default function TitleModal({
     };
 
     const handleDeleteCustomTag = (tagId) => {
-        const updated = customTags.filter(t => t.id !== tagId); // filter recois le return d'une fonction qui renvoie vrai si le tag t existe dans tagID => t il vient d'ou ? c'est une props de tagID, c'est quoi la différence entre t et tagid si on compare les deux ?
-        // Garde tous les tag t qui sont différent de celui qui a été séléectionné en tagID
-        // t c'est l'élément courant qu'on est en train d'observer dans le tableau et tagId c'est le tag qui a été séléctionné par l'utilisateur
+        const updated = customTags.filter(t => t.id !== tagId); 
         setCustomTags(updated);
         persistCustomTags(updated);
         loadCustomTagsCache(); // Mettre à jour le cache global
@@ -225,7 +227,7 @@ export default function TitleModal({
             : (trimmedTitle || defaultTitle || 'Sans titre');
         if (mode === 'message' && !deliverDate) return;
         const finalDeliverDate = mode === 'message' ? new Date(deliverDate).toISOString() : null;
-        onConfirm(finalTitle, mode, finalDeliverDate, selectedTags);
+        onConfirm(finalTitle, mode, finalDeliverDate, selectedTags, graftType);
     };
 
     const handleCancel = () => {
@@ -280,6 +282,41 @@ export default function TitleModal({
                                 onSubmitEditing={handleConfirm}
                                 returnKeyType="done"
                             />
+
+                            {/* Choix du type de greffe (déplacé au-dessus des étiquettes) */}
+                            {showGraftType && (
+                                <View style={styles.graftTypeSection}>
+                                    <Text style={styles.tagsLabel}>Type de pensée</Text>
+                                    <View style={styles.graftTypeOptions}>
+                                        <TouchableOpacity 
+                                            style={[styles.graftOption, graftType === 'root' && styles.graftOptionActive]} 
+                                            onPress={() => setGraftType('root')}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Network size={20} color={graftType === 'root' ? '#D97706' : '#78716C'} strokeWidth={graftType === 'root' ? 2.5 : 2} />
+                                            <Text style={[styles.graftOptionText, graftType === 'root' && { color: '#D97706', fontWeight: 'bold' }]}>Racine</Text>
+                                        </TouchableOpacity>
+                                        
+                                        <TouchableOpacity 
+                                            style={[styles.graftOption, graftType === 'leaf' && styles.graftOptionActive]} 
+                                            onPress={() => setGraftType('leaf')}
+                                            activeOpacity={0.7}
+                                        >
+                                            <GitMerge size={20} color={graftType === 'leaf' ? '#15803D' : '#78716C'} strokeWidth={graftType === 'leaf' ? 2.5 : 2} />
+                                            <Text style={[styles.graftOptionText, graftType === 'leaf' && { color: '#15803D', fontWeight: 'bold' }]}>Feuille</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity 
+                                            style={[styles.graftOption, graftType === 'fruit' && styles.graftOptionActive]} 
+                                            onPress={() => setGraftType('fruit')}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Apple size={20} color={graftType === 'fruit' ? '#DC2626' : '#78716C'} strokeWidth={graftType === 'fruit' ? 2.5 : 2} />
+                                            <Text style={[styles.graftOptionText, graftType === 'fruit' && { color: '#DC2626', fontWeight: 'bold' }]}>Fruit</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
 
                             {/* Sélecteur de tags/catégories */}
                             <View style={styles.tagsSection}>
@@ -531,30 +568,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 16,
     },
-    toggleRow: {
-        flexDirection: 'row',
-        backgroundColor: '#F5F0E8',
-        borderRadius: 10,
-        padding: 3,
-        marginBottom: 16,
-    },
-    toggleTab: {
-        flex: 1,
-        paddingVertical: 10,
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    toggleTabActive: {
-        backgroundColor: '#78350F',
-    },
-    toggleText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#78716C',
-    },
-    toggleTextActive: {
-        color: '#FFFFFF',
-    },
     input: {
         backgroundColor: '#FFFFFF',
         borderWidth: 1,
@@ -575,12 +588,12 @@ const styles = StyleSheet.create({
         color: '#57534E',
         marginBottom: 8,
     },
-    quickDateRow: {
+    offsetGrid: {
         flexDirection: 'row',
         gap: 8,
         marginBottom: 12,
     },
-    quickDateBtn: {
+    offsetOptionBtn: {
         flex: 1,
         paddingVertical: 8,
         backgroundColor: '#F5F0E8',
@@ -589,29 +602,42 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#D4A574',
     },
-    quickDateBtnActive: {
+    offsetOptionBtnActive: {
         backgroundColor: '#78350F',
         borderColor: '#78350F',
     },
-    quickDateText: {
-        fontSize: 13,
+    offsetGridInput: {
+        width: '100%',
+        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#78350F',
+    },
+    offsetGridInputActive: {
+        color: '#FFFFFF',
+    },
+    offsetOptionLabel: {
+        fontSize: 10,
         fontWeight: '500',
         color: '#78350F',
     },
-    quickDateTextActive: {
+    offsetOptionLabelActive: {
         color: '#FFFFFF',
     },
-    dateButton: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#D4A574',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+    customDateToggleBtn: {
+        marginTop: 4,
+        alignItems: 'center',
     },
-    dateButtonText: {
-        fontSize: 16,
-        color: '#292524',
+    customDateToggleText: {
+        fontSize: 13,
+        color: '#D97706',
+        textDecorationLine: 'underline',
+    },
+    dateModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
     },
     buttonRow: {
         flexDirection: 'row',
@@ -644,10 +670,10 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     confirmButtonDisabled: {
-        backgroundColor: '#E7E5E4', // stone-200
+        backgroundColor: '#E7E5E4',
     },
     confirmTextDisabled: {
-        color: '#A8A29E', // stone-400
+        color: '#A8A29E',
     },
     modeSwitchLink: {
         marginTop: 16,
@@ -898,6 +924,40 @@ const styles = StyleSheet.create({
     offsetOptionLabelActive: {
         color: '#D97706',
         fontWeight: 'bold',
+    },
+    graftTypeSection: {
+        marginBottom: 20,
+    },
+    graftTypeOptions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    graftOption: {
+        flex: 1,
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        backgroundColor: '#F5F0E8',
+        borderRadius: 16,
+        gap: 8,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    graftOptionActive: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#D4A574',
+        shadowColor: '#D4A574',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    graftOptionText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#78716C',
     },
     customDateToggleBtn: {
         flexDirection: 'row',
