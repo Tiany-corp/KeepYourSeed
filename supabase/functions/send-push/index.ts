@@ -1,4 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-nocheck
+/// <reference types="jsr:@supabase/functions-js/edge-runtime.d.ts" />
 import { createClient } from 'npm:@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
@@ -14,13 +15,11 @@ Deno.serve(async (req) => {
 
   try {
     // 1. Initialiser Supabase pour se connecter à la base de données
-    // Utiliser la clé de service (SERVICE_ROLE_KEY) pour contourner les RLS sur la recherche de token si besoin,
-    // ou la clé anonyme avec l'en-tête d'autorisation de l'utilisateur.
-    // Puisque l'utilisateur peut appeler cette fonction, nous allons récupérer son Auth header.
+    const authHeader = req.headers.get('Authorization');
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      authHeader ? { global: { headers: { Authorization: authHeader } } } : undefined
     );
 
     // 2. Récupérer l'utilisateur qui fait la requête

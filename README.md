@@ -37,3 +37,25 @@ Ces informations sont utilisées par le service de synchronisation pour décider
 ---
 
 Pour plus de détails, consultez le code source des services `storage.js`, `sync.js` et le composant `SettingsDrawer.js`.
+
+---
+
+## 📱 Architecture Expo & Profils de Compilation (EAS Build)
+
+Pour exécuter et tester l'application sur un appareil mobile Android via un fichier APK, deux profils de compilation distincts configurés dans `eas.json` sont à utiliser selon les besoins :
+
+### 1. Profil de Développement (`--profile development`) - Development Client
+* **Principe** : Il compile une coquille native de l'application (semblable à Expo Go) mais n'embarque **pas** le code JavaScript de l'application.
+* **Comportement** : 
+  * Affiche un écran intermédiaire d'Expo pour se connecter à ton serveur de développement local (Metro).
+  * **Ne fonctionne pas hors-ligne** : Il nécessite une connexion Wi-Fi ou filaire active avec ton ordinateur (`npx expo start`) pour charger le JavaScript.
+  * Sert uniquement à tester et débugger en direct avec le rechargement à chaud (Hot Reloading).
+* **Commande de build** : `eas build -p android --profile development`
+
+### 2. Profil de Preview (`--profile preview`) - APK Autonome (Standalone)
+* **Principe** : Il compile et intègre directement l'ensemble du code JavaScript et des assets (le bundle JS) à l'intérieur du fichier binaire `.apk`.
+* **Comportement** :
+  * S'ouvre instantanément directement sur l'application KeepYourSeed, sans menu intermédiaire.
+  * **Fonctionne parfaitement hors-ligne** (indispensable pour valider la logique Local-First).
+  * Permet de tester en conditions réelles de production (partage de fichiers natifs, notifications push, etc.).
+* **Commande de build** : `eas build -p android --profile preview`
