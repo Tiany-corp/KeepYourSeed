@@ -2,10 +2,10 @@ import { useState, useEffect, useContext, useMemo, useCallback, useRef } from 'r
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Platform, Modal, RefreshControl } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Animated, { FadeInDown, withTiming } from 'react-native-reanimated';
-import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId, getAutoSyncPreference } from '../services/storage';
+import { getRecordings, getDailyMemory, setPinnedThought, updateRecording, deleteRecording, getSeenDailyMemoryId, setSeenDailyMemoryId, getAutoSyncPreference, getDailyMemoryPrefTag, setDailyMemoryPrefTag, clearDailyMemoriesCache } from '../services/storage';
 import { updateRecordingMetadataInDatabase, deleteRecordingFromCloud } from '../services/cloud';
 import { syncAll } from '../services/sync';
-import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin, Search } from 'lucide-react-native';
+import { ArrowLeft, Pencil, MoreVertical, Trash2, Pin, Search, Settings } from 'lucide-react-native';
 import { shareAudio } from '../utils/share';
 import AppHeader from '../components/AppHeader';
 import TagFilterBar from '../components/TagFilterBar';
@@ -22,6 +22,7 @@ import HistorySkeleton from '../components/history/HistorySkeleton';
 import DailyMemoryCard from '../components/history/DailyMemoryCard';
 import TreeSelectionModal from '../components/TreeSelectionModal';
 import SearchModal from '../components/SearchModal';
+import DailyMemoryFilterModal from '../components/DailyMemoryFilterModal';
 export default function HistoryScreen() {
     const { session, setDrawerOpen } = useContext(AppContext);
     const navigation = useNavigation();
@@ -36,6 +37,8 @@ export default function HistoryScreen() {
     const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
     const [dailyMemories, setDailyMemories] = useState([]);
     const [isDailyMemorySeen, setIsDailyMemorySeen] = useState(null); // null = en attente de vérification
+    const [prefModalVisible, setPrefModalVisible] = useState(false);
+    const [currentPrefTag, setCurrentPrefTag] = useState(null);
     const [selectedFilterTag, setSelectedFilterTag] = useState(null);
     const [optionsVisible, setOptionsVisible] = useState(false);
     const [optionsPosition, setOptionsPosition] = useState(null);
@@ -69,6 +72,8 @@ export default function HistoryScreen() {
     useEffect(() => {
         const initialize = async () => {
             await loadCustomTagsCache();
+            const tagPref = await getDailyMemoryPrefTag(session?.user?.id || null);
+            setCurrentPrefTag(tagPref);
             // Charger les vocaux (toujours disponible)
             const recordingsPromise = getRecordings().then(localData => {
                 return dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
@@ -129,6 +134,24 @@ export default function HistoryScreen() {
 
         initialize();
     }, [session]);
+
+    const handleUpdatePrefTag = async (newTag) => {
+        const userId = session?.user?.id || null;
+        await setDailyMemoryPrefTag(userId, newTag);
+        setCurrentPrefTag(newTag);
+        await clearDailyMemoriesCache();
+
+        const { getDailyMemories } = require('../services/storage');
+        const memories = await getDailyMemories(userId);
+        let seen = true;
+        if (memories && memories.length > 0) {
+            const firstMemory = memories[0];
+            const seenId = await getSeenDailyMemoryId(userId);
+            seen = !!seenId && !!firstMemory.id && String(seenId) === String(firstMemory.id);
+        }
+        setDailyMemories(memories || []);
+        setIsDailyMemorySeen(seen);
+    };
 
     const [refreshing, setRefreshing] = useState(false);
 
@@ -401,9 +424,9 @@ export default function HistoryScreen() {
             const updates = { parentId: null, graftType: null, status: 'pending_update', updatedAt: new Date().toISOString() };
             await updateRecording(recording.id, updates);
             applyRecordingUpdateInState(recording.id, updates);
-            
+
             showAlert('Succès', 'Pensée dégreffée avec succès.', 'success');
-            
+
             if (session?.user) {
                 syncAll(session.user.id, true).catch(e => console.log('Silent sync failed after ungraft', e));
             }
@@ -472,7 +495,12 @@ export default function HistoryScreen() {
             <View>
                 {/* Pensées Souvenirs */}
                 {notes.length > 0 && (
-                    <Text style={styles.dailyMemoryHeaderTitle}>Pensée souvenir</Text>
+                    <View style={styles.dailyMemoryHeaderRow}>
+                        <Text style={[styles.dailyMemoryHeaderTitle, { marginTop: 0, marginBottom: 0 }]}>Pensée souvenir</Text>
+                        <TouchableOpacity style={styles.dailyMemorySettingsBtn} onPress={() => setPrefModalVisible(true)}>
+                            <Settings size={18} color="#D97706" />
+                        </TouchableOpacity>
+                    </View>
                 )}
                 {notes.map((memory, index) => (
                     <DailyMemoryCard
@@ -565,6 +593,14 @@ export default function HistoryScreen() {
                     }
                 />
             )}
+
+            <DailyMemoryFilterModal
+                visible={prefModalVisible}
+                onClose={() => setPrefModalVisible(false)}
+                availableTags={availableTags}
+                currentPref={currentPrefTag}
+                onSave={handleUpdatePrefTag}
+            />
 
             <OptionsMenu
                 isVisible={optionsVisible}
@@ -725,5 +761,15 @@ const styles = StyleSheet.create({
     },
     dailyMemoryHeaderTitleMessage: {
         color: '#B91C1C',
+    },
+    dailyMemoryHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 10,
+        marginBottom: 8,
+    },
+    dailyMemorySettingsBtn: {
+        padding: 4,
     },
 });

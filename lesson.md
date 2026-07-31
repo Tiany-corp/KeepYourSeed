@@ -159,9 +159,80 @@ Le bouton "fermer la modale" du lecteur audio ne fonctionnait plus sur l'APK And
 
 ---
 
+## 🐞 Le Piège du `.single()` dans Supabase (Erreur "Aucun Push Token trouvé")
+
+**Le Problème :**
+L'Edge Function Deno renvoyait systématiquement l'erreur "Aucun Push Token trouvé pour cet utilisateur" lors des tests de notifications distantes, avec un code HTTP 400. Dans l'application mobile, l'erreur était masquée par le message générique *"Edge Function returned a non-2xx status code"* issu du SDK Supabase.
+
+**L'Investigation :**
+En interrogeant directement la base de données, nous avons constaté que la table `user_push_tokens` contenait **plusieurs lignes** pour le même utilisateur ! 
+En effet, lors des tests sur Web ou Émulateurs, Expo ne parvenait pas à générer de vrais jetons et renvoyait des **phrases d'erreur** (`Error: You must provide notification...`).
+L'application sauvegardait naïvement ces textes via `upsert({ onConflict: 'expo_push_token' })`. Chaque erreur étant textuellement différente, Supabase créait de multiples nouvelles lignes au lieu d'écraser la précédente.
+
+**Le Crash :**
+Dans l'Edge Function Deno, la requête SQL se terminait par la méthode `.single()`. Cette méthode exige de trouver **strictement une et une seule ligne**. Face à ces multiples lignes, Supabase Postgres renvoyait une erreur `PGRST116 (multiple rows returned)`, déclenchant le bloc `catch` et l'échec de la fonction.
+
+**La Solution Apportée :**
+1. **Extraction de l'erreur client** : Mise à jour de `SettingsDrawer.js` avec `await error.context.json()` pour forcer le client à afficher la VRAIE erreur envoyée par le serveur Deno.
+2. **Robustesse de l'Edge Function** : 
+   - Modification de la requête Supabase dans `index.ts`.
+   - Utilisation de `.like('expo_push_token', 'ExponentPushToken%')` pour filtrer et ignorer toutes les fausses chaînes d'erreurs.
+   - Remplacement du `.single()` mortel par `.order('created_at', { ascending: false }).limit(1)`, afin de toujours prendre le jeton valide le plus récent sans jamais crasher (ce qui prépare aussi l'application au support multi-appareils).
+   - Sécurisation de l'authentification Deno en passant explicitement le JWT (`supabaseClient.auth.getUser(jwt)`).
+
+---
+
+## Modales React Native : Séparer les animations (Slide & Fade) et gérer la Barre d'état
+
+**Le Problème (Effet visuel indésirable) :**
+Lorsqu'on utilise le composant `<Modal>` par défaut de React Native avec `animationType="slide"` et `transparent={true}`, l'animation de glissement (vers le haut) affecte **la totalité de l'écran**, y compris l'overlay/le fond noir semi-transparent. Cela crée un effet étrange où l'ombre glisse depuis le bas au lieu d'apparaître naturellement.
+
+De plus, sur Android, le fond transparent de la modale s'arrêtait net juste en dessous de la barre d'état (StatusBar), créant une bande claire disgracieuse tout en haut de l'écran.
+
+**La Solution Apportée :**
+1. **Séparation des Animations via l'API `Animated` :**
+   - Remplacement de `animationType="slide"` par `animationType="none"`.
+   - Utilisation de deux variables animées (`fadeAnim` pour l'opacité du fond noir et `slideAnim` pour le déplacement vertical du bloc de contenu).
+   - Utilisation de `Animated.parallel()` dans un `useEffect` pour jouer les deux animations simultanément à l'ouverture.
+   - **Interception de la fermeture** : Création d'une fonction `handleClose` qui joue les animations à l'envers (disparition du fond noir et glissement vers le bas du contenu) avant de déclencher l'unmount réel de la modale.
+2. **Couverture de la Barre d'état :**
+   - Ajout de la propriété `statusBarTranslucent={true}` sur le composant `<Modal>`. Cela force la modale à s'étendre sur 100% de la hauteur de l'écran (y compris derrière la barre d'état et l'encoche), permettant à l'overlay noir de recouvrir intégralement l'application.
+
+**Retenir pour la suite :**
+Pour des composants d'interface premium comme des "Bottom Sheets" ou des roulettes de sélection, ne pas s'appuyer sur l'animation native basique de la modale. Créer sa propre composition `Animated` offre un rendu beaucoup plus professionnel, et ne pas oublier `statusBarTranslucent={true}` pour éviter les artefacts visuels sur Android.
+
+---
+
+## ⏰ Notifications Programmées : Syntaxe du Trigger (Erreur expo-notifications)
+
+**Le Problème :**
+Les notifications distantes Push fonctionnaient parfaitement, mais les rappels quotidiens (programmés localement via `scheduleNotificationAsync`) ne se déclenchaient pas.
+Aucune erreur n'était visible dans le terminal, ou une erreur discrète "The trigger object you provided is invalid" survenait selon la version d'Expo.
+
+**La Cause :**
+Dans les versions récentes d'`expo-notifications`, passer directement un objet `Date` Javascript à la propriété `trigger` ne fonctionne plus de manière fiable, particulièrement sur Android où un identifiant de canal (`channelId`) est exigé pour que la notification locale soit acceptée par le système d'exploitation.
+
+**La Solution Apportée :**
+Encapsuler la date dans un objet spécifique, préciser IMPÉRATIVEMENT `type: 'date'` pour qu'Expo ne l'ignore pas, et renseigner explicitement le `channelId` pour Android :
+```javascript
+// Avant (Incorrect / Déprécié) :
+trigger: new Date()
+
+// Après (Correct et Robuste) :
+trigger: { 
+  type: 'date',
+  date: new Date(),
+  channelId: 'default' // Identifiant défini lors de setNotificationChannelAsync
+}
+```
+
+**Retenir pour la suite :**
+Si l'objet `trigger` passé à Expo n'est pas strictement reconnu (ex: oubli de la propriété `type: 'date'`), **Expo ignorera silencieusement la date et déclenchera la notification IMMÉDIATEMENT**. C'est ce qui provoque l'apparition de 14 notifications simultanées lors d'une boucle `for` de programmation !
+
+---
+
 ## 🔜 Prochaines Optimisations Prévues (À faire plus tard)
 
 1. **Fluidité de la Barre de Progression (Interpolation) [FAIT]** :
    - **Enjeu** : L'affichage natif fait des "sauts" ( Bridge JS). 
    - **Solution** : Implémenté via `react-native-reanimated`. La SharedValue `animatedPosition` est synchronisée avec `withTiming` pour un défilement fluide à 60 FPS, offrant une expérience premium.
-

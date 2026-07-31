@@ -74,7 +74,8 @@
         }
       ],
       "expo-web-browser",
-      "expo-updates"
+      "expo-updates",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

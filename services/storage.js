@@ -499,6 +499,24 @@ const getTodayKey = () => {
     const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     return `${DAILY_MEMORY_PREFIX}${localDate}`;
 };
+const PREF_TAG_KEY = (userId) => `@daily_memory_pref_tag_${userId || 'guest'}`;
+
+export const getDailyMemoryPrefTag = async (userId = null) => {
+    try {
+        return await universalStorage.getData(PREF_TAG_KEY(userId));
+    } catch {
+        return null;
+    }
+};
+
+export const setDailyMemoryPrefTag = async (userId = null, tag = null) => {
+    try {
+        await universalStorage.saveData(PREF_TAG_KEY(userId), tag);
+    } catch (e) {
+        console.error("Erreur enregistrement tag préféré", e);
+    }
+};
+
 const getSeenDailyMemoryKey = (userId) => `${SEEN_DAILY_MEMORY_PREFIX}${userId || 'guest'}`;
 
 export const clearDailyMemoriesCache = async () => {
@@ -557,9 +575,18 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
         const results = [];
 
         // 2. La pensée souvenir du jour (Rituel local) - TOUJOURS EN PREMIER
-        const notes = allLocal.filter(r =>
+        let notes = allLocal.filter(r =>
             !r.deletedAt && r.type === 'note' && (!r.deliverDate || new Date(r.deliverDate) <= now)
         );
+
+        const preferredTag = await getDailyMemoryPrefTag(userId);
+        if (preferredTag) {
+            const filteredNotes = notes.filter(r => r.tags && r.tags.includes(preferredTag));
+            if (filteredNotes.length > 0) {
+                notes = filteredNotes;
+            }
+        }
+
         if (notes.length > 0) {
             const start = new Date(now.getFullYear(), 0, 0);
             const diff = now - start;

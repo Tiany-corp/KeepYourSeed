@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator, ScrollView, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
@@ -9,6 +9,9 @@ import * as Notifications from 'expo-notifications';
 import { fetchTotalCloudUsage } from '../services/cloud';
 import { syncAll, forcePushAllLocalNotes } from '../services/sync';
 import Logo from './Logo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import TimeWheelPickerModal from './TimeWheelPickerModal';
 
 const DRAWER_WIDTH = 280;
 
@@ -27,21 +30,34 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const [cloudQuota, setCloudQuotaState] = useState(30 * 1024 * 1024); // 30 Mo par défaut
     const [secretClicks, setSecretClicks] = useState(0);
 
+    const { scheduleRotatingDailyReminders, cancelDailyReminder } = usePushNotifications(session);
+    const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
+    const [dailyReminderTime, setDailyReminderTime] = useState('20:00');
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
+    const handleTimeSave = async (newTime) => {
+        setDailyReminderTime(newTime);
+        await AsyncStorage.setItem('dailyReminderTime', newTime);
+        const [h, m] = newTime.split(':').map(Number);
+        await scheduleRotatingDailyReminders(h, m);
+        showAlert('Heure modifiée', `Rappel programmé à ${newTime}`, 'success');
+    };
+
     const loadStorageStats = async () => {
         const recordings = await getRecordings();
         const nonDeleted = recordings.filter(r => !r.deletedAt);
         const local = nonDeleted.filter(r => r.localUri).length;
         const total = nonDeleted.length;
         const percent = total > 0 ? Math.round((local / total) * 100) : 100;
-        
+
         const sizeBytes = await calculateStorageSize(recordings);
         const formattedSize = formatSize(sizeBytes);
-        
+
         // Estimation du poids manquant (1 min = ~0.5 Mo)
         const missing = nonDeleted.filter(r => !r.localUri);
         const totalMissingDurationMs = missing.reduce((sum, r) => sum + (r.duration || 60000), 0);
         const missingMo = ((totalMissingDurationMs / 60000) * 0.5).toFixed(1);
-        
+
         setStorageStats({ local, total, percent, formattedSize, missingMo });
 
         // Charger aussi l'usage Cloud réel depuis Supabase
@@ -62,6 +78,11 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 setAutoSync(autoSyncPref);
                 const currentQuota = await getCloudQuota();
                 setCloudQuotaState(currentQuota);
+
+                const reminderEnabled = await AsyncStorage.getItem('dailyReminderEnabled');
+                const reminderTime = await AsyncStorage.getItem('dailyReminderTime');
+                setDailyReminderEnabled(reminderEnabled === 'true');
+                if (reminderTime) setDailyReminderTime(reminderTime);
             })();
         }
     }, [visible]);
@@ -111,7 +132,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
 
     const handleSync = async () => {
         if (!session?.user?.id) return;
-        
+
         setIsSyncing(true);
         try {
             const { syncAll } = require('../services/sync');
@@ -258,7 +279,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {/* Menu items — seulement si connecté */}
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
-                        
+
                         {/* Info de stockage CLOUD */}
                         <View style={{ paddingVertical: 14, paddingHorizontal: 20 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
@@ -271,16 +292,16 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                             {formatSize(cloudUsage)} / {formatSize(cloudQuota)}
                                         </Text>
                                     </View>
-                                    
+
                                     {/* Ligne 2 : La barre */}
                                     <View style={{ height: 6, backgroundColor: '#E8D5BF', borderRadius: 3, overflow: 'hidden' }}>
-                                        <View 
-                                            style={{ 
-                                                height: '100%', 
+                                        <View
+                                            style={{
+                                                height: '100%',
                                                 width: `${Math.min((cloudUsage / cloudQuota) * 100, 100)}%`,
                                                 backgroundColor: (cloudUsage / cloudQuota) > 0.9 ? '#DC2626' : '#78350F',
                                                 borderRadius: 3
-                                            }} 
+                                            }}
                                         />
                                     </View>
 
@@ -308,7 +329,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     </View>
                                 </View>
                                 {storageStats.local < storageStats.total && (
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, alignItems: 'center' }}
                                         onPress={async () => {
                                             setIsSyncing(true);
@@ -330,8 +351,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             </View>
                         </View>
 
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
+                        <TouchableOpacity
+                            style={styles.menuItem}
                             onPress={handleSync}
                             disabled={isSyncing}
                         >
@@ -342,16 +363,16 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
+                        <TouchableOpacity
+                            style={styles.menuItem}
                             onPress={() => { onClose(); navigation.navigate('Garden'); }}
                         >
                             <Trees size={20} color="#15803d" style={styles.menuIcon} />
                             <Text style={styles.menuItemText}>Mon Jardin</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
+                        <TouchableOpacity
+                            style={styles.menuItem}
                             onPress={() => { onClose(); navigation.navigate('Trash'); }}
                         >
                             <Trash2 size={20} color="#78350F" style={styles.menuIcon} />
@@ -392,8 +413,63 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
 
                         <View style={[styles.separator, { marginVertical: 16 }]} />
 
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
+                        {/* Section Rappel Quotidien */}
+                        <View style={[styles.menuItem, { paddingVertical: 8, justifyContent: 'space-between' }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Bell size={20} color="#78350F" style={styles.menuIcon} />
+                                <View>
+                                    <Text style={styles.menuItemText}>Rappel quotidien</Text>
+                                    {dailyReminderEnabled && (
+                                        <Text style={{ fontSize: 12, color: '#A8A29E', marginTop: 2 }}>
+                                            Chaque jour à {dailyReminderTime}
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                            <Switch
+                                value={dailyReminderEnabled}
+                                onValueChange={async (value) => {
+                                    setDailyReminderEnabled(value);
+                                    await AsyncStorage.setItem('dailyReminderEnabled', value ? 'true' : 'false');
+                                    if (value) {
+                                        const [h, m] = dailyReminderTime.split(':').map(Number);
+                                        const success = await scheduleRotatingDailyReminders(h, m);
+                                        if (success) showAlert('Rappel activé', `Tu recevras un rappel inspirant tous les jours à ${dailyReminderTime}.`, 'success');
+                                    } else {
+                                        await cancelDailyReminder();
+                                        showAlert('Rappel désactivé', 'Les rappels quotidiens ont été annulés.', 'info');
+                                    }
+                                }}
+                                trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
+                                thumbColor={dailyReminderEnabled ? '#78350F' : '#F5F5F4'}
+                            />
+                        </View>
+
+                        {dailyReminderEnabled && (
+                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', paddingRight: 20, marginBottom: 12 }}>
+                                <Text style={{ fontSize: 13, color: '#78350F', marginRight: 8 }}>Heure :</Text>
+
+                                <TouchableOpacity
+                                    style={{ backgroundColor: '#F3EFEA', borderRadius: 6, paddingVertical: 6, paddingHorizontal: 12, width: 65, alignItems: 'center' }}
+                                    onPress={() => setShowTimePicker(true)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={{ color: '#78350F', fontWeight: 'bold', fontSize: 14 }}>
+                                        {dailyReminderTime}
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TimeWheelPickerModal
+                                    visible={showTimePicker}
+                                    onClose={() => setShowTimePicker(false)}
+                                    initialTime={dailyReminderTime}
+                                    onSave={handleTimeSave}
+                                />
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
                             onPress={async () => {
                                 console.log("Bouton test notification cliqué !");
                                 showAlert('Test lancé', 'La notification devrait apparaître immédiatement...', 'info');
@@ -418,8 +494,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             <Text style={styles.menuItemText}>Tester notification locale</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            style={styles.menuItem} 
+                        <TouchableOpacity
+                            style={styles.menuItem}
                             onPress={async () => {
                                 console.log("Bouton test push distant cliqué !");
                                 showAlert('Envoi en cours...', 'Contact du serveur Supabase...', 'info');
@@ -428,16 +504,26 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     const { data, error } = await supabase.functions.invoke('send-push', {
                                         body: { trigger: 'manual' }
                                     });
-                                    if (error) throw new Error(error.message);
+                                    if (error) {
+                                        let errorMsg = error.message;
+                                        if (error.context && typeof error.context.json === 'function') {
+                                            try {
+                                                const errData = await error.context.json();
+                                                errorMsg = errData.error || errorMsg;
+                                            } catch (e) { }
+                                        }
+                                        throw new Error(errorMsg);
+                                    }
                                     console.log("Réponse serveur :", data);
                                     if (data?.success) {
                                         console.log("Le serveur a bien envoyé le push à Expo.");
+                                        showAlert('Succès', 'La notification a été envoyée !', 'success');
                                     } else {
                                         showAlert('Erreur Serveur', data?.error || 'Erreur inconnue', 'error');
                                     }
                                 } catch (e) {
                                     console.error("Erreur appel fonction send-push :", e);
-                                    showAlert('Erreur', 'Impossible de contacter le serveur distant.', 'error');
+                                    showAlert('Erreur', e.message || 'Impossible de contacter le serveur distant.', 'error');
                                 }
                             }}
                         >
@@ -473,9 +559,9 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 )}
 
                 {/* Footer avec interaction cachée */}
-                <TouchableOpacity 
-                    style={styles.footer} 
-                    onPress={handleSecretClick} 
+                <TouchableOpacity
+                    style={styles.footer}
+                    onPress={handleSecretClick}
                     activeOpacity={0.8}
                 >
                     <Logo size={36} style={styles.footerLogo} />

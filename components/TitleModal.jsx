@@ -11,7 +11,8 @@ import {
     ScrollView,
     KeyboardAvoidingView,
 } from 'react-native';
-import { Trash2, Plus, X, Network, GitMerge, Apple } from 'lucide-react-native';
+import { Trash2, Plus, X, Apple, Leaf } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
 import CustomDatePicker from './CustomDatePicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get, set } from 'idb-keyval';
@@ -48,6 +49,19 @@ const persistCustomTags = async (tags) => {
         }
     } catch (e) { console.warn('Failed to save custom tags', e); }
 };
+
+const RootIcon = ({ size = 24, color = "currentColor", strokeWidth = 2 }) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M12 4v4" />
+        <Path d="M12 8c-2.5 2-4 5-4.5 8" />
+        <Path d="M12 8c2.5 2 4 5 4.5 8" />
+        <Path d="M7.5 16c-1.5 2-3 3-5 3.5" />
+        <Path d="M16.5 16c1.5 2 3 3 5 3.5" />
+        <Path d="M12 8v4" />
+        <Path d="M12 12c-1.5 2-2 4-2 6" />
+        <Path d="M12 12c1.5 2 2 4 2 6" />
+    </Svg>
+);
 
 /**
  * Modale qui s'ouvre après l'enregistrement pour demander un titre.
@@ -211,7 +225,7 @@ export default function TitleModal({
     };
 
     const handleDeleteCustomTag = (tagId) => {
-        const updated = customTags.filter(t => t.id !== tagId); 
+        const updated = customTags.filter(t => t.id !== tagId);
         setCustomTags(updated);
         persistCustomTags(updated);
         loadCustomTagsCache(); // Mettre à jour le cache global
@@ -288,26 +302,26 @@ export default function TitleModal({
                                 <View style={styles.graftTypeSection}>
                                     <Text style={styles.tagsLabel}>Type de pensée</Text>
                                     <View style={styles.graftTypeOptions}>
-                                        <TouchableOpacity 
-                                            style={[styles.graftOption, graftType === 'root' && styles.graftOptionActive]} 
+                                        <TouchableOpacity
+                                            style={[styles.graftOption, graftType === 'root' && styles.graftOptionActive]}
                                             onPress={() => setGraftType('root')}
                                             activeOpacity={0.7}
                                         >
-                                            <Network size={20} color={graftType === 'root' ? '#D97706' : '#78716C'} strokeWidth={graftType === 'root' ? 2.5 : 2} />
+                                            <RootIcon size={20} color={graftType === 'root' ? '#D97706' : '#78716C'} strokeWidth={graftType === 'root' ? 2.5 : 2} />
                                             <Text style={[styles.graftOptionText, graftType === 'root' && { color: '#D97706', fontWeight: 'bold' }]}>Racine</Text>
                                         </TouchableOpacity>
-                                        
-                                        <TouchableOpacity 
-                                            style={[styles.graftOption, graftType === 'leaf' && styles.graftOptionActive]} 
+
+                                        <TouchableOpacity
+                                            style={[styles.graftOption, graftType === 'leaf' && styles.graftOptionActive]}
                                             onPress={() => setGraftType('leaf')}
                                             activeOpacity={0.7}
                                         >
-                                            <GitMerge size={20} color={graftType === 'leaf' ? '#15803D' : '#78716C'} strokeWidth={graftType === 'leaf' ? 2.5 : 2} />
+                                            <Leaf size={20} color={graftType === 'leaf' ? '#15803D' : '#78716C'} strokeWidth={graftType === 'leaf' ? 2.5 : 2} />
                                             <Text style={[styles.graftOptionText, graftType === 'leaf' && { color: '#15803D', fontWeight: 'bold' }]}>Feuille</Text>
                                         </TouchableOpacity>
 
-                                        <TouchableOpacity 
-                                            style={[styles.graftOption, graftType === 'fruit' && styles.graftOptionActive]} 
+                                        <TouchableOpacity
+                                            style={[styles.graftOption, graftType === 'fruit' && styles.graftOptionActive]}
                                             onPress={() => setGraftType('fruit')}
                                             activeOpacity={0.7}
                                         >
@@ -315,6 +329,21 @@ export default function TitleModal({
                                             <Text style={[styles.graftOptionText, graftType === 'fruit' && { color: '#DC2626', fontWeight: 'bold' }]}>Fruit</Text>
                                         </TouchableOpacity>
                                     </View>
+                                    {graftType === 'root' && (
+                                        <Text style={styles.graftHintText}>
+                                            🌱 Racine : Une pensée fondatrice, une direction ou une révélation qui ancre et approfondit cette pensée.
+                                        </Text>
+                                    )}
+                                    {graftType === 'leaf' && (
+                                        <Text style={styles.graftHintText}>
+                                            🌿 Feuille : Une pensée annexe, une réfléxion, un éclaircissement liée à cette pensée.
+                                        </Text>
+                                    )}
+                                    {graftType === 'fruit' && (
+                                        <Text style={styles.graftHintText}>
+                                            🍎 Fruit : Un résultat, un témoignage ou un encouragement liée de cette pensée.
+                                        </Text>
+                                    )}
                                 </View>
                             )}
 
@@ -958,6 +987,14 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#78716C',
+    },
+    graftHintText: {
+        fontSize: 12,
+        color: '#A8A29E',
+        textAlign: 'center',
+        marginTop: 12,
+        fontStyle: 'italic',
+        lineHeight: 18,
     },
     customDateToggleBtn: {
         flexDirection: 'row',

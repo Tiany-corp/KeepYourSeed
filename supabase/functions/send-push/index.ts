@@ -23,21 +23,27 @@ Deno.serve(async (req) => {
     );
 
     // 2. Récupérer l'utilisateur qui fait la requête
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    const jwt = authHeader?.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(jwt);
     if (userError || !user) {
+      console.error("User Auth Error:", userError);
       throw new Error("Non autorisé ou jeton invalide");
     }
 
     // 3. Chercher le Push Token de cet utilisateur dans la table
-    const { data: pushData, error: dbError } = await supabaseClient
+    const { data: pushDataArray, error: dbError } = await supabaseClient
       .from('user_push_tokens')
       .select('expo_push_token')
       .eq('user_id', user.id)
-      .single();
+      .like('expo_push_token', 'ExponentPushToken%') // Ignore error messages saved as tokens
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (dbError || !pushData?.expo_push_token) {
-      throw new Error("Aucun Push Token trouvé pour cet utilisateur");
+    if (dbError || !pushDataArray || pushDataArray.length === 0) {
+      throw new Error("Aucun Push Token valide trouvé pour cet utilisateur");
     }
+
+    const pushData = pushDataArray[0];
 
     // 4. Construire le message pour Expo
     const expoMessage = {
@@ -66,6 +72,7 @@ Deno.serve(async (req) => {
       status: 200,
     });
   } catch (error) {
+    console.error("Function error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
