@@ -5,7 +5,7 @@ import Animated, {
     useAnimatedStyle,
     withSpring
 } from 'react-native-reanimated';
-import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle, Share2 } from 'lucide-react-native';
+import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle, Share2, GitBranch } from 'lucide-react-native';
 import Logo from '../Logo';
 import AnimatedPlayButton from '../AnimatedPlayButton';
 import { getTagInfo } from '../../utils/tags';
@@ -30,6 +30,7 @@ const RecordingItem = memo(({
     onDeletePermanent
 }) => {
     const optionsRef = useRef(null);
+    const hasChildren = childrenRecords && childrenRecords.length > 0;
 
     const handleOptionsPress = () => {
         if (optionsRef.current) {
@@ -47,8 +48,8 @@ const RecordingItem = memo(({
                     const tag = getTagInfo(tagId);
                     if (!tag) return null;
                     return (
-                        <View key={tagId} style={styles.tagPill}>
-                            <Text style={styles.tagPillText}>{tag.emoji} {tag.label}</Text>
+                        <View key={tagId} style={[styles.tagPill, hasChildren && styles.tagPillParent]}>
+                            <Text style={[styles.tagPillText, hasChildren && styles.tagPillTextParent]}>{tag.emoji} {tag.label}</Text>
                         </View>
                     );
                 })}
@@ -79,46 +80,46 @@ const RecordingItem = memo(({
         <>
             <Animated.View style={[styles.itemContainer, animatedStyle]}>
                 <Pressable
-                    style={styles.item}
+                    style={[styles.item, hasChildren && styles.itemParent]}
                     onPress={() => onTogglePlay(item)}
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
                 >
-                    <View style={[styles.playButtonIcon, (isItemPlaying || isLoading) && styles.playButtonIconActive]}>
+                    <View style={[styles.playButtonIcon, hasChildren && styles.playButtonIconParent, (isItemPlaying || isLoading) && styles.playButtonIconActive]}>
                         <AnimatedPlayButton
                             key={item.id}
                             isPlaying={isItemPlaying && audioPlayerIsPlaying}
                             size={18}
-                            color="#FFFFFF"
+                            color={hasChildren ? "#E8D5BF" : "#FFFFFF"}
                             strokeWidth={1.5}
                         />
                     </View>
                     <View style={styles.itemInfo}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                            {item.pinned && <Pin size={12} color="#D97706" style={{ marginRight: 6 }} fill="#D97706" />}
-                            {childrenRecords && childrenRecords.length > 0 && (
-                                <Share2 size={12} color="#10B981" style={{ marginRight: 6, transform: [{ rotate: '90deg' }] }} />
+                            {item.pinned && <Pin size={12} color={hasChildren ? "#E8D5BF" : "#D97706"} style={{ marginRight: 6 }} fill={hasChildren ? "#E8D5BF" : "#D97706"} />}
+                            {hasChildren && (
+                                <GitBranch size={14} color="#E8D5BF" style={{ marginRight: 6 }} />
                             )}
-                            <Text style={[styles.itemTitle, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                            <Text style={[styles.itemTitle, hasChildren && styles.itemTitleParent, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
 
                             {/* Indicateur de synchro (caché en mode corbeille pour plus de clarté) */}
                             {sessionUser && !isTrashMode && (
                                 <View style={styles.statusIcons}>
                                     {item.status === 'error' && (
-                                        <AlertCircle size={14} color="#EF4444" style={{ marginRight: 4 }} />
+                                        <AlertCircle size={14} color={hasChildren ? "#FCA5A5" : "#EF4444"} style={{ marginRight: 4 }} />
                                     )}
                                     {item.dbId ? (
-                                        <Cloud size={14} color={item.status === 'error' ? "#EF4444" : "#10B981"} opacity={0.6} />
+                                        <Cloud size={14} color={item.status === 'error' ? (hasChildren ? "#FCA5A5" : "#EF4444") : (hasChildren ? "#6EE7B7" : "#10B981")} opacity={hasChildren ? 0.9 : 0.6} />
                                     ) : (
-                                        <CloudOff size={14} color="#78716C" opacity={0.4} />
+                                        <CloudOff size={14} color={hasChildren ? "#D4A574" : "#78716C"} opacity={hasChildren ? 0.8 : 0.4} />
                                     )}
                                 </View>
                             )}
                         </View>
                         <View style={styles.metaLineContainer}>
-                            <Text style={styles.itemDate} numberOfLines={1}>{formatDateWithTime(item.date)}</Text>
+                            <Text style={[styles.itemDate, hasChildren && styles.itemDateParent]} numberOfLines={1}>{formatDateWithTime(item.date)}</Text>
                             <View style={{ flex: 1 }} />
-                            <Text style={styles.itemDuration}>{formatSecondsDuration(item.duration)}</Text>
+                            <Text style={[styles.itemDuration, hasChildren && styles.itemDurationParent]}>{formatSecondsDuration(item.duration)}</Text>
                         </View>
                         {item.tags && item.tags.length > 0 && renderTags(item.tags)}
                     </View>
@@ -209,6 +210,16 @@ const styles = StyleSheet.create({
         flex: 1,
         marginRight: 10,
     },
+    itemParent: {
+        backgroundColor: '#78350F',
+        borderColor: '#78350F',
+        borderWidth: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 3,
+    },
     playButtonIcon: {
         width: 40,
         height: 40,
@@ -217,6 +228,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
+    },
+    playButtonIconParent: {
+        backgroundColor: 'rgba(255, 255, 255, 0)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.8)',
     },
     playButtonIconActive: {
         backgroundColor: '#B91C1C',
@@ -231,9 +247,16 @@ const styles = StyleSheet.create({
         color: '#292524',
         marginBottom: 2,
     },
+    itemTitleParent: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+    },
     itemDate: {
         fontSize: 12,
         color: '#78716C',
+    },
+    itemDateParent: {
+        color: '#E8D5BF',
     },
     metaLineContainer: {
         flexDirection: 'row',
@@ -243,6 +266,9 @@ const styles = StyleSheet.create({
         color: '#78716C',
         fontSize: 14,
         fontWeight: '500',
+    },
+    itemDurationParent: {
+        color: '#F5F0E8',
     },
     tagsRow: {
         flexDirection: 'row',
@@ -262,6 +288,13 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#78350F',
         fontWeight: '500',
+    },
+    tagPillParent: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    tagPillTextParent: {
+        color: '#FFFFFF',
     },
     optionsButton: {
         paddingHorizontal: 8,

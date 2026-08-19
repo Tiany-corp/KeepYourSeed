@@ -24,7 +24,8 @@ const INSPIRING_MESSAGES = [
   "Prends une seconde pour toi : comment te sens-tu ce soir ?",
   "Une victoire à célébrer aujourd'hui, même petite ?",
   "Qu'as-tu appris de nouveau aujourd'hui ?",
-  "Y a-t-il quelqu'un que tu aimerais remercier aujourd'hui ?"
+  "Y a-t-il quelqu'un que tu aimerais remercier aujourd'hui ?",
+  "Transparence... Dit moi à quoi tu penses ?"
 ];
 
 export function usePushNotifications(session) {
