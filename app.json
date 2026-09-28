@@ -22,7 +22,12 @@
       "backgroundColor": "#FAF7F2"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tianyr.KeepYourSeed",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "KeepYourSeed a besoin d'accéder au micro pour enregistrer vos pensées vocales.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {

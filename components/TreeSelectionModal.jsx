@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput } from 'react-native';
-import { X, Search, GitMerge, Apple, Network } from 'lucide-react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, Animated, Dimensions } from 'react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { X, Search, GitMerge, Apple, Network, Star } from 'lucide-react-native';
 import { getRecordings } from '../services/storage';
 import Logo from './Logo';
 import { formatDateWithTime } from '../utils/date';
@@ -17,27 +19,91 @@ export default function TreeSelectionModal({
     const [selectedTreeId, setSelectedTreeId] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const slideAnim = React.useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
     useEffect(() => {
         if (visible) {
             loadTrees();
             setStep(1);
             setSelectedTreeId(null);
             setSearchQuery('');
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                })
+            ]).start();
+        } else {
+            fadeAnim.setValue(0);
+            slideAnim.setValue(SCREEN_HEIGHT);
         }
     }, [visible]);
+
+    const handleClose = () => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: SCREEN_HEIGHT,
+                duration: 250,
+                useNativeDriver: true,
+            })
+        ]).start(() => {
+            onClose();
+        });
+    };
 
     const loadTrees = async () => {
         setLoading(true);
         try {
             const allRecordings = await getRecordings();
 
-            // Un "Arbre" (Tronc) potentiel est un enregistrement qui n'a pas de parentId
-            // On exclut aussi l'enregistrement courant (excludeId) pour ne pas qu'il soit son propre parent
-            const potentialTrees = allRecordings.filter(r =>
-                !r.deletedAt &&
-                !r.parentId &&
-                r.id !== excludeId
-            ).sort((a, b) => new Date(b.date) - new Date(a.date));
+            // Créer un Set contenant les IDs de tous les parents existants pour une recherche rapide
+            const parentIds = new Set(
+                allRecordings
+                    .filter(r => !r.deletedAt && r.parentId)
+                    .map(r => r.parentId)
+            );
+
+            // Fonction pour vérifier si un parent potentiel est un descendant de l'enregistrement courant
+            // Cela empêche les boucles infinies (ex: Greffer A sur B, alors que B est déjà greffé sur A)
+            const isDescendant = (potentialParentId, targetId) => {
+                let currentId = potentialParentId;
+                const visited = new Set();
+                while (currentId) {
+                    if (currentId === targetId) return true;
+                    if (visited.has(currentId)) return false; // Sécurité anti-boucle
+                    visited.add(currentId);
+                    const parent = allRecordings.find(r => r.id === currentId || (r.dbId && r.dbId.toString() === currentId?.toString()));
+                    currentId = parent ? parent.parentId : null;
+                }
+                return false;
+            };
+
+            // Un "Arbre" potentiel est n'importe quel enregistrement valide
+            // On exclut l'enregistrement courant (excludeId) ET tous ses descendants pour éviter les cycles
+            const potentialTrees = allRecordings
+                .filter(r => !r.deletedAt && r.id !== excludeId && !isDescendant(r.id, excludeId))
+                .map(r => ({
+                    ...r,
+                    // Est considéré comme racine s'il l'est manuellement OU s'il a déjà des enfants (organique)
+                    isEffectivelyRoot: r.isRoot || parentIds.has(r.id) || (r.dbId && parentIds.has(r.dbId.toString()))
+                }))
+                .sort((a, b) => {
+                    if (a.isEffectivelyRoot && !b.isEffectivelyRoot) return -1;
+                    if (!a.isEffectivelyRoot && b.isEffectivelyRoot) return 1;
+                    return new Date(b.date) - new Date(a.date);
+                });
 
             setTrees(potentialTrees);
         } catch (e) {
@@ -61,7 +127,10 @@ export default function TreeSelectionModal({
         >
             <Logo size={24} color="#78350F" variant="outline" />
             <View style={styles.treeInfo}>
-                <Text style={styles.treeTitle} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.treeTitle} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
+                    {item.isEffectivelyRoot && <Star size={14} color="#D97706" fill="#D97706" />}
+                </View>
                 <Text style={styles.treeDate}>{formatDateWithTime(item.date)}</Text>
             </View>
         </TouchableOpacity>
@@ -71,21 +140,26 @@ export default function TreeSelectionModal({
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
-            onRequestClose={onClose}
+            animationType="none"
+            statusBarTranslucent={true}
+            onRequestClose={handleClose}
         >
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Sélectionner un Arbre</Text>
-                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+                <KeyboardAvoidingView
+                    style={{ flex: 1, justifyContent: 'flex-end' }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
+                        <View style={styles.header}>
+                            <Text style={styles.headerTitle}>Choisir l'arbre à nourrir</Text>
+                            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
                             <X size={24} color="#78716C" />
                         </TouchableOpacity>
                     </View>
 
                     {step === 1 ? (
                         <>
-                            <Text style={styles.subtitle}>Choisissez un enregistrement principal auquel rattacher cette pensée.</Text>
+                            <Text style={styles.subtitle}>Choisissez l'arbre (ou l'arbuste) que vous allez nourrir grâce à cette pensée ramifiée.</Text>
 
                             <View style={styles.searchContainer}>
                                 <Search size={20} color="#A8A29E" style={styles.searchIcon} />
@@ -114,7 +188,7 @@ export default function TreeSelectionModal({
                         <View style={styles.roleSelectionContainer}>
                             <Text style={styles.subtitle}>Quel est la nature de cette pensée ?</Text>
 
-                            <TouchableOpacity style={styles.roleBtn} onPress={() => { onSelectTree(selectedTreeId, 'root'); onClose(); }}>
+                            <TouchableOpacity style={styles.roleBtn} onPress={() => { onSelectTree(selectedTreeId, 'root'); handleClose(); }}>
                                 <View style={[styles.roleIconBox, { backgroundColor: '#FDE68A' }]}>
                                     <Network size={24} color="#D97706" />
                                 </View>
@@ -124,7 +198,7 @@ export default function TreeSelectionModal({
                                 </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.roleBtn} onPress={() => { onSelectTree(selectedTreeId, 'leaf'); onClose(); }}>
+                            <TouchableOpacity style={styles.roleBtn} onPress={() => { onSelectTree(selectedTreeId, 'leaf'); handleClose(); }}>
                                 <View style={[styles.roleIconBox, { backgroundColor: '#D1FAE5' }]}>
                                     <GitMerge size={24} color="#059669" />
                                 </View>
@@ -134,7 +208,7 @@ export default function TreeSelectionModal({
                                 </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.roleBtn} onPress={() => { onSelectTree(selectedTreeId, 'fruit'); onClose(); }}>
+                            <TouchableOpacity style={styles.roleBtn} onPress={() => { onSelectTree(selectedTreeId, 'fruit'); handleClose(); }}>
                                 <View style={[styles.roleIconBox, { backgroundColor: '#FEE2E2' }]}>
                                     <Apple size={24} color="#DC2626" />
                                 </View>
@@ -148,13 +222,14 @@ export default function TreeSelectionModal({
                                 <Text style={styles.backBtnText}>Retour à la sélection de l'arbre</Text>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.skipBtn} onPress={() => { onSelectTree(selectedTreeId, 'leaf'); onClose(); }}>
+                            <TouchableOpacity style={styles.skipBtn} onPress={() => { onSelectTree(selectedTreeId, 'leaf'); handleClose(); }}>
                                 <Text style={styles.skipBtnText}>Passer (Par défaut : Feuille)</Text>
                             </TouchableOpacity>
                         </View>
                     )}
-                </View>
-            </View>
+                    </Animated.View>
+                </KeyboardAvoidingView>
+            </Animated.View>
         </Modal>
     );
 }
@@ -163,7 +238,6 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: '#FAF7F2',

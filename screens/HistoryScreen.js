@@ -293,6 +293,24 @@ export default function HistoryScreen() {
         await shareAudio(item, showAlert);
     };
 
+    const handleToggleRoot = async (item) => {
+        try {
+            const newIsRoot = !item.isRoot;
+            const updates = { isRoot: newIsRoot, status: 'pending_update', updatedAt: new Date().toISOString() };
+            await updateRecording(item.id, updates);
+            applyRecordingUpdateInState(item.id, updates);
+
+            showAlert('Succès', newIsRoot ? 'Définie comme racine avec succès.' : 'Retirée des racines avec succès.', 'success');
+
+            if (session?.user) {
+                syncAll(session.user.id, true).catch(e => console.log('Silent sync failed after toggle root', e));
+            }
+        } catch (error) {
+            console.error('Toggle root failed:', error);
+            showAlert('Erreur', 'Impossible de modifier le statut de racine.', 'error');
+        }
+    };
+
     // Fonctionnalité d'édition (Placeholder pour la logique future)
     const handleEdit = (item) => {
         setEditingRecording(item);
@@ -617,6 +635,8 @@ export default function HistoryScreen() {
                 onGraft={() => handleGraftInit(selectedRecording)}
                 isGrafted={!!selectedRecording?.parentId}
                 onUngraft={() => handleUngraft(selectedRecording)}
+                isRoot={!!selectedRecording?.isRoot}
+                onToggleRoot={() => handleToggleRoot(selectedRecording)}
             />
 
             <TreeSelectionModal

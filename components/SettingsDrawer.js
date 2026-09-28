@@ -91,10 +91,10 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         const next = secretClicks + 1;
         setSecretClicks(next);
         if (next === 10) {
-            const EXTENDED_QUOTA = 500 * 1024 * 1024; // 500 Mo
+            const EXTENDED_QUOTA = 800 * 1024 * 1024; // 800 Mo
             await setCloudQuota(EXTENDED_QUOTA);
             setCloudQuotaState(EXTENDED_QUOTA);
-            showAlert('🔓 Quota Étendu', 'Mode développeur activé : Quota cloud passé à 500 Mo !', 'success');
+            showAlert('🔓 Quota Étendu', 'Mode développeur activé : Quota cloud passé à 800 Mo !', 'success');
             setSecretClicks(0);
         }
     };

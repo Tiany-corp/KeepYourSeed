@@ -30,7 +30,7 @@ const RecordingItem = memo(({
     onDeletePermanent
 }) => {
     const optionsRef = useRef(null);
-    const hasChildren = childrenRecords && childrenRecords.length > 0;
+    const hasChildren = (childrenRecords && childrenRecords.length > 0) || item.isRoot;
 
     const handleOptionsPress = () => {
         if (optionsRef.current) {

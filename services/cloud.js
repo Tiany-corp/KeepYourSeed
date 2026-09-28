@@ -95,7 +95,7 @@ export const getSignedAudioUrl = async (storagePath, expiresIn = 3600) => {
  * @param {string|null} deliverDate - ISO date for message delivery (null for notes)
  * @returns {Promise<Object|null>} - The inserted record or null if failed
  */
-export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], originalDate = null, parentId = null, graftType = null) => {
+export const saveRecordingToDatabase = async (userId, title, audioUrl, duration, type = 'note', deliverDate = null, tags = [], originalDate = null, parentId = null, graftType = null, isRoot = false) => {
     try {
         const insertData = {
             user_id: userId,
@@ -120,6 +120,7 @@ export const saveRecordingToDatabase = async (userId, title, audioUrl, duration,
             insertData['graftType'] = graftType;
         }
         insertData['waterCount'] = 0;
+        insertData.is_root = isRoot;
 
         // ANTI-DOUBLONS : Vérifier si une note identique existe déjà pour cet utilisateur
         const { data: existing, error: searchError } = await supabase
@@ -194,6 +195,7 @@ export const fetchCloudRecordings = async (userId) => {
             parentId: row.parent_id || null,
             graftType: row.graftType || null,
             waterCount: row.waterCount || 0,
+            isRoot: row.is_root || false,
         }));
 
     } catch (e) {
@@ -228,6 +230,7 @@ export const updateRecordingMetadataInDatabase = async ({
         };
         if (recording.graftType !== undefined) updates['graftType'] = recording.graftType;
         if (recording.waterCount !== undefined) updates['waterCount'] = recording.waterCount;
+        if (recording.isRoot !== undefined) updates['is_root'] = recording.isRoot;
 
         let query = supabase.from('recordings').update(updates).eq('user_id', userId);
         if (recording.dbId) {

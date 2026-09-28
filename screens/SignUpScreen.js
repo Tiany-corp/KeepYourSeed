@@ -18,19 +18,24 @@ export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack })
         }
 
         setLoading(true);
-        const { data: { session }, error } = await supabase.auth.signUp({
-            email: email,
-            password: password,
-        });
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: email.trim(),
+                password: password,
+            });
 
-        if (error) {
-            console.log("Erreur complète:", error);
-            Alert.alert("Erreur d'inscription", error.message);
-        } else if (!session) {
-            Alert.alert('Vérifiez vos emails', 'Un lien de confirmation a été envoyé à votre adresse email.');
+            if (error) {
+                console.error("Erreur Auth Supabase:", error);
+                Alert.alert("Erreur d'inscription", error.message || JSON.stringify(error));
+            } else if (!data?.session) {
+                Alert.alert('Vérifiez vos emails', 'Un lien de confirmation a été envoyé à votre adresse email.');
+            }
+        } catch (e) {
+            console.error("Exception locale d'inscription:", e);
+            Alert.alert('Erreur inattendue', e.message || "Problème réseau ou serveur.");
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     }
 
     async function handleGoogleSignIn() {

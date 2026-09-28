@@ -12,13 +12,24 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
 
     async function signInWithEmail() {
         setLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password,
-        });
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password: password,
+            });
 
-        if (error) Alert.alert('Erreur de connexion', error.message);
-        setLoading(false);
+            if (error) {
+                console.error("Erreur Auth Supabase:", error);
+                Alert.alert('Erreur de connexion', error.message || JSON.stringify(error));
+            } else if (!data?.session) {
+                Alert.alert('Erreur', "Impossible de récupérer la session.");
+            }
+        } catch (e) {
+            console.error("Exception locale de connexion:", e);
+            Alert.alert('Erreur inattendue', e.message || "Problème réseau ou serveur.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     async function handleGoogleSignIn() {

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View, Text, Animated, Dimensions, Pressable } from 'react-native';
-import { Edit2, Trash2, Pin, X, Share2 } from 'lucide-react-native';
+import { Edit2, Trash2, Pin, X, Share2, Sprout, GitGraph, GitPullRequestArrow } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, onShare, onGraft, isGrafted, onUngraft }) => {
+const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, onShare, onGraft, isGrafted, onUngraft, isRoot, onToggleRoot }) => {
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
     React.useEffect(() => {
@@ -50,15 +50,20 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
                         <Text style={styles.menuText}>Épingler</Text>
                     </TouchableOpacity>
 
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { onToggleRoot(); onClose(); }}>
+                        <Sprout size={18} color={isRoot ? "#B91C1C" : "#78350F"} fill={isRoot ? "#B91C1C" : "none"} />
+                        <Text style={[styles.menuText, isRoot && styles.deleteText]}>{isRoot ? "Enlever du sol" : "Planter"}</Text>
+                    </TouchableOpacity>
+
                     {isGrafted ? (
                         <TouchableOpacity style={styles.menuItem} onPress={() => { onUngraft(); onClose(); }}>
-                            <Share2 size={18} color="#B91C1C" style={{ transform: [{ rotate: '90deg' }] }} />
-                            <Text style={styles.menuText}>Dégreffer</Text>
+                            <GitGraph size={18} color="#B91C1C" />
+                            <Text style={styles.menuText}>Détacher</Text>
                         </TouchableOpacity>
                     ) : (
                         <TouchableOpacity style={styles.menuItem} onPress={() => { onGraft(); onClose(); }}>
-                            <Share2 size={18} color="#78350F" style={{ transform: [{ rotate: '90deg' }] }} />
-                            <Text style={styles.menuText}>Greffer</Text>
+                            <GitPullRequestArrow size={18} color="#78350F" />
+                            <Text style={styles.menuText}>Ramifier à...</Text>
                         </TouchableOpacity>
                     )}
 
@@ -66,6 +71,8 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
                         <Edit2 size={18} color="#78350F" />
                         <Text style={styles.menuText}>Modifier</Text>
                     </TouchableOpacity>
+
+
 
                     <TouchableOpacity style={styles.menuItem} onPress={() => { onShare(); onClose(); }}>
                         <Share2 size={18} color="#78350F" />

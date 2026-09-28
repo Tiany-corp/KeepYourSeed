@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, Animated, Dimensions } from 'react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { X, Search } from 'lucide-react-native';
 import { getRecordings } from '../services/storage';
 import Logo from './Logo';
@@ -14,13 +16,47 @@ export default function SearchModal({
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
 
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const slideAnim = React.useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
     useEffect(() => {
         if (visible) {
             loadRecordings();
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                })
+            ]).start();
         } else {
             setSearchQuery('');
+            fadeAnim.setValue(0);
+            slideAnim.setValue(SCREEN_HEIGHT);
         }
     }, [visible]);
+
+    const handleClose = () => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: SCREEN_HEIGHT,
+                duration: 250,
+                useNativeDriver: true,
+            })
+        ]).start(() => {
+            onClose();
+        });
+    };
 
     const loadRecordings = async () => {
         setLoading(true);
@@ -48,7 +84,7 @@ export default function SearchModal({
             style={styles.itemContainer}
             onPress={() => {
                 onSelectAudio(item);
-                onClose();
+                handleClose();
             }}
         >
             <Logo size={24} color="#78350F" variant="outline" />
@@ -63,14 +99,19 @@ export default function SearchModal({
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
-            onRequestClose={onClose}
+            animationType="none"
+            statusBarTranslucent={true}
+            onRequestClose={handleClose}
         >
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <View style={styles.header}>
-                        <Text style={styles.headerTitle}>Rechercher un audio</Text>
-                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+                <KeyboardAvoidingView 
+                    style={{ flex: 1, justifyContent: 'flex-end' }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
+                        <View style={styles.header}>
+                            <Text style={styles.headerTitle}>Rechercher un audio</Text>
+                            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
                             <X size={24} color="#78716C" />
                         </TouchableOpacity>
                     </View>
@@ -100,8 +141,9 @@ export default function SearchModal({
                             </Text>
                         }
                     />
-                </View>
-            </View>
+                    </Animated.View>
+                </KeyboardAvoidingView>
+            </Animated.View>
         </Modal>
     );
 }
@@ -110,7 +152,6 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: '#FAF7F2',
