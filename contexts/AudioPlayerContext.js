@@ -78,8 +78,8 @@ export function AudioPlayerProvider({ children }) {
             if (status.didJustFinish) {
                 intentionalPlay.current = false;
                 setIsPlaying(false);
-                setPosition(0);
-                positionRef.current = 0;
+                setPosition(durationRef.current);
+                positionRef.current = durationRef.current;
             }
         });
 
@@ -148,8 +148,8 @@ export function AudioPlayerProvider({ children }) {
         if (player.playing) {
             pause();
         } else {
-            // Si fini, remettre au début
-            if (positionRef.current >= durationRef.current && durationRef.current > 0) {
+            // Si fini (ou réinitialisé à 0 par l'événement de fin), on rembobine avant de lire
+            if ((positionRef.current >= durationRef.current && durationRef.current > 0) || positionRef.current === 0) {
                 player.seekTo(0);
             }
             player.play();
