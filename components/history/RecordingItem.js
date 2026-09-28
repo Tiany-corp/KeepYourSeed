@@ -5,7 +5,7 @@ import Animated, {
     useAnimatedStyle,
     withSpring
 } from 'react-native-reanimated';
-import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle, Share2, GitBranch } from 'lucide-react-native';
+import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle, Share2, Sprout } from 'lucide-react-native';
 import Logo from '../Logo';
 import AnimatedPlayButton from '../AnimatedPlayButton';
 import { getTagInfo } from '../../utils/tags';
@@ -98,7 +98,7 @@ const RecordingItem = memo(({
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                             {item.pinned && <Pin size={12} color={hasChildren ? "#E8D5BF" : "#D97706"} style={{ marginRight: 6 }} fill={hasChildren ? "#E8D5BF" : "#D97706"} />}
                             {hasChildren && (
-                                <GitBranch size={14} color="#E8D5BF" style={{ marginRight: 6 }} />
+                                <Sprout size={14} color="#E8D5BF" style={{ marginRight: 6 }} />
                             )}
                             <Text style={[styles.itemTitle, hasChildren && styles.itemTitleParent, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
 
