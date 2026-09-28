@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Modal, Pressable } from 'react-native';
-import { ChevronDown, Check, Search } from 'lucide-react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Modal, Pressable, Animated, ScrollView, TouchableWithoutFeedback } from 'react-native';
+import { Filter, Check, Search, X } from 'lucide-react-native';
 
 /**
  * Barre de filtrage avec un bouton déroulant (dropdown) pour sélectionner un thème.
@@ -13,9 +13,62 @@ import { ChevronDown, Check, Search } from 'lucide-react-native';
  */
 const TagFilterBar = React.memo(({ availableTags, selectedTag, onSelectTag, onSearchPress }) => {
     const [modalVisible, setModalVisible] = useState(false);
+    const [tempSelectedTag, setTempSelectedTag] = useState(selectedTag);
     const hasTags = availableTags && availableTags.length > 0;
     const selectedTagObject = selectedTag && hasTags ? availableTags.find(t => t.id === selectedTag) : null;
-    const buttonText = selectedTagObject ? `${selectedTagObject.emoji} ${selectedTagObject.label}` : 'Tous';
+    
+    // Si c'est _messages_
+    const isMessages = selectedTag === '_messages_';
+    const buttonText = isMessages ? '📬 Messages reçus' : (selectedTagObject ? `${selectedTagObject.emoji} ${selectedTagObject.label}` : 'Filtrer');
+
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(300)).current;
+
+    useEffect(() => {
+        if (modalVisible) {
+            setTempSelectedTag(selectedTag);
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                })
+            ]).start();
+        }
+    }, [modalVisible]);
+
+    const handleCloseAnimation = (callback) => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 300,
+                duration: 250,
+                useNativeDriver: true,
+            })
+        ]).start(() => {
+            setModalVisible(false);
+            if (callback) callback();
+        });
+    };
+
+    const handleRequestClose = () => {
+        handleCloseAnimation();
+    };
+
+    const handleSave = () => {
+        handleCloseAnimation(() => {
+            onSelectTag(tempSelectedTag);
+        });
+    };
 
     return (
         <View style={styles.filterContainer}>
@@ -32,7 +85,7 @@ const TagFilterBar = React.memo(({ availableTags, selectedTag, onSelectTag, onSe
                         onPress={() => setModalVisible(true)}
                     >
                         <Text style={styles.dropdownButtonText}>{buttonText}</Text>
-                        <ChevronDown size={16} color="#78350F" style={styles.dropdownIcon} />
+                        <Filter size={14} color="#78350F" style={styles.dropdownIcon} />
                     </TouchableOpacity>
                 )}
             </View>
@@ -40,37 +93,54 @@ const TagFilterBar = React.memo(({ availableTags, selectedTag, onSelectTag, onSe
             <Modal
                 visible={modalVisible}
                 transparent={true}
-                animationType="fade"
-                onRequestClose={() => setModalVisible(false)}
+                animationType="none"
+                statusBarTranslucent={true}
+                onRequestClose={handleRequestClose}
             >
-                <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
-                    <Pressable style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Filtrer par thème</Text>
+                <TouchableWithoutFeedback onPress={handleRequestClose}>
+                    <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+                        <TouchableWithoutFeedback>
+                            <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
+                                <View style={styles.header}>
+                                    <Text style={styles.modalTitle}>Filtrer par thème</Text>
+                                    <TouchableOpacity onPress={handleRequestClose} style={styles.closeBtn}>
+                                        <X size={24} color="#78716C" />
+                                    </TouchableOpacity>
+                                </View>
 
-                        <View style={styles.modalList}>
-                            <TouchableOpacity
-                                style={[styles.modalItem, !selectedTag && styles.modalItemActive]}
-                                onPress={() => { onSelectTag(null); setModalVisible(false); }}
-                            >
-                                <Text style={[styles.modalItemText, !selectedTag && styles.modalItemTextActive]}>Tous</Text>
-                                {!selectedTag && <Check size={18} color="#78350F" />}
-                            </TouchableOpacity>
+                                <ScrollView style={styles.list}>
+                                    <TouchableOpacity
+                                        style={[styles.tagItem, !tempSelectedTag && styles.tagItemSelected]}
+                                        onPress={() => setTempSelectedTag(null)}
+                                    >
+                                        <Text style={[styles.tagText, !tempSelectedTag && styles.tagTextSelected]}>Tous</Text>
+                                        {!tempSelectedTag && <Check size={20} color="#78350F" />}
+                                    </TouchableOpacity>
 
-                            {availableTags.map(tag => (
-                                <TouchableOpacity
-                                    key={tag.id}
-                                    style={[styles.modalItem, selectedTag === tag.id && styles.modalItemActive]}
-                                    onPress={() => { onSelectTag(tag.id); setModalVisible(false); }}
-                                >
-                                    <Text style={[styles.modalItemText, selectedTag === tag.id && styles.modalItemTextActive]}>
-                                        {tag.emoji} {tag.label}
-                                    </Text>
-                                    {selectedTag === tag.id && <Check size={18} color="#78350F" />}
+                                    {availableTags.map(tag => {
+                                        const isSelected = tempSelectedTag === tag.id;
+                                        return (
+                                            <TouchableOpacity
+                                                key={tag.id}
+                                                style={[styles.tagItem, isSelected && styles.tagItemSelected]}
+                                                onPress={() => setTempSelectedTag(tag.id)}
+                                            >
+                                                <Text style={[styles.tagText, isSelected && styles.tagTextSelected]}>
+                                                    {tag.emoji} {tag.label}
+                                                </Text>
+                                                {isSelected && <Check size={20} color="#78350F" />}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+
+                                <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                                    <Text style={styles.saveBtnText}>Valider</Text>
                                 </TouchableOpacity>
-                            ))}
-                        </View>
-                    </Pressable>
-                </Pressable>
+                            </Animated.View>
+                        </TouchableWithoutFeedback>
+                    </Animated.View>
+                </TouchableWithoutFeedback>
             </Modal>
         </View>
     );
@@ -131,53 +201,67 @@ const styles = StyleSheet.create({
     // --- Styles de la Modale ---
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: '#FAF7F2',
-        borderRadius: 20,
-        padding: 20,
-        width: '100%',
-        maxWidth: 320,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 5,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        maxHeight: '80%',
     },
-    modalTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#292524',
-        marginBottom: 16,
-        textAlign: 'center',
-    },
-    modalList: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    modalItem: {
+    header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#292524',
+    },
+    closeBtn: {
+        padding: 4,
+    },
+    list: {
+        marginBottom: 24,
+    },
+    tagItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingVertical: 14,
         paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0E6D2',
-    },
-    modalItemActive: {
         backgroundColor: '#F5F0E8',
+        borderRadius: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'transparent',
     },
-    modalItemText: {
-        fontSize: 15,
+    tagItemSelected: {
+        backgroundColor: '#F3E8D8', // Light brown instead of yellow
+        borderColor: '#D4A574',     // Brown border
+    },
+    tagText: {
+        fontSize: 16,
         color: '#44403C',
+        fontWeight: '500',
     },
-    modalItemTextActive: {
+    tagTextSelected: {
+        color: '#78350F', // Primary brown
+        fontWeight: '600',
+    },
+    saveBtn: {
+        backgroundColor: '#78350F', // Primary brown
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    saveBtnText: {
+        color: '#FFF',
+        fontSize: 16,
         fontWeight: 'bold',
-        color: '#78350F',
     },
 });
