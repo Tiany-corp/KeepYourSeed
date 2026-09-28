@@ -294,7 +294,7 @@ const pushLocalChanges = async (userId) => {
                     const dbRecord = await saveRecordingToDatabase(
                         userId, rec.title, remoteUrl, rec.duration,
                         rec.type || 'note', rec.deliverDate, rec.tags || [], rec.date,
-                        cloudParentId
+                        cloudParentId, rec.graftType, rec.isRoot
                     );
                     if (dbRecord) {
                         // Extraire le vrai UUID (saveRecordingToDatabase retourne l'objet complet)
@@ -314,7 +314,13 @@ const pushLocalChanges = async (userId) => {
                         const estimatedSize = rec.duration ? (rec.duration / 60) * 1024 * 1024 : 1024 * 1024;
                         currentUsage += estimatedSize;
                         if (currentUsage >= MAX_QUOTA_BYTES) quotaReached = true;
+                    } else {
+                        workingList[idx] = { ...workingList[idx], status: 'error' };
+                        hasChanged = true;
                     }
+                } else {
+                    workingList[idx] = { ...workingList[idx], status: 'error' };
+                    hasChanged = true;
                 }
             } else if (rec.status === 'pending_update') {
                 let resolvedParentId = rec.parentId;
@@ -343,12 +349,15 @@ const pushLocalChanges = async (userId) => {
                     workingList[idx] = { ...workingList[idx], status: 'synced' };
                     count++;
                     hasChanged = true;
+                } else {
+                    workingList[idx] = { ...workingList[idx], status: 'error' };
+                    hasChanged = true;
                 }
             }
         } catch (err) {
             console.error(`Erreur push change pour "${rec.title}":`, err);
-            // On ne modifie pas le status ici pour laisser une chance au prochain sycn, 
-            // ou on pourrait mettre 'error' mais sans sauvegarder le tableau complet à chaque fois.
+            workingList[idx] = { ...workingList[idx], status: 'error' };
+            hasChanged = true;
         }
     }
 
