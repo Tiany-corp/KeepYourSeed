@@ -300,7 +300,7 @@ export default function HistoryScreen() {
             await updateRecording(item.id, updates);
             applyRecordingUpdateInState(item.id, updates);
 
-            showAlert('Succès', newIsRoot ? 'Définie comme racine avec succès.' : 'Retirée des racines avec succès.', 'success');
+            showAlert('Succès', newIsRoot ? 'Graine plantée avec succès. \n\n Vous pourrez la retrouver et la voir grandir dans la rubrique "Mon Jardin"' : 'Retirée des racines avec succès.', 'success');
 
             if (session?.user) {
                 syncAll(session.user.id, true).catch(e => console.log('Silent sync failed after toggle root', e));
@@ -474,9 +474,10 @@ export default function HistoryScreen() {
                 sessionUser={session?.user}
                 activeChildId={currentTrack?.id}
                 isLoading={isLoading}
+                isOptionsOpen={optionsVisible && selectedRecording?.id === item.id}
             />
         );
-    }, [currentTrack?.id, audioPlayerIsPlaying, loadingTrackId, childrenByParent, handleTogglePlay, session?.user]);
+    }, [currentTrack?.id, audioPlayerIsPlaying, loadingTrackId, childrenByParent, handleTogglePlay, session?.user, optionsVisible, selectedRecording?.id]);
 
     const handleToggleDailyMemory = useCallback(async (memory) => {
         if (!memory) return;

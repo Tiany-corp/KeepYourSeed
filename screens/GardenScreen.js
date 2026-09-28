@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { StyleSheet, View, Text, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
-import { ArrowLeft, Share2 } from 'lucide-react-native';
+import { ArrowLeft, Share2, Bean, Sprout, TreeDeciduous } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import { getRecordings } from '../services/storage';
 import TreeCard from '../components/garden/TreeCard';
@@ -16,6 +16,7 @@ export default function GardenScreen() {
 
     const [trees, setTrees] = useState([]);
     const [childrenMap, setChildrenMap] = useState({});
+    const [counts, setCounts] = useState({ seed: 0, sprout: 0, tree: 0 });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -46,9 +47,23 @@ export default function GardenScreen() {
                 }
             });
 
-            // "Trees" are recordings that have at least one child
+            // "Trees" are recordings that have at least one child OR are marked as isRoot
             const treeIds = Object.keys(map);
-            const treeRecordings = activeRecordings.filter(r => treeIds.includes(r.id));
+            const treeRecordings = activeRecordings.filter(r => treeIds.includes(r.id) || r.isRoot);
+
+            let seedCount = 0;
+            let sproutCount = 0;
+            let adultTreeCount = 0;
+
+            treeRecordings.forEach(r => {
+                const leaves = map[r.id] || [];
+                const leafCount = leaves.length;
+                if (leafCount === 0) seedCount++;
+                else if (leafCount < 3) sproutCount++;
+                else adultTreeCount++;
+            });
+
+            setCounts({ seed: seedCount, sprout: sproutCount, tree: adultTreeCount });
 
             // Sort by date descending
             treeRecordings.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -101,8 +116,23 @@ export default function GardenScreen() {
 
             <View style={styles.content}>
                 <Text style={styles.description}>
-                    Voici votre jardin. Chaque arbre représente une idée principale qui à été nourrit avec plusieurs pensées.
+                    Voici votre jardin. Chaque arbre représente une idée racine qui a été nourrie (ou qui le sera).
                 </Text>
+
+                <View style={styles.statsContainer}>
+                    <View style={styles.statItem}>
+                        <Bean size={18} color="#78350F" />
+                        <Text style={styles.statText}>{counts.seed}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                        <Sprout size={18} color="#78350F" />
+                        <Text style={styles.statText}>{counts.sprout}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                        <TreeDeciduous size={18} color="#78350F" />
+                        <Text style={styles.statText}>{counts.tree}</Text>
+                    </View>
+                </View>
 
                 {loading ? (
                     <ActivityIndicator size="large" color="#15803d" style={{ marginTop: 40 }} />
@@ -164,6 +194,29 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         fontStyle: 'italic',
         textAlign: 'center',
+    },
+    statsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 16,
+        marginBottom: 16,
+        paddingHorizontal: 16,
+    },
+    statItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F0E8',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#D4A574',
+    },
+    statText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#78350F',
     },
     listContainer: {
         paddingHorizontal: 12,

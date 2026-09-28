@@ -5,7 +5,7 @@ import Animated, {
     useAnimatedStyle,
     withSpring
 } from 'react-native-reanimated';
-import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle, Share2, Sprout } from 'lucide-react-native';
+import { Pin, MoreVertical, Cloud, CloudOff, RotateCcw, Trash2, AlertCircle, Share2, Sprout, Bean, TreeDeciduous } from 'lucide-react-native';
 import Logo from '../Logo';
 import AnimatedPlayButton from '../AnimatedPlayButton';
 import { getTagInfo } from '../../utils/tags';
@@ -27,7 +27,8 @@ const RecordingItem = memo(({
     isLoading,
     isTrashMode = false,
     onRestore,
-    onDeletePermanent
+    onDeletePermanent,
+    isOptionsOpen = false
 }) => {
     const optionsRef = useRef(null);
     const hasChildren = (childrenRecords && childrenRecords.length > 0) || item.isRoot;
@@ -80,7 +81,7 @@ const RecordingItem = memo(({
         <>
             <Animated.View style={[styles.itemContainer, animatedStyle]}>
                 <Pressable
-                    style={[styles.item, hasChildren && styles.itemParent]}
+                    style={[styles.item, hasChildren && styles.itemParent, isOptionsOpen && styles.itemOptionsOpen]}
                     onPress={() => onTogglePlay(item)}
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
@@ -98,7 +99,12 @@ const RecordingItem = memo(({
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                             {item.pinned && <Pin size={12} color={hasChildren ? "#E8D5BF" : "#D97706"} style={{ marginRight: 6 }} fill={hasChildren ? "#E8D5BF" : "#D97706"} />}
                             {hasChildren && (
-                                <Sprout size={14} color="#E8D5BF" style={{ marginRight: 6 }} />
+                                (() => {
+                                    const childCount = childrenRecords ? childrenRecords.length : 0;
+                                    if (childCount === 0) return <Bean size={14} color="#E8D5BF" style={{ marginRight: 6 }} />;
+                                    if (childCount < 3) return <Sprout size={14} color="#E8D5BF" style={{ marginRight: 6 }} />;
+                                    return <TreeDeciduous size={14} color="#E8D5BF" style={{ marginRight: 6 }} />;
+                                })()
                             )}
                             <Text style={[styles.itemTitle, hasChildren && styles.itemTitleParent, { flex: 1 }]} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
 
@@ -209,6 +215,16 @@ const styles = StyleSheet.create({
         elevation: 1,
         flex: 1,
         marginRight: 10,
+    },
+    itemOptionsOpen: {
+        borderColor: '#78350F', // Primary brown instead of orange
+        borderWidth: 1.5,
+        // Pas de changement de fond brutal pour respecter les cartes "Arbre"
+        shadowColor: "#78350F",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        elevation: 4,
     },
     itemParent: {
         backgroundColor: '#78350F',

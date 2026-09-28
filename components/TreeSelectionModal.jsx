@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, Animated, Dimensions } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-import { X, Search, GitMerge, Apple, Network, Star } from 'lucide-react-native';
+import { X, Search, GitMerge, Apple, Network, Star, Bean, Sprout, TreeDeciduous } from 'lucide-react-native';
 import { getRecordings } from '../services/storage';
 import Logo from './Logo';
 import { formatDateWithTime } from '../utils/date';
@@ -68,12 +68,11 @@ export default function TreeSelectionModal({
         try {
             const allRecordings = await getRecordings();
 
-            // Créer un Set contenant les IDs de tous les parents existants pour une recherche rapide
-            const parentIds = new Set(
-                allRecordings
-                    .filter(r => !r.deletedAt && r.parentId)
-                    .map(r => r.parentId)
-            );
+            const childCountMap = new Map();
+            allRecordings.filter(r => !r.deletedAt && r.parentId).forEach(r => {
+                const pid = r.parentId;
+                childCountMap.set(pid, (childCountMap.get(pid) || 0) + 1);
+            });
 
             // Fonction pour vérifier si un parent potentiel est un descendant de l'enregistrement courant
             // Cela empêche les boucles infinies (ex: Greffer A sur B, alors que B est déjà greffé sur A)
@@ -94,11 +93,17 @@ export default function TreeSelectionModal({
             // On exclut l'enregistrement courant (excludeId) ET tous ses descendants pour éviter les cycles
             const potentialTrees = allRecordings
                 .filter(r => !r.deletedAt && r.id !== excludeId && !isDescendant(r.id, excludeId))
-                .map(r => ({
-                    ...r,
-                    // Est considéré comme racine s'il l'est manuellement OU s'il a déjà des enfants (organique)
-                    isEffectivelyRoot: r.isRoot || parentIds.has(r.id) || (r.dbId && parentIds.has(r.dbId.toString()))
-                }))
+                .map(r => {
+                    const idCount = childCountMap.get(r.id) || 0;
+                    const dbIdCount = r.dbId ? (childCountMap.get(r.dbId.toString()) || 0) : 0;
+                    const totalChildCount = idCount + dbIdCount;
+                    return {
+                        ...r,
+                        childCount: totalChildCount,
+                        // Est considéré comme racine s'il l'est manuellement OU s'il a déjà des enfants (organique)
+                        isEffectivelyRoot: r.isRoot || totalChildCount > 0
+                    };
+                })
                 .sort((a, b) => {
                     if (a.isEffectivelyRoot && !b.isEffectivelyRoot) return -1;
                     if (!a.isEffectivelyRoot && b.isEffectivelyRoot) return 1;
@@ -129,7 +134,11 @@ export default function TreeSelectionModal({
             <View style={styles.treeInfo}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={styles.treeTitle} numberOfLines={1}>{item.title || 'Sans titre'}</Text>
-                    {item.isEffectivelyRoot && <Star size={14} color="#D97706" fill="#D97706" />}
+                    {item.isEffectivelyRoot && (() => {
+                        if (!item.childCount || item.childCount === 0) return <Bean size={14} color="#78350F" />;
+                        if (item.childCount < 3) return <Sprout size={14} color="#78350F" />;
+                        return <TreeDeciduous size={14} color="#78350F" />;
+                    })()}
                 </View>
                 <Text style={styles.treeDate}>{formatDateWithTime(item.date)}</Text>
             </View>

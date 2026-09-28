@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, StyleSheet, TouchableOpacity, View, Text, Animated, Dimensions, Pressable } from 'react-native';
-import { Edit2, Trash2, Pin, X, Share2, Sprout, GitGraph, GitPullRequestArrow } from 'lucide-react-native';
+import { Edit2, Trash2, Pin, X, Share2, Sprout, GitGraph, GitPullRequestArrow, BeanOff, Bean } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,7 +23,7 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
 
     // Positionnement à gauche du bouton
     const menuWidth = 180;
-    const menuHeight = 200;
+    const menuHeight = 320;
 
     // On place le menu à gauche (pageX) moins sa largeur, avec une petite marge
     let left = position.pageX - menuWidth - 10;
@@ -50,10 +50,17 @@ const OptionsMenu = ({ isVisible, onClose, position, onEdit, onDelete, onPin, on
                         <Text style={styles.menuText}>Épingler</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { onToggleRoot(); onClose(); }}>
-                        <Sprout size={18} color={isRoot ? "#B91C1C" : "#78350F"} fill={isRoot ? "#B91C1C" : "none"} />
-                        <Text style={[styles.menuText, isRoot && styles.deleteText]}>{isRoot ? "Enlever du sol" : "Planter"}</Text>
-                    </TouchableOpacity>
+                    {isRoot ? (
+                        <TouchableOpacity style={styles.menuItem} onPress={() => { onToggleRoot(); onClose(); }}>
+                            <BeanOff size={18} color="#B91C1C" />
+                            <Text style={[styles.menuText]}>Déterrer</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity style={styles.menuItem} onPress={() => { onToggleRoot(); onClose(); }}>
+                            <Bean size={18} color="#78350F" />
+                            <Text style={styles.menuText}>Planter</Text>
+                        </TouchableOpacity>
+                    )}
 
                     {isGrafted ? (
                         <TouchableOpacity style={styles.menuItem} onPress={() => { onUngraft(); onClose(); }}>

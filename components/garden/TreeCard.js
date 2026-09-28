@@ -1,19 +1,38 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Share2, Play } from 'lucide-react-native';
+import { Leaf, Play, HeartPlus, Apple } from 'lucide-react-native';
 import { formatDateWithTime } from '../../utils/date';
 import Logo from '../Logo';
 
 export default function TreeCard({ tree, leaves, onPress, onPlay }) {
-    const leafCount = leaves ? leaves.length : 0;
+    const allChildren = leaves || [];
+    const rootsCount = allChildren.filter(c => c.graftType === 'root').length;
+    const fruitsCount = allChildren.filter(c => c.graftType === 'fruit').length;
+    const leafCount = allChildren.filter(c => !c.graftType || c.graftType === 'leaf').length;
 
     return (
         <TouchableOpacity style={styles.card} onPress={onPress}>
             <View style={styles.headerRow}>
-                <Logo size={24} color="#15803d" variant="outline" />
-                <View style={styles.leafBadge}>
-                    <Share2 size={12} color="#15803d" style={{ transform: [{ rotate: '90deg' }] }} />
-                    <Text style={styles.leafText}>{leafCount}</Text>
+                <Logo size={20} color="#15803d" variant="outline" />
+                <View style={styles.badgesContainer}>
+                    {rootsCount > 0 && (
+                        <View style={[styles.badge, styles.rootBadge]}>
+                            <HeartPlus size={10} color="#78350F" />
+                            <Text style={[styles.badgeText, { color: '#78350F' }]}>{rootsCount}</Text>
+                        </View>
+                    )}
+                    {leafCount > 0 && (
+                        <View style={[styles.badge, styles.leafBadge]}>
+                            <Leaf size={10} color="#15803d" />
+                            <Text style={[styles.badgeText, { color: '#15803d' }]}>{leafCount}</Text>
+                        </View>
+                    )}
+                    {fruitsCount > 0 && (
+                        <View style={[styles.badge, styles.fruitBadge]}>
+                            <Apple size={10} color="#DC2626" />
+                            <Text style={[styles.badgeText, { color: '#DC2626' }]}>{fruitsCount}</Text>
+                        </View>
+                    )}
                 </View>
             </View>
 
@@ -54,19 +73,34 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         marginBottom: 12,
     },
-    leafBadge: {
+    badgesContainer: {
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        justifyContent: 'flex-end',
+        gap: 2,
+        flex: 1,
+        paddingLeft: 4,
+    },
+    badge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#dcfce7',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        gap: 4,
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        borderRadius: 8,
+        gap: 2,
     },
-    leafText: {
-        fontSize: 12,
+    rootBadge: {
+        backgroundColor: '#FDE68A',
+    },
+    leafBadge: {
+        backgroundColor: '#dcfce7',
+    },
+    fruitBadge: {
+        backgroundColor: '#FEE2E2',
+    },
+    badgeText: {
+        fontSize: 10,
         fontWeight: 'bold',
-        color: '#15803d',
     },
     infoContainer: {
         flex: 1,

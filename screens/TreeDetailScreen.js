@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, useWindowDimensions } from 'react-native';
-import { ArrowLeft, Network, GitMerge, Apple, Play, Mic } from 'lucide-react-native';
+import { ArrowLeft, HeartPlus, Leaf, Apple, ScanHeart, Mic } from 'lucide-react-native';
 import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { getRecordings, saveRecording } from '../services/storage';
 import { syncAll } from '../services/sync';
@@ -93,7 +93,7 @@ export default function TreeDetailScreen() {
 
     const trunkX = width / 2;
     const trunkY = leavesHeight + fruitsHeight + 40;
-    
+
     const isSeed = roots.length === 0;
     const baseOriginY = isSeed ? trunkY + 70 : trunkY;
 
@@ -126,14 +126,14 @@ export default function TreeDetailScreen() {
         const row = Math.floor(i / 2);
         const isLeft = i % 2 === 0;
         const nY = baseOriginY - 50 - row * 40 - (isLeft ? 0 : 25); // Monte plus lentement
-        
+
         if (nY < highestLeafY) highestLeafY = nY;
 
         // Déploiement plus horizontal et limité à la largeur de l'écran
-        const maxSpread = (width / 2) - 30; 
+        const maxSpread = (width / 2) - 30;
         const calculatedOffset = 70 + row * 50;
         const boundedOffset = Math.min(calculatedOffset, maxSpread);
-        
+
         const sideOffset = (isLeft ? -1 : 1) * boundedOffset;
         const nX = trunkX + sideOffset;
         nodes.push({ ...l, x: nX, y: nY, type: 'leaf' });
@@ -142,7 +142,7 @@ export default function TreeDetailScreen() {
         const startX = trunkX + startXOffset;
 
         // Les courbes partent presque à l'horizontale
-        const cp1x = startX + (isLeft ? -70 : 70); 
+        const cp1x = startX + (isLeft ? -70 : 70);
         const cp1y = baseOriginY + 5; // Ne monte pas tout de suite, s'évase horizontalement
         const cp2x = nX + (isLeft ? 10 : -10);
         const cp2y = nY + 30;
@@ -174,14 +174,14 @@ export default function TreeDetailScreen() {
     });
 
     const renderNodeBubble = (node) => {
-        let Icon = GitMerge;
+        let Icon = Leaf;
         let color = '#059669';
         let bgColor = '#D1FAE5';
         let borderColor = '#34D399';
 
-        if (node.type === 'root') { Icon = Network; color = '#D97706'; bgColor = '#FDE68A'; borderColor = '#FBBF24'; }
+        if (node.type === 'root') { Icon = HeartPlus; color = '#FFF'; bgColor = '#78350F'; borderColor = '#78350F'; }
         else if (node.type === 'fruit') { Icon = Apple; color = '#DC2626'; bgColor = '#FEE2E2'; borderColor = '#F87171'; }
-        else if (node.type === 'trunk') { Icon = Play; color = '#FFF'; bgColor = '#78350F'; borderColor = '#451A03'; }
+        else if (node.type === 'trunk') { Icon = ScanHeart; color = '#FFF'; bgColor = '#78350F'; borderColor = '#78350F'; }
 
         const NODE_SIZE = node.type === 'trunk' ? 70 : 50;
         // Ajustement pour centrer le wrapper (qui fait 120px de large) exactement sur nX
@@ -198,7 +198,7 @@ export default function TreeDetailScreen() {
                     ]}
                     onPress={() => handlePlay(node)}
                 >
-                    <Icon size={node.type === 'trunk' ? 32 : 24} color={color} fill={node.type === 'trunk' ? color : 'none'} />
+                    <Icon size={node.type === 'trunk' ? 40 : 24} color={color} fill="none" />
                     {node.type === 'trunk' && waterCount > 0 && (
                         <View style={styles.waterBadge}>
                             <Text style={styles.waterBadgeText}>💧{waterCount}</Text>
@@ -234,74 +234,74 @@ export default function TreeDetailScreen() {
                 <View style={{ flex: 1 }}>
                     <View style={styles.treeTitleContainer}>
                         <Text style={styles.sectionLabel}>📌 Pensée à nourrir</Text>
-                    <TouchableOpacity
-                        style={[styles.card, isRecording && styles.cardRecording]}
-                        onLongPress={() => {
-                            if (!isRecording) startRecording();
-                        }}
-                        onPress={async () => {
-                            if (isRecording) {
-                                const uri = await stopRecording();
-                                if (uri) {
-                                    setPendingRecording({ uri, duration, parentId: freshTree.id });
-                                    setShowTitleModal(true);
+                        <TouchableOpacity
+                            style={[styles.card, isRecording && styles.cardRecording]}
+                            onLongPress={() => {
+                                if (!isRecording) startRecording();
+                            }}
+                            onPress={async () => {
+                                if (isRecording) {
+                                    const uri = await stopRecording();
+                                    if (uri) {
+                                        setPendingRecording({ uri, duration, parentId: freshTree.id });
+                                        setShowTitleModal(true);
+                                    }
                                 }
-                            }
-                        }}
-                        delayLongPress={400}
-                        activeOpacity={0.8}
-                    >
-                        <View style={styles.logoWrapper}>
-                            <Logo size={24} color={isRecording ? '#B91C1C' : '#78350F'} variant="outline" />
-                        </View>
-                        <View style={styles.info}>
-                            <Text style={styles.title} numberOfLines={1}>{freshTree.title || 'Sans titre'}</Text>
-                            <View style={styles.hintRow}>
-                                <Mic size={11} color={isRecording ? '#B91C1C' : '#A8A29E'} strokeWidth={2} />
-                                <Text style={[styles.hint, isRecording && styles.hintRecording]}>
-                                    {isRecording ? 'Enregistrement... (Tap pour stopper)' : 'Appui long pour nourrir'}
-                                </Text>
+                            }}
+                            delayLongPress={400}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.logoWrapper}>
+                                <Logo size={24} color={isRecording ? '#B91C1C' : '#78350F'} variant="outline" />
                             </View>
-                        </View>
-                    </TouchableOpacity>
-                </View>
-                <ScrollView
-                    contentContainerStyle={{ height: canvasHeight, width: '100%' }}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <Svg height={canvasHeight} width={width} style={StyleSheet.absoluteFill}>
-                        {/* Sol visuel */}
-                        <Path
-                            d={`M 0,${trunkY + 50} Q ${width / 2},${trunkY + 30} ${width},${trunkY + 50} L ${width},${canvasHeight} L 0,${canvasHeight} Z`}
-                            fill="#F5EBE0"
-                        />
-
-                        {/* Tronc Principal de base */}
-                        {!isSeed && (
+                            <View style={styles.info}>
+                                <Text style={styles.title} numberOfLines={1}>{freshTree.title || 'Sans titre'}</Text>
+                                <View style={styles.hintRow}>
+                                    <Mic size={11} color={isRecording ? '#B91C1C' : '#A8A29E'} strokeWidth={2} />
+                                    <Text style={[styles.hint, isRecording && styles.hintRecording]}>
+                                        {isRecording ? 'Enregistrement... (Tap pour stopper)' : 'Appui long pour nourrir'}
+                                    </Text>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView
+                        contentContainerStyle={{ height: canvasHeight, width: '100%' }}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <Svg height={canvasHeight} width={width} style={StyleSheet.absoluteFill}>
+                            {/* Sol visuel */}
                             <Path
-                                d={`M ${trunkX},${trunkY + 50} L ${trunkX},${trunkY}`}
-                                stroke="#78350F"
-                                strokeWidth={trunkThickness + 4}
-                                strokeLinecap="round"
+                                d={`M 0,${trunkY + 50} Q ${width / 2},${trunkY + 30} ${width},${trunkY + 50} L ${width},${canvasHeight} L 0,${canvasHeight} Z`}
+                                fill="#F5EBE0"
                             />
-                        )}
 
-                        {/* Liens SVG */}
-                        {paths.map((p, i) => (
-                            <Path
-                                key={i}
-                                d={p.d}
-                                stroke={p.color}
-                                strokeWidth={p.width}
-                                fill="none"
-                            />
-                        ))}
-                    </Svg>
+                            {/* Tronc Principal de base */}
+                            {!isSeed && (
+                                <Path
+                                    d={`M ${trunkX},${trunkY + 50} L ${trunkX},${trunkY}`}
+                                    stroke="#78350F"
+                                    strokeWidth={trunkThickness + 4}
+                                    strokeLinecap="round"
+                                />
+                            )}
 
-                    {/* Noeuds Clikables */}
-                    {nodes.map(renderNodeBubble)}
-                    {renderNodeBubble({ ...freshTree, x: trunkX, y: baseOriginY, type: 'trunk' })}
-                </ScrollView>
+                            {/* Liens SVG */}
+                            {paths.map((p, i) => (
+                                <Path
+                                    key={i}
+                                    d={p.d}
+                                    stroke={p.color}
+                                    strokeWidth={p.width}
+                                    fill="none"
+                                />
+                            ))}
+                        </Svg>
+
+                        {/* Noeuds Clikables */}
+                        {nodes.map(renderNodeBubble)}
+                        {renderNodeBubble({ ...freshTree, x: trunkX, y: baseOriginY, type: 'trunk' })}
+                    </ScrollView>
                 </View>
             )}
 
@@ -316,7 +316,7 @@ export default function TreeDetailScreen() {
                 onConfirm={async (title, type = 'note', deliverDate = null, tags = [], graftType = 'leaf') => {
                     setShowTitleModal(false);
                     if (!pendingRecording) return;
-                    
+
                     const { uri, duration, parentId } = pendingRecording;
                     const dateStr = new Date().toISOString();
                     const newRecordId = Date.now().toString();
@@ -341,12 +341,12 @@ export default function TreeDetailScreen() {
                     updateStreak();
 
                     if (session?.user) {
-                        syncAll(session.user.id, false).then(() => {});
+                        syncAll(session.user.id, false).then(() => { });
                     }
 
                     showAlert("Sauvegardé", "Ta nouvelle pensée a été rattachée à cet arbre.", "success");
                     setPendingRecording(null);
-                    
+
                     // Recharger l'arbre
                     loadData();
                 }}
