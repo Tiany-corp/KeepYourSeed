@@ -445,6 +445,31 @@ export const emptyAudiosBucket = async (userId) => {
 };
 
 /**
+ * Supprime complètement le compte de l'utilisateur.
+ * 1. Vide le bucket (storage)
+ * 2. Appelle la fonction RPC pour supprimer l'utilisateur auth
+ */
+export const deleteUserAccount = async (userId) => {
+    try {
+        // 1. Vider le bucket audios
+        await emptyAudiosBucket(userId);
+
+        // 2. Supprimer le compte via la fonction RPC
+        const { error } = await supabase.rpc('delete_my_account');
+        if (error) {
+            console.error('Supabase RPC Error (delete_my_account):', error.message);
+            return false;
+        }
+
+        return true;
+    } catch (e) {
+        console.error('Failed to delete user account:', e);
+        return false;
+    }
+};
+
+
+/**
  * Récupère UN enregistrement aléatoire via la fonction RPC PostgreSQL.
  * Utilisé pour la fonctionnalité "Souvenir du jour".
  * Plus performant : 1 seule requête au lieu de 2 (count + select).

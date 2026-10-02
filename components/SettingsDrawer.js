@@ -195,6 +195,39 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
         }
     };
 
+    const handleDeleteAccount = () => {
+        const confirmMsg = "Es-tu absolument sûr de vouloir supprimer définitivement ton compte et TOUTES tes données ? Cette action est IRRÉVERSIBLE.";
+        const executeDelete = async () => {
+            if (!session?.user?.id) return;
+            setIsSyncing(true);
+            try {
+                const { deleteUserAccount } = require('../services/cloud');
+                const success = await deleteUserAccount(session.user.id);
+                if (success) {
+                    // On ne vide pas le local pour ne pas affecter les audios "hors ligne" ou des autres comptes
+                    await supabase.auth.signOut();
+                    onClose();
+                } else {
+                    showAlert('Erreur', 'Impossible de supprimer le compte pour le moment.', 'error');
+                }
+            } catch (e) {
+                console.error('Delete account failed:', e);
+                showAlert('Erreur', 'Une erreur est survenue.', 'error');
+            } finally {
+                setIsSyncing(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(confirmMsg)) executeDelete();
+        } else {
+            Alert.alert('🚨 Suppression Définitive', confirmMsg, [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer mon compte', style: 'destructive', onPress: executeDelete }
+            ]);
+        }
+    };
+
     const handleClearLocalData = () => {
         const confirmMsg = "Supprimer toutes les notes sur ce téléphone ? Elles resteront sur ton Cloud.";
         const executeClear = async () => {
@@ -534,6 +567,11 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
                             <LogOut size={20} color="#991B1B" style={styles.menuIcon} />
                             <Text style={[styles.menuItemText, { color: '#991B1B' }]}>Se déconnecter</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: '#fecaca', marginTop: 16 }]} onPress={handleDeleteAccount}>
+                            <Trash2 size={20} color="#DC2626" style={styles.menuIcon} />
+                            <Text style={[styles.menuItemText, { color: '#DC2626', fontWeight: 'bold' }]}>Supprimer mon compte</Text>
                         </TouchableOpacity>
                     </ScrollView>
                 ) : (
