@@ -317,11 +317,11 @@ export default function HistoryScreen() {
         setShowEditModal(true);
     };
 
-    const handleOptions = (item, position) => {
+    const handleOptions = useCallback((item, position) => {
         setSelectedRecording(item);
         setOptionsPosition(position);
         setOptionsVisible(true);
-    };
+    }, []);
 
     const applyRecordingUpdateInState = (id, updates) => {
         setRecordings(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
