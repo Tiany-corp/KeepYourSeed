@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
-import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, SafeAreaView, ActivityIndicator, Text, TouchableOpacity, AppState } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { AppContext } from '../contexts/AppContext';
 import useAudioRecorder from '../hooks/useAudioRecorder';
-import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getSeenDailyMemoryId, setSeenDailyMemoryId } from '../services/storage';
+import { getDailyMemory, saveRecording, getPinnedThought, clearPinnedThought, getSeenDailyMemoryId, setSeenDailyMemoryId, clearDailyMemoriesCache } from '../services/storage';
 import { uploadRecordingToCloud, saveRecordingToDatabase } from '../services/cloud';
 import { syncAll } from '../services/sync';
 import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useAlert } from '../contexts/AlertContext';
+import { scheduleTimeCapsuleNotification } from '../hooks/usePushNotifications';
 import { Flame } from 'lucide-react-native';
 
 import AppHeader from '../components/AppHeader';
@@ -20,7 +21,7 @@ import PinnedThought from '../components/PinnedThought';
 export default function RecordScreen() {
     const { session, setDrawerOpen, streakCount, updateStreak } = useContext(AppContext);
     const navigation = useNavigation();
-    
+
     const { isRecording, duration, startRecording, stopRecording, formatDuration } = useAudioRecorder();
     const [dailyMemory, setDailyMemory] = useState(null);
     const [isMemoryLoading, setIsMemoryLoading] = useState(true);
@@ -35,7 +36,6 @@ export default function RecordScreen() {
     // --- Pensée épinglée ---
     const [pinnedThought, setPinnedThoughtState] = useState(null);
     const [recordingParentId, setRecordingParentId] = useState(null);
-
     const audioPlayer = useAudioPlayer();
     const { showAlert } = useAlert();
     const isFetchingMemory = useRef(false);
@@ -55,6 +55,49 @@ export default function RecordScreen() {
             });
         }
     }, [session]);
+
+    // --- AUTO-SAUVEGARDE EN ARRIÈRE-PLAN ---
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', async nextAppState => {
+            if (nextAppState.match(/inactive|background/) && isRecording) {
+                console.log("[Auto-Save] L'application passe en arrière-plan, sauvegarde automatique en cours...");
+                const uri = await stopRecording();
+                if (uri) {
+                    const recordingId = Date.now().toString();
+                    const defaultTitle = `Auto-save ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                    const timestamp = new Date().toISOString();
+
+                    const newRecording = {
+                        id: recordingId,
+                        localUri: uri,
+                        remoteUrl: null,
+                        status: 'pending',
+                        date: timestamp,
+                        updatedAt: timestamp,
+                        duration: duration || 1,
+                        title: defaultTitle,
+                        type: recordingMode || 'note',
+                        deliverDate: null,
+                        tags: [],
+                        parentId: recordingParentId || null,
+                    };
+
+                    await saveRecording(newRecording);
+                    updateStreak();
+
+                    setPendingRecording(null);
+                    setShowTitleModal(false);
+                    setRecordingParentId(null);
+
+                    showAlert("Auto-sauvegarde", "Ton application s'est coupé au milieu de l'enregistrement. \n\n Ton audio a donc été sauvegardé automatiquement dès que tu a quitté l'appli.", "success");
+                }
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [isRecording, duration, recordingMode, recordingParentId, stopRecording, updateStreak, showAlert]);
 
     useEffect(() => {
         let cancelled = false;
@@ -80,14 +123,14 @@ export default function RecordScreen() {
     useFocusEffect(
         useCallback(() => {
             getPinnedThought().then(setPinnedThoughtState);
-            
+
             if (!isFetchingMemory.current) {
                 isFetchingMemory.current = true;
                 const userId = session?.user?.id || null;
                 getDailyMemory(userId).then(async (memory) => {
                     setDailyMemory(memory);
                     isFetchingMemory.current = false;
-                    
+
                     // Rafraîchir aussi le statut "vu" pour le badge
                     if (memory) {
                         const seenId = await getSeenDailyMemoryId(userId);
@@ -150,6 +193,17 @@ export default function RecordScreen() {
         };
 
         await saveRecording(newRecording);
+        
+        if (type === 'message' && deliverDate) {
+            scheduleTimeCapsuleNotification(title, deliverDate, recordingId);
+            
+            // On vérifie si c'est pour aujourd'hui. Si oui, on vide le cache pour forcer 
+            // son affichage immédiat (ou dès que l'heure sera passée) dans l'historique en haut.
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (deliverDate.split('T')[0] === todayStr) {
+                await clearDailyMemoriesCache();
+            }
+        }
 
         // Mettre à jour la streak dynamiquement après un nouvel enregistrement
         updateStreak();

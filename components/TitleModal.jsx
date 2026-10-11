@@ -14,6 +14,7 @@ import {
 import { Trash2, Plus, X, Apple, Leaf } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import CustomDatePicker from './CustomDatePicker';
+import TimeWheelPickerModal from './TimeWheelPickerModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get, set } from 'idb-keyval';
 import { AVAILABLE_TAGS, loadCustomTagsCache } from '../utils/tags';
@@ -91,6 +92,9 @@ export default function TitleModal({
     const [title, setTitle] = useState('');
     const [mode, setMode] = useState('note');
     const [deliverDate, setDeliverDate] = useState('');
+    const [deliverTime, setDeliverTime] = useState('20:00');
+    const [timeError, setTimeError] = useState('');
+    const [showTimePicker, setShowTimePicker] = useState(false);
     const [selectedTags, setSelectedTags] = useState([]);
     const [customTags, setCustomTags] = useState([]);
     const [newTagText, setNewTagText] = useState('');
@@ -112,6 +116,8 @@ export default function TitleModal({
             setTitle(defaultTitle || '');
             setMode(initialMode);
             setDeliverDate(initialDeliverDate ? new Date(initialDeliverDate).toISOString().split('T')[0] : '');
+            setDeliverTime(initialDeliverDate ? new Date(initialDeliverDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '20:00');
+            setTimeError('');
             setSelectedTags(Array.isArray(initialTags) ? initialTags : []);
             setNewTagText('');
             setSelectedNewEmoji(CUSTOM_TAG_EMOJIS[0]);
@@ -128,9 +134,8 @@ export default function TitleModal({
     }, [visible, defaultTitle, initialMode, initialDeliverDate, initialTags]);
 
     const getMinDate = () => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
+        const today = new Date();
+        return today.toISOString().split('T')[0];
     };
 
     const setDateOffset = (type, explicitVal) => {
@@ -239,9 +244,21 @@ export default function TitleModal({
         const finalTitle = isEditMode
             ? (trimmedTitle || 'Sans titre')
             : (trimmedTitle || defaultTitle || 'Sans titre');
-        if (mode === 'message' && !deliverDate) return;
-        const finalDeliverDate = mode === 'message' ? new Date(deliverDate).toISOString() : null;
-        onConfirm(finalTitle, mode, finalDeliverDate, selectedTags, graftType);
+        if (mode === 'message') {
+            if (!deliverDate) return;
+            const [year, month, day] = deliverDate.split('-');
+            const [hours, minutes] = deliverTime.split(':');
+            const combinedDate = new Date(year, month - 1, day, hours, minutes);
+            
+            if (combinedDate < new Date()) {
+                setTimeError("L'heure choisie est déjà passée !");
+                return;
+            }
+            setTimeError('');
+            onConfirm(finalTitle, mode, combinedDate.toISOString(), selectedTags, graftType);
+        } else {
+            onConfirm(finalTitle, mode, null, selectedTags, graftType);
+        }
     };
 
     const handleCancel = () => {
@@ -480,6 +497,30 @@ export default function TitleModal({
                                             </Pressable>
                                         </Pressable>
                                     </Modal>
+                                    
+                                    {deliverDate ? (
+                                        <TouchableOpacity
+                                            style={[styles.customDateToggleBtn, { marginTop: 8, backgroundColor: '#FAF7F2', borderColor: '#D4A574', borderWidth: 1 }]}
+                                            onPress={() => setShowTimePicker(true)}
+                                        >
+                                            <Text style={[styles.customDateToggleText, { color: '#78350F', fontWeight: 'bold' }]}>
+                                                À {deliverTime} (Modifier)
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ) : null}
+                                    {timeError ? <Text style={{ color: '#DC2626', fontSize: 13, textAlign: 'center', marginTop: 8, fontWeight: '500' }}>{timeError}</Text> : null}
+                                    
+                                    <TimeWheelPickerModal
+                                        visible={showTimePicker}
+                                        onClose={() => setShowTimePicker(false)}
+                                        initialTime={deliverTime}
+                                        onSave={(newTime) => {
+                                            setDeliverTime(newTime);
+                                            setShowTimePicker(false);
+                                            setTimeError('');
+                                        }}
+                                        title="Heure de livraison"
+                                    />
                                 </View>
                             )}
 

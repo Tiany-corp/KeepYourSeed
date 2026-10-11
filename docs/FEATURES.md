@@ -31,6 +31,11 @@ Ces fonctionnalités constituent le cœur de l'application.
 - [x] **Livraison Intelligente** : Les messages apparaissent dans le "Souvenir du jour" dès qu'ils sont dus.
 - [x] **Visualisation "DM"** : Icône style messagerie pour une expérience plus intime.
 
+## 🟠 2. À faire prochainement (Backlog)
+- [x] **Filet de sécurité Cloud** : Empêcher la synchronisation Supabase des fichiers trop volumineux (ex: > 40 minutes) pour protéger le quota. La note bascule automatiquement en statut "Local-Only".
+- [x] **Enregistrement en arrière-plan (Auto-Save)** : Si l'écran s'éteint pendant la capture, l'audio est automatiquement coupé et sauvegardé sans perte de données.
+- [ ] **Lecture en arrière-plan** : Permettre à l'utilisateur de continuer d'écouter ses audios lorsque l'écran s'éteint ou quand il quitte l'application.
+
 ---
 
 ## 🔴 3. Vision Long Terme (V2.0)

@@ -151,9 +151,15 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             msg += '.';
                         }
                     }
+                    if (result.oversized && result.oversized.length > 0) {
+                        msg += `\n\n⚠️ ${result.oversized.length} note(s) trop longue(s) (ex: "${result.oversized[0]}") gardée(s) uniquement en local.`;
+                    }
                     showAlert('Succès', msg.trim() || 'Synchronisation terminée !', 'success');
                     if (onDataCleared) onDataCleared(); // Rafraîchir l'historique
                     loadStorageStats(); // Mettre à jour les stats de stockage
+                } else if (result.oversized && result.oversized.length > 0) {
+                    showAlert('Fichier trop long', `${result.oversized.length} note(s) ignorée(s) pour le Cloud car elle dépasse 40 minutes (gardée en local).`, 'warning');
+                    loadStorageStats();
                 } else {
                     showAlert('À jour', 'Toutes vos pensées sont déjà synchronisées.', 'success');
                     loadStorageStats();
@@ -196,7 +202,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     };
 
     const handleDeleteAccount = () => {
-        const confirmMsg = "Es-tu absolument sûr de vouloir supprimer définitivement ton compte et TOUTES tes données ? Cette action est IRRÉVERSIBLE.";
+        const confirmMsg = "Es-tu sûr de vouloir supprimer ton compte ? Tes données sur le Cloud seront effacées (compte + audio), mais tes vocaux locaux resteront sur ton téléphone.";
         const executeDelete = async () => {
             if (!session?.user?.id) return;
             setIsSyncing(true);

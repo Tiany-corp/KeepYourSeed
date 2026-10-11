@@ -65,11 +65,16 @@ export const syncAll = async (userId, isManual = false) => {
 
         let pushedCount = 0;
         let pulledCount = 0;
+        let oversizedNotes = [];
 
         // 1. PUSH : Autorisé si (Wifi) OR (4G ET !wifiOnly) OR (Manual)
         const canPush = isManual || isWifi || !wifiOnly;
         if (canPush) {
-            pushedCount = await pushLocalChanges(userId);
+            const pushResult = await pushLocalChanges(userId);
+            pushedCount = typeof pushResult === 'object' ? pushResult.count : pushResult;
+            if (typeof pushResult === 'object' && pushResult.oversized) {
+                oversizedNotes = pushResult.oversized;
+            }
         } else {
             console.log('Push sauté (Wi-Fi requis)');
         }
@@ -87,6 +92,7 @@ export const syncAll = async (userId, isManual = false) => {
             pulled: pulledCount.count !== undefined ? pulledCount.count : pulledCount,
             newTitles: pulledCount.newTitles || [],
             orphans: pulledCount.orphans || 0,
+            oversized: oversizedNotes,
             status: (!isWifi && wifiOnly && !isManual) ? 'wifi-required' : 'done'
         };
     } catch (error) {
@@ -132,7 +138,8 @@ export const forcePushAllLocalNotes = async (userId) => {
         }
 
         // 2. Lancement du push normal
-        const pushed = await pushLocalChanges(userId);
+        const pushResult = await pushLocalChanges(userId);
+        const pushed = typeof pushResult === 'object' ? pushResult.count : pushResult;
         return { success: true, pushed, repaired: repairCount };
     } catch (error) {
         console.error('Erreur forcePush:', error);
@@ -245,10 +252,11 @@ const pushLocalChanges = async (userId) => {
         r.status === 'local_only'
     );
     
-    if (toSync.length === 0) return 0;
+    if (toSync.length === 0) return { count: 0, oversized: [] };
     
     let count = 0;
     let hasChanged = false;
+    let oversizedNotes = [];
 
     // --- VÉRIFICATION DU QUOTA CLOUD (Limite dynamique) ---
     const { getCloudQuota } = require('./storage');
@@ -268,6 +276,22 @@ const pushLocalChanges = async (userId) => {
             const isUpdate = rec.status === 'pending_update' || (rec.status === 'error' && rec.dbId);
 
             if (isCreation) {
+                // --- FILET DE SÉCURITÉ : Limite de taille (40 minutes) ---
+                const MAX_DURATION_SECONDS = 2400; // 40 minutes max
+                if (rec.duration && rec.duration > MAX_DURATION_SECONDS) {
+                    console.log(`[Sécurité Cloud] Fichier trop volumineux (${rec.duration}s). ${rec.title} restera en local.`);
+                    workingList[idx] = { 
+                        ...workingList[idx], 
+                        keepLocalOnly: true, 
+                        dbId: null, 
+                        remoteUrl: null, 
+                        status: 'local_only' 
+                    };
+                    oversizedNotes.push(rec.title);
+                    hasChanged = true;
+                    continue; // On passe au fichier suivant sans l'uploader
+                }
+
                 // Si le quota est atteint, on annule l'upload et on force le fichier à rester en local
                 if (quotaReached) {
                     console.log(`[Quota] Limite de 30 Mo atteinte. ${rec.title} restera en local.`);
@@ -365,7 +389,7 @@ const pushLocalChanges = async (userId) => {
         await saveRawRecordings(workingList);
     }
 
-    return count;
+    return { count, oversized: oversizedNotes };
 };
 
 /**

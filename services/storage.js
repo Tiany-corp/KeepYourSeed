@@ -543,7 +543,7 @@ export const updateDailyMemoryInCache = async (id, updates) => {
     }
 };
 
-export const getDailyMemories = async (userId = null, forceRefresh = false) => {
+export const getDailyMemories = async (userId = null, forceRefresh = false, preloadedLocal = null) => {
     try {
         const todayKey = getTodayKey();
         const now = new Date();
@@ -559,7 +559,7 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
             });
 
             if (isCacheValid) {
-                const allLocal = await getRecordings();
+                const allLocal = preloadedLocal || await getRecordings();
                 return cached.map(memory => {
                     const localMatch = allLocal.find(r =>
                         (memory.remoteUrl && r.remoteUrl === memory.remoteUrl) ||
@@ -571,7 +571,7 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
             }
         }
 
-        const allLocal = await getRecordings();
+        const allLocal = preloadedLocal || await getRecordings();
         const results = [];
 
         // 2. La pensée souvenir du jour (Rituel local) - TOUJOURS EN PREMIER
@@ -596,51 +596,13 @@ export const getDailyMemories = async (userId = null, forceRefresh = false) => {
             results.push({ ...notes[index] });
         }
 
-        // 3. Messages du jour (Cloud)
-        if (userId) {
-            try {
-                // On récupère TOUS les messages non ouverts (plus sûr pour les décalages horaires)
-                const { data: cloudData } = await supabase
-                    .from('recordings')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .eq('type', 'message')
-                    .eq('opened', false)
-                    .lte('deliver_date', now.toISOString()); // Tout ce qui est dû jusqu'à maintenant
-
-                if (cloudData && cloudData.length > 0) {
-                    cloudData.forEach(row => {
-                        // On ne garde que ceux d'AUJOURD'HUI selon l'heure du téléphone
-                        const deliverStr = row.deliver_date ? row.deliver_date.split('T')[0] : null;
-                        if (deliverStr === todayStr && !results.some(r => r.dbId === row.id)) {
-                            results.push({
-                                id: `cloud_${row.id}`,
-                                dbId: row.id,
-                                localUri: null,
-                                remoteUrl: row.audio_url,
-                                status: 'synced',
-                                date: row.created_at,
-                                deliverDate: row.deliver_date,
-                                duration: row.duration_seconds || 0,
-                                title: row.title || 'Sans titre',
-                                type: 'message',
-                                tags: row.tags || [],
-                                opened: false,
-                            });
-                        }
-                    });
-                }
-            } catch (e) {
-                console.log('[DailyMemories] Erreur cloud fetch', e);
-            }
-        }
-
-        // 4. Messages du jour (Local - pour ceux pas encore synchronisés)
+        // 3. Messages du jour (depuis les enregistrements locaux synchronisés par syncAll)
         const localMessages = allLocal.filter(r =>
             r.type === 'message' &&
             !r.deletedAt &&
             r.deliverDate &&
-            r.deliverDate.split('T')[0] === todayStr
+            r.deliverDate.split('T')[0] === todayStr &&
+            new Date(r.deliverDate) <= now
         );
         localMessages.forEach(msg => {
             if (!results.some(r => r.id === msg.id || (r.dbId && r.dbId === msg.dbId))) {

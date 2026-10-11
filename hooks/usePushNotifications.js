@@ -192,11 +192,12 @@ export function usePushNotifications(session) {
             title: "🌱 KeepYourSeed",
             body: randomMessage,
             data: { type: 'daily_reminder' },
+            channelId: 'default',
+            priority: Notifications.AndroidNotificationPriority.MAX,
           },
           trigger: {
-            type: 'date',
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: trigger,
-            channelId: 'default'
           },
         });
         countScheduled++;
@@ -214,6 +215,50 @@ export function usePushNotifications(session) {
     notification,
     scheduleLocalNotification,
     scheduleRotatingDailyReminders,
-    cancelDailyReminder
+    cancelDailyReminder,
   };
+}
+
+export async function scheduleTimeCapsuleNotification(title, deliverDate, recordingId) {
+    if (!deliverDate) return false;
+
+    const targetDate = new Date(deliverDate);
+    if (targetDate <= new Date()) return false;
+
+    try {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Rappels & Messages',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+          sound: 'default',
+        });
+      }
+
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        const { status: newStatus } = await Notifications.requestPermissionsAsync();
+        if (newStatus !== 'granted') return false;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "🚀 Capsule Temporelle",
+          body: `Ton message "${title}" est prêt à être écouté !`,
+          data: { type: 'time_capsule', id: recordingId },
+          channelId: 'default',
+          priority: Notifications.AndroidNotificationPriority.MAX,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: targetDate,
+        },
+      });
+      console.log(`Notification capsule programmée pour le ${targetDate.toLocaleString()}`);
+      return true;
+    } catch (e) {
+      console.error("Erreur lors de la programmation de la capsule:", e);
+      return false;
+    }
 }

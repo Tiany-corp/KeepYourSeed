@@ -71,57 +71,38 @@ export default function HistoryScreen() {
 
     useEffect(() => {
         const initialize = async () => {
-            await loadCustomTagsCache();
-            const tagPref = await getDailyMemoryPrefTag(session?.user?.id || null);
-            setCurrentPrefTag(tagPref);
-            // Charger les vocaux (toujours disponible)
-            const recordingsPromise = getRecordings().then(localData => {
-                return dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
-            });
+            // Initialisations légères
+            loadCustomTagsCache();
+            getDailyMemoryPrefTag(session?.user?.id || null).then(setCurrentPrefTag);
 
-            // Charger la pensée souvenir (pour tous les utilisateurs)
+            // 1. Chargement local des vocaux (~10ms)
+            const localData = await getRecordings();
+            const sorted = dedup(localData.sort((a, b) => new Date(b.date) - new Date(a.date)));
+
+            // 2. Calcul local instantané des pensées souvenirs et messages du jour (0ms, 100% local)
             const { getDailyMemories } = require('../services/storage');
             const userId = session?.user?.id || null;
-            const dailyPromise = getDailyMemories(userId).then(async (memories) => {
-                // Pour simplifier, on considère "vu" si le PREMIER est vu (ou on pourrait gérer par ID)
-                let seen = true;
+            let memories = [];
+            let seen = true;
+            try {
+                memories = await getDailyMemories(userId, false, sorted);
                 if (memories && memories.length > 0) {
                     const firstMemory = memories[0];
                     const seenId = await getSeenDailyMemoryId(userId);
                     seen = !!seenId && !!firstMemory.id && String(seenId) === String(firstMemory.id);
                 }
-                return { memories, seen };
-            }).catch(() => ({ memories: [], seen: true }));
-
-            // Timeout de sécurité : si la pensée prend trop longtemps, on affiche quand même
-            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('timeout'), 2000));
-
-            // Attendre les vocaux + (pensée OU timeout)
-            const [sortedRecordings, dailyResult] = await Promise.all([
-                recordingsPromise,
-                Promise.race([dailyPromise, timeoutPromise])
-            ]);
-
-            // Appliquer tout d'un coup
-            setRecordings(sortedRecordings);
-            if (dailyResult && dailyResult !== 'timeout') {
-                setDailyMemories(dailyResult.memories || []);
-                setIsDailyMemorySeen(dailyResult.seen);
+            } catch (e) {
+                console.warn('Erreur chargement pensée souvenir:', e);
             }
+
+            // 3. APPLIQUER LES DEUX STRICTEMENT EN MÊME TEMPS (Affichage simultané quasi-instantané)
+            setRecordings(sorted);
+            setDailyMemories(memories || []);
+            setIsDailyMemorySeen(seen);
             setIsLoading(false);
             setIsInitialLoad(false);
 
-            // Si la pensée a timeout, on la charge en arrière-plan
-            if (dailyResult === 'timeout') {
-                dailyPromise.then(result => {
-                    if (result && result.memories) {
-                        setDailyMemories(result.memories);
-                        setIsDailyMemorySeen(result.seen);
-                    }
-                });
-            }
-
-            // Sync silencieuse (uniquement si connecté)
+            // 4. Sync silencieuse (uniquement si connecté)
             if (session?.user && !hasInitialSyncRun.current) {
                 hasInitialSyncRun.current = true;
                 syncAll(session.user.id, false).then(result => {
@@ -157,7 +138,11 @@ export default function HistoryScreen() {
 
     async function loadRecordings() {
         const data = await getRecordings();
-        setRecordings(dedup(data.sort((a, b) => new Date(b.date) - new Date(a.date))));
+        const sorted = dedup(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+        setRecordings(sorted);
+        const { getDailyMemories } = require('../services/storage');
+        const refreshedMemories = await getDailyMemories(session?.user?.id || null, false, sorted);
+        setDailyMemories(refreshedMemories || []);
     }
 
     // Pull-to-refresh : sync manuelle (bypass cooldown) puis rechargement local
@@ -214,13 +199,6 @@ export default function HistoryScreen() {
 
     // Grouper les recordings avec useMemo pour éviter la recréation des références
     const { parentRecordings, childrenByParent } = useMemo(() => {
-        // Un parent est une note qui n'a pas de parentId OU dont le parentId n'est pas trouvé dans la liste
-        // (on vérifie l'existence pour éviter de cacher des notes dont le parent aurait été supprimé physiquement)
-        const allIds = new Set(recordings.map(r => r.id));
-        const allDbIds = new Set(recordings.map(r => r.dbId?.toString()).filter(Boolean));
-
-        // On inclut tous les enregistrements pour qu'ils apparaissent dans la vue normale.
-        // Ceux qui ont un parentId apparaîtront AUSSI sous forme de graine dans le composant de leur parent.
         const parents = recordings;
 
         const now = new Date();
@@ -229,14 +207,16 @@ export default function HistoryScreen() {
             (!r.deliverDate || new Date(r.deliverDate) <= now)
         );
 
+        // Map indexée O(1) pour éviter un .find() coûteux sur chaque enfant
+        const recById = new Map();
+        recordings.forEach(r => {
+            recById.set(r.id, r);
+            if (r.dbId) recById.set(r.dbId.toString(), r);
+        });
+
         const childrenMap = {};
         recordings.filter(r => r.parentId && !r.deletedAt).forEach(child => {
-            // On cherche le parent : soit par ID local, soit par DB ID (pour la synchro cross-device)
-            const parent = recordings.find(p =>
-                p.id === child.parentId ||
-                (p.dbId && p.dbId.toString() === child.parentId?.toString())
-            );
-
+            const parent = recById.get(child.parentId) || (child.parentId && recById.get(child.parentId.toString()));
             if (parent) {
                 if (!childrenMap[parent.id]) childrenMap[parent.id] = [];
                 childrenMap[parent.id].push(child);

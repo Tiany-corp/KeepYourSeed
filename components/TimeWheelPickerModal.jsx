@@ -1,8 +1,17 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, Modal, TouchableOpacity, FlatList, StyleSheet, Animated } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 
 const ITEM_HEIGHT = 44;
+
+// Composant item optimisé avec React.memo (Règle utilisateur)
+const WheelItem = React.memo(({ item, isSelected }) => (
+    <View style={styles.wheelItem}>
+        <Text style={[styles.wheelText, isSelected && styles.wheelTextSelected]}>
+            {item}
+        </Text>
+    </View>
+));
 
 const WheelPicker = ({ data, value, onValueChange }) => {
     const flatListRef = useRef(null);
@@ -30,6 +39,12 @@ const WheelPicker = ({ data, value, onValueChange }) => {
         onValueChange(data[index]);
     };
 
+    const renderItem = useCallback(({ item, index }) => {
+        const actualIndex = index - 2;
+        const isSelected = actualIndex === selectedIndex;
+        return <WheelItem item={item} isSelected={isSelected} />;
+    }, [selectedIndex]);
+
     return (
         <View style={styles.wheelContainer}>
             <View style={styles.selectionHighlight} />
@@ -42,17 +57,10 @@ const WheelPicker = ({ data, value, onValueChange }) => {
                 decelerationRate="fast"
                 onMomentumScrollEnd={handleMomentumScrollEnd}
                 getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
-                renderItem={({ item, index }) => {
-                    const actualIndex = index - 2;
-                    const isSelected = actualIndex === selectedIndex;
-                    return (
-                        <View style={styles.wheelItem}>
-                            <Text style={[styles.wheelText, isSelected && styles.wheelTextSelected]}>
-                                {item}
-                            </Text>
-                        </View>
-                    );
-                }}
+                renderItem={renderItem}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={3}
             />
         </View>
     );
@@ -139,10 +147,11 @@ export default function TimeWheelPickerModal({ visible, onClose, initialTime, on
 
     return (
         <Modal visible={showModal} transparent animationType="none" statusBarTranslucent={true}>
-            <View style={styles.overlay}>
-                <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-                    <TouchableOpacity style={styles.backdropTouch} activeOpacity={1} onPress={handleClose} />
-                </Animated.View>
+            {showModal && (
+                <View style={styles.overlay}>
+                    <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
+                        <TouchableOpacity style={styles.backdropTouch} activeOpacity={1} onPress={handleClose} />
+                    </Animated.View>
                 
                 <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
                     {isSuccess ? (
@@ -180,6 +189,7 @@ export default function TimeWheelPickerModal({ visible, onClose, initialTime, on
                     )}
                 </Animated.View>
             </View>
+            )}
         </Modal>
     );
 }
