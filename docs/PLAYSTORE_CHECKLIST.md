@@ -64,7 +64,7 @@
 | Nom de l'app | ✅ | « KeepYourSeed » (max 30 caractères) |
 | Description courte | ❌ À rédiger | Max 80 caractères |
 | Description longue | ❌ À rédiger | Max 4000 caractères |
-| Icône Play Store | ❌ À préparer | 512×512 px, PNG, 32 bits, pas de transparence |
+| Icône Play Store | ✅ Prêt | `assets/oragnicKYS512.png` (512×512 px, PNG) |
 | Feature Graphic | ❌ À créer | 1024×500 px, PNG/JPEG |
 | Screenshots (min 2) | ❌ À capturer | Min 320px, max 3840px, JPEG/PNG |
 | Catégorie | ❌ À choisir | Suggestion : Lifestyle ou Productivité |
@@ -94,7 +94,7 @@ Le Play Store exige un **AAB** (Android App Bundle), pas un APK.
 
 1. ✏️ Remplir les infos manquantes dans `docs/LEGAL.md` (nom, email)
 2. 🌐 Héberger la Privacy Policy en ligne (GitHub Pages)
-3. 🖼️ Préparer l'icône 512×512 sans transparence
+3. ✅ 🖼️ Préparer l'icône 512×512 sans transparence (`assets/oragnicKYS512.png`)
 4. 📱 Créer/vérifier le compte développeur Google Play (25$)
 5. 🧪 Lancer le test fermé avec 20 testeurs pendant 14 jours
 6. ✍️ Rédiger les descriptions (courte + longue)

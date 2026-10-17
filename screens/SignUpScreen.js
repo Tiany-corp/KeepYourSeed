@@ -58,6 +58,7 @@ export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack })
         setGoogleLoading(true);
         try {
             await signInWithGoogle();
+            if (onGoBack) onGoBack();
         } catch (error) {
             Alert.alert('Erreur', error.message);
         } finally {

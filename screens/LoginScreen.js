@@ -22,8 +22,14 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
 
             if (error) {
                 console.error("Erreur Auth Supabase:", error);
-                Alert.alert('Erreur de connexion', error.message || JSON.stringify(error));
-            } else if (!data?.session) {
+                let message = error.message;
+                if (message?.includes('Invalid login credentials')) {
+                    message = 'Email ou mot de passe incorrect.';
+                }
+                Alert.alert('Erreur de connexion', message || JSON.stringify(error));
+            } else if (data?.session) {
+                if (onGoBack) onGoBack();
+            } else {
                 Alert.alert('Erreur', "Impossible de récupérer la session.");
             }
         } catch (e) {
@@ -38,6 +44,7 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
         setGoogleLoading(true);
         try {
             await signInWithGoogle();
+            if (onGoBack) onGoBack();
         } catch (error) {
             Alert.alert('Erreur', error.message);
         } finally {

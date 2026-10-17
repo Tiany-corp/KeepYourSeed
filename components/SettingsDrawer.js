@@ -581,10 +581,37 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         </TouchableOpacity>
                     </ScrollView>
                 ) : (
-                    <View style={styles.menuContainer}>
-                        <Text style={styles.guestHint}>
-                            Les enregistrements sont sauvegardés{'\n'}localement sur cet appareil.
-                        </Text>
+                    <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
+                        {/* Info de stockage local */}
+                        <View style={{ paddingVertical: 16, paddingHorizontal: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Database size={20} color="#78350F" style={styles.menuIcon} />
+                                <View>
+                                    <Text style={styles.menuItemText}>Stockage local</Text>
+                                    <Text style={{ fontSize: 13, color: '#A8A29E', marginTop: 2 }}>
+                                        {storageStats.formattedSize} ({storageStats.local} audios)
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => { onClose(); navigation.navigate('Garden'); }}
+                        >
+                            <Trees size={20} color="#15803d" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Mon Jardin</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => { onClose(); navigation.navigate('Trash'); }}
+                        >
+                            <Trash2 size={20} color="#78350F" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>Ma Corbeille</Text>
+                        </TouchableOpacity>
+
+                        <View style={[styles.separator, { marginVertical: 16 }]} />
 
                         <TouchableOpacity
                             style={styles.authButton}
@@ -599,7 +626,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         >
                             <Text style={styles.authButtonOutlineText}>Créer un compte</Text>
                         </TouchableOpacity>
-                    </View>
+                    </ScrollView>
                 )}
 
                 {/* Footer avec interaction cachée */}
