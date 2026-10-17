@@ -3,6 +3,7 @@ import { Alert, View, Text, TextInput, TouchableOpacity, ActivityIndicator, Styl
 import { supabase } from '../services/supabase';
 import { signInWithGoogle } from '../services/googleAuth';
 import Logo from '../components/Logo';
+import { Check, Eye, EyeOff } from 'lucide-react-native';
 
 export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack }) {
     const [email, setEmail] = useState('');
@@ -10,8 +11,15 @@ export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack })
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     async function signUpWithEmail() {
+        if (!acceptedTerms) {
+            Alert.alert('Conditions requises', "Veuillez accepter les conditions d'utilisation et la politique de confidentialité.");
+            return;
+        }
         if (password !== confirmPassword) {
             Alert.alert('Erreur', 'Les mots de passe ne correspondent pas.');
             return;
@@ -27,7 +35,11 @@ export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack })
             if (error) {
                 console.error("Erreur Auth Supabase:", error);
                 Alert.alert("Erreur d'inscription", error.message || JSON.stringify(error));
-            } else if (!data?.session) {
+            } else if (data?.session) {
+                // Connexion automatique réussie → retour à l'écran principal
+                if (onGoBack) onGoBack();
+            } else {
+                // Fallback si la confirmation email est réactivée
                 Alert.alert('Vérifiez vos emails', 'Un lien de confirmation a été envoyé à votre adresse email.');
             }
         } catch (e) {
@@ -39,6 +51,10 @@ export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack })
     }
 
     async function handleGoogleSignIn() {
+        if (!acceptedTerms) {
+            Alert.alert('Conditions requises', "Veuillez accepter les conditions d'utilisation et la politique de confidentialité.");
+            return;
+        }
         setGoogleLoading(true);
         try {
             await signInWithGoogle();
@@ -52,102 +68,145 @@ export default function SignUpScreen({ onSwitchToLogin, onShowTerms, onGoBack })
     return (
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.card}>
-                <Logo size={120} style={styles.logo} />
-                <Text style={styles.title}>Créer un compte</Text>
+                <View style={styles.card}>
+                    <Logo size={50} style={styles.logo} />
+                    <Text style={styles.title}>Créer un compte</Text>
 
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        onChangeText={(text) => setEmail(text)}
-                        value={email}
-                        placeholder="email@address.com"
-                        autoCapitalize={'none'}
-                        style={styles.input}
-                        placeholderTextColor="#999"
-                    />
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            onChangeText={(text) => setEmail(text)}
+                            value={email}
+                            placeholder="email@address.com"
+                            autoCapitalize={'none'}
+                            style={styles.input}
+                            placeholderTextColor="#999"
+                        />
+                    </View>
+
+                    <View style={[styles.inputContainer, styles.mt2]}>
+                        <View style={{ position: 'relative' }}>
+                            <TextInput
+                                onChangeText={(text) => setPassword(text)}
+                                value={password}
+                                secureTextEntry={!showPassword}
+                                placeholder="Mot de passe"
+                                autoCapitalize={'none'}
+                                style={[styles.input, { paddingRight: 50 }]}
+                                placeholderTextColor="#999"
+                            />
+                            <TouchableOpacity
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={{ position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' }}
+                            >
+                                {showPassword ? <EyeOff size={20} color="#A8A29E" /> : <Eye size={20} color="#A8A29E" />}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={[styles.inputContainer, styles.mt2]}>
+                        <View style={{ position: 'relative' }}>
+                            <TextInput
+                                onChangeText={(text) => setConfirmPassword(text)}
+                                value={confirmPassword}
+                                secureTextEntry={!showConfirmPassword}
+                                placeholder="Confirmer le mot de passe"
+                                autoCapitalize={'none'}
+                                style={[styles.input, { paddingRight: 50 }]}
+                                placeholderTextColor="#999"
+                            />
+                            <TouchableOpacity
+                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                style={{ position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' }}
+                            >
+                                {showConfirmPassword ? <EyeOff size={20} color="#A8A29E" /> : <Eye size={20} color="#A8A29E" />}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={[styles.inputContainer, styles.mt5]}>
+                        <TouchableOpacity
+                            style={[styles.primaryButton, !acceptedTerms && { opacity: 0.5 }]}
+                            onPress={signUpWithEmail}
+                            disabled={loading || googleLoading}
+                        >
+                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>S'inscrire</Text>}
+                        </TouchableOpacity>
+                    </View>
+
+
+
+                    <View style={styles.inputContainer}>
+                        <TouchableOpacity
+                            style={[styles.googleButton, !acceptedTerms && { opacity: 0.5 }]}
+                            onPress={handleGoogleSignIn}
+                            disabled={loading || googleLoading}
+                        >
+                            {googleLoading ? (
+                                <ActivityIndicator color="#292524" />
+                            ) : (
+                                <View style={styles.googleButtonContent}>
+                                    <Text style={styles.googleIcon}>G</Text>
+                                    <Text style={styles.googleButtonText}>Continuer avec Google</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 24, paddingHorizontal: 4 }}>
+                        <TouchableOpacity
+                            onPress={() => setAcceptedTerms(!acceptedTerms)}
+                            style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 7,
+                                borderWidth: 2,
+                                borderColor: acceptedTerms ? '#78350F' : '#D4A574',
+                                backgroundColor: acceptedTerms ? '#78350F' : 'transparent',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 10,
+                                marginTop: 1,
+                            }}
+                        >
+                            {acceptedTerms && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                        </TouchableOpacity>
+                        <Text style={{ flex: 1, color: '#78716C', fontSize: 13, lineHeight: 20 }}>
+                            *J'accepte les{' '}
+                            <Text onPress={onShowTerms} style={{ color: '#78350F', fontWeight: 'bold', textDecorationLine: 'underline' }}>
+                                Conditions d'Utilisation
+                            </Text>
+                            {' '}et la{' '}
+                            <Text onPress={onShowTerms} style={{ color: '#78350F', fontWeight: 'bold', textDecorationLine: 'underline' }}>
+                                Politique de Confidentialité
+                            </Text>
+                        </Text>
+                    </View>
+
+                    <View style={styles.separator}>
+                        <View style={styles.separatorLine} />
+                        <Text style={styles.separatorText}>ou</Text>
+                        <View style={styles.separatorLine} />
+                    </View>
+
+                    <View style={[styles.inputContainer, styles.mt2]}>
+                        <Text style={styles.secondaryText}>Déjà un compte ?</Text>
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={onSwitchToLogin}
+                            disabled={loading || googleLoading}
+                        >
+                            <Text style={styles.secondaryButtonText}>Se connecter</Text>
+                        </TouchableOpacity>
+                    </View>
+
+
+
+                    {onGoBack && (
+                        <TouchableOpacity onPress={onGoBack} style={{ marginTop: 16, alignItems: 'center' }}>
+                            <Text style={{ color: '#78716C', fontSize: 14 }}>Continuer sans compte</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
-
-                <View style={[styles.inputContainer, styles.mt2]}>
-                    <TextInput
-                        onChangeText={(text) => setPassword(text)}
-                        value={password}
-                        secureTextEntry={true}
-                        placeholder="Mot de passe"
-                        autoCapitalize={'none'}
-                        style={styles.input}
-                        placeholderTextColor="#999"
-                    />
-                </View>
-
-                <View style={[styles.inputContainer, styles.mt2]}>
-                    <TextInput
-                        onChangeText={(text) => setConfirmPassword(text)}
-                        value={confirmPassword}
-                        secureTextEntry={true}
-                        placeholder="Confirmer le mot de passe"
-                        autoCapitalize={'none'}
-                        style={styles.input}
-                        placeholderTextColor="#999"
-                    />
-                </View>
-
-                <View style={[styles.inputContainer, styles.mt5]}>
-                    <TouchableOpacity
-                        style={styles.primaryButton}
-                        onPress={signUpWithEmail}
-                        disabled={loading || googleLoading}
-                    >
-                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>S'inscrire</Text>}
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.separator}>
-                    <View style={styles.separatorLine} />
-                    <Text style={styles.separatorText}>ou</Text>
-                    <View style={styles.separatorLine} />
-                </View>
-
-                <View style={styles.inputContainer}>
-                    <TouchableOpacity
-                        style={styles.googleButton}
-                        onPress={handleGoogleSignIn}
-                        disabled={loading || googleLoading}
-                    >
-                        {googleLoading ? (
-                            <ActivityIndicator color="#292524" />
-                        ) : (
-                            <View style={styles.googleButtonContent}>
-                                <Text style={styles.googleIcon}>G</Text>
-                                <Text style={styles.googleButtonText}>Continuer avec Google</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
-                <View style={[styles.inputContainer, styles.mt5]}>
-                    <Text style={styles.secondaryText}>Déjà un compte ?</Text>
-                    <TouchableOpacity
-                        style={styles.secondaryButton}
-                        onPress={onSwitchToLogin}
-                        disabled={loading || googleLoading}
-                    >
-                        <Text style={styles.secondaryButtonText}>Se connecter</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity onPress={onShowTerms} style={{ marginTop: 24, alignItems: 'center' }}>
-                    <Text style={{ color: '#A8A29E', fontSize: 12, textAlign: 'center' }}>
-                        En vous inscrivant, vous acceptez nos{'\n'}
-                        <Text style={{ color: '#78350F', fontWeight: 'bold', textDecorationLine: 'underline' }}>Conditions d'Utilisation</Text>
-                    </Text>
-                </TouchableOpacity>
-
-                {onGoBack && (
-                    <TouchableOpacity onPress={onGoBack} style={{ marginTop: 16, alignItems: 'center' }}>
-                        <Text style={{ color: '#78716C', fontSize: 14 }}>Continuer sans compte</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -157,7 +216,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FAF7F2' },
     scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 20 },
     card: { width: '100%', maxWidth: 400, alignSelf: 'center' },
-    logo: { alignSelf: 'center', marginBottom: 20 },
+    logo: { alignSelf: 'center', marginBottom: 20, marginTop: 20 },
     title: { fontSize: 30, fontWeight: 'bold', textAlign: 'center', marginBottom: 40, color: '#292524' },
     inputContainer: { paddingVertical: 4 },
     input: { backgroundColor: '#F5F0E8', padding: 16, borderRadius: 8, fontSize: 16, borderWidth: 1, borderColor: '#D4A574', color: '#292524' },

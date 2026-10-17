@@ -3,12 +3,14 @@ import { Alert, View, Text, TextInput, TouchableOpacity, ActivityIndicator, Styl
 import { supabase } from '../services/supabase';
 import { signInWithGoogle } from '../services/googleAuth';
 import Logo from '../components/Logo';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     async function signInWithEmail() {
         setLoading(true);
@@ -61,15 +63,23 @@ export default function LoginScreen({ onSwitchToSignUp, onGoBack }) {
                 </View>
 
                 <View style={[styles.inputContainer, styles.mt2]}>
-                    <TextInput
-                        onChangeText={(text) => setPassword(text)}
-                        value={password}
-                        secureTextEntry={true}
-                        placeholder="Mot de passe"
-                        autoCapitalize={'none'}
-                        style={styles.input}
-                        placeholderTextColor="#999"
-                    />
+                    <View style={{ position: 'relative' }}>
+                        <TextInput
+                            onChangeText={(text) => setPassword(text)}
+                            value={password}
+                            secureTextEntry={!showPassword}
+                            placeholder="Mot de passe"
+                            autoCapitalize={'none'}
+                            style={[styles.input, { paddingRight: 50 }]}
+                            placeholderTextColor="#999"
+                        />
+                        <TouchableOpacity
+                            onPress={() => setShowPassword(!showPassword)}
+                            style={{ position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' }}
+                        >
+                            {showPassword ? <EyeOff size={20} color="#A8A29E" /> : <Eye size={20} color="#A8A29E" />}
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <View style={[styles.inputContainer, styles.mt5]}>
