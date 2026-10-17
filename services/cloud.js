@@ -196,6 +196,7 @@ export const fetchCloudRecordings = async (userId) => {
             graftType: row.graftType || null,
             waterCount: row.waterCount || 0,
             isRoot: row.is_root || false,
+            opened: row.opened || false,
         }));
 
     } catch (e) {

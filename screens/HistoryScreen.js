@@ -307,9 +307,10 @@ export default function HistoryScreen() {
         setRecordings(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
         setDailyMemories(prev => prev.map(rec => (rec.id === id ? { ...rec, ...updates } : rec)));
 
-        // Mettre à jour le cache local pour que l'état "ouvert" persiste après un redémarrage
-        const { updateDailyMemoryInCache } = require('../services/storage');
+        // Mettre à jour le cache ET le stockage principal permanent pour persister après fermeture
+        const { updateDailyMemoryInCache, updateRecording } = require('../services/storage');
         updateDailyMemoryInCache(id, updates);
+        updateRecording(id, updates);
     };
 
     const handleEditCancel = () => {
@@ -462,20 +463,19 @@ export default function HistoryScreen() {
     const handleToggleDailyMemory = useCallback(async (memory) => {
         if (!memory) return;
 
-        // Marquer comme vu localement
+        // Marquer comme vu localement (fonctionne connecté ou invité)
         const isFirst = dailyMemories[0]?.id === memory.id;
-        if (isFirst && !isDailyMemorySeen && session?.user) {
+        if (isFirst && !isDailyMemorySeen) {
             setIsDailyMemorySeen(true);
-            await setSeenDailyMemoryId(session.user.id, memory.id);
+            await setSeenDailyMemoryId(session?.user?.id || null, memory.id);
         }
 
-        // Marquer comme ouvert dans le cloud si c'est un message
-        if (memory.type === 'message' && !memory.opened && session?.user) {
-            const { markMessageAsOpened } = require('../services/cloud');
-            if (memory.dbId) {
+        // Marquer comme ouvert pour stopper le glow et persister l'état lu
+        if (memory.type === 'message' && !memory.opened) {
+            applyRecordingUpdateInState(memory.id, { opened: true });
+            if (memory.dbId && session?.user) {
+                const { markMessageAsOpened } = require('../services/cloud');
                 await markMessageAsOpened(memory.dbId);
-                // Mettre à jour l'objet dans l'état local pour stopper le glow
-                applyRecordingUpdateInState(memory.id, { opened: true });
             }
         }
 

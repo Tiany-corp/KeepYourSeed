@@ -464,6 +464,7 @@ const pullCloudRecordings = async (userId, canDownloadAudio = true) => {
                         waterCount: cloudRec.waterCount,
                         remoteUrl: cloudRec.remoteUrl || existing.remoteUrl,
                         status: 'synced',
+                        opened: cloudRec.opened || existing.opened || false,
                     });
                     updatedCount++;
                 } else if (existing.deletedAt !== cloudRec.deletedAt) {
@@ -471,7 +472,7 @@ const pullCloudRecordings = async (userId, canDownloadAudio = true) => {
                     updatedCount++;
                 } else if (!existing.dbId && cloudRec.dbId) {
                     // Au minimum, on récupère toujours le dbId
-                    resultMap.set(localId, { ...existing, dbId: cloudRec.dbId, remoteUrl: cloudRec.remoteUrl || existing.remoteUrl, status: 'synced' });
+                    resultMap.set(localId, { ...existing, dbId: cloudRec.dbId, remoteUrl: cloudRec.remoteUrl || existing.remoteUrl, opened: cloudRec.opened || existing.opened || false, status: 'synced' });
                 }
             } else {
                 // PAS DE MATCH → Nouvel élément
