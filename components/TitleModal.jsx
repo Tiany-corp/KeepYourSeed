@@ -249,7 +249,7 @@ export default function TitleModal({
             const [year, month, day] = deliverDate.split('-');
             const [hours, minutes] = deliverTime.split(':');
             const combinedDate = new Date(year, month - 1, day, hours, minutes);
-            
+
             if (combinedDate < new Date()) {
                 setTimeError("L'heure choisie est déjà passée !");
                 return;
@@ -358,7 +358,7 @@ export default function TitleModal({
                                     )}
                                     {graftType === 'fruit' && (
                                         <Text style={styles.graftHintText}>
-                                            🍎 Fruit : Un résultat, un témoignage ou un encouragement liée de cette pensée.
+                                            🍎 Fruit : Un résultat, un témoignage ou un encouragement lié à cette pensée.
                                         </Text>
                                     )}
                                 </View>
@@ -497,7 +497,7 @@ export default function TitleModal({
                                             </Pressable>
                                         </Pressable>
                                     </Modal>
-                                    
+
                                     {deliverDate ? (
                                         <TouchableOpacity
                                             style={[styles.customDateToggleBtn, { marginTop: 8, backgroundColor: '#FAF7F2', borderColor: '#D4A574', borderWidth: 1 }]}
@@ -509,7 +509,7 @@ export default function TitleModal({
                                         </TouchableOpacity>
                                     ) : null}
                                     {timeError ? <Text style={{ color: '#DC2626', fontSize: 13, textAlign: 'center', marginTop: 8, fontWeight: '500' }}>{timeError}</Text> : null}
-                                    
+
                                     <TimeWheelPickerModal
                                         visible={showTimePicker}
                                         onClose={() => setShowTimePicker(false)}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator, ScrollView, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator, ScrollView, TextInput, Modal, InteractionManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
@@ -81,7 +81,9 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     // Load preferences and stats on mount or when visible
     useEffect(() => {
         if (visible) {
-            loadStorageStats();
+            const task = InteractionManager.runAfterInteractions(() => {
+                loadStorageStats();
+            });
             (async () => {
                 const pref = await getWifiOnlyPreference();
                 setWifiOnly(pref);
@@ -95,6 +97,9 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 setDailyReminderEnabled(reminderEnabled === 'true');
                 if (reminderTime) setDailyReminderTime(reminderTime);
             })();
+            return () => {
+                if (task && typeof task.cancel === 'function') task.cancel();
+            };
         }
     }, [visible]);
 
@@ -111,18 +116,19 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     };
 
     useEffect(() => {
+        const useNative = Platform.OS !== 'web';
         if (visible) {
             setIsRendered(true);
             Animated.parallel([
                 Animated.timing(slideAnim, {
                     toValue: 0,
                     duration: 250,
-                    useNativeDriver: false,
+                    useNativeDriver: useNative,
                 }),
                 Animated.timing(overlayOpacity, {
                     toValue: 1,
                     duration: 250,
-                    useNativeDriver: false,
+                    useNativeDriver: useNative,
                 }),
             ]).start();
         } else {
@@ -130,12 +136,12 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 Animated.timing(slideAnim, {
                     toValue: -DRAWER_WIDTH,
                     duration: 200,
-                    useNativeDriver: false,
+                    useNativeDriver: useNative,
                 }),
                 Animated.timing(overlayOpacity, {
                     toValue: 0,
                     duration: 200,
-                    useNativeDriver: false,
+                    useNativeDriver: useNative,
                 }),
             ]).start(() => setIsRendered(false));
         }
@@ -330,8 +336,12 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 {session?.user ? (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
 
+                        {/* =================================================== */}
+                        {/* 1ère SECTION : FONCTIONNALITÉS CLOUD (avec compte) */}
+                        {/* =================================================== */}
+
                         {/* Info de stockage CLOUD */}
-                        <View style={{ paddingVertical: 14, paddingHorizontal: 20 }}>
+                        <View style={{ paddingVertical: 10, paddingHorizontal: 20 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                                 <Cloud size={20} color="#78350F" style={[styles.menuIcon, { marginTop: 2 }]} />
                                 <View style={{ flex: 1 }}>
@@ -368,8 +378,52 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                 </View>
                             </View>
                         </View>
-                        {/* Info de stockage simplifiée */}
-                        <View style={{ paddingVertical: 16, paddingHorizontal: 20 }}>
+
+                        {/* Save Cloud Auto (Switch) */}
+                        <View style={[styles.menuItem, { paddingVertical: 10, justifyContent: 'space-between' }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                {autoSync ? (
+                                    <Cloud size={20} color="#78350F" style={styles.menuIcon} />
+                                ) : (
+                                    <CloudOff size={20} color="#78350F" style={styles.menuIcon} />
+                                )}
+                                <Text style={styles.menuItemText}>Sauvegarde Cloud</Text>
+                            </View>
+                            <Switch
+                                value={autoSync}
+                                onValueChange={async (value) => {
+                                    if (value) {
+                                        setShowAutoSyncModal(true);
+                                    } else {
+                                        setAutoSync(false);
+                                        await setAutoSyncPreference(false);
+                                    }
+                                }}
+                                trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
+                                thumbColor={autoSync ? '#78350F' : '#F5F5F4'}
+                            />
+                        </View>
+
+                        {/* Enregistrer dans le cloud (Bouton synchro manuelle) */}
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={handleSync}
+                            disabled={isSyncing}
+                        >
+                            <RefreshCcw size={20} color="#78350F" style={styles.menuIcon} />
+                            <Text style={styles.menuItemText}>
+                                {isSyncing ? 'Synchronisation...' : 'Enregistrer dans le cloud'}
+                            </Text>
+                            {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
+                        </TouchableOpacity>
+
+                        {/* =================================================== */}
+                        {/* 2ème SECTION : FONCTIONNALITÉS LOCALES (sans compte) */}
+                        {/* =================================================== */}
+                        <View style={[styles.separator, { marginVertical: 10 }]} />
+
+                        {/* Stockage local */}
+                        <View style={{ paddingVertical: 10, paddingHorizontal: 20 }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Database size={20} color="#78350F" style={styles.menuIcon} />
@@ -401,18 +455,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.menuItem}
-                            onPress={handleSync}
-                            disabled={isSyncing}
-                        >
-                            <RefreshCcw size={20} color="#78350F" style={styles.menuIcon} />
-                            <Text style={styles.menuItemText}>
-                                {isSyncing ? 'Synchronisation...' : 'Synchroniser mes pensées'}
-                            </Text>
-                            {isSyncing && <ActivityIndicator size="small" color="#78350F" style={{ marginLeft: 10 }} />}
-                        </TouchableOpacity>
-
+                        {/* Mon Jardin */}
                         <TouchableOpacity
                             style={styles.menuItem}
                             onPress={() => { onClose(); navigation.navigate('Garden'); }}
@@ -421,6 +464,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             <Text style={styles.menuItemText}>Mon Jardin</Text>
                         </TouchableOpacity>
 
+                        {/* Ma Corbeille */}
                         <TouchableOpacity
                             style={styles.menuItem}
                             onPress={() => { onClose(); navigation.navigate('Trash'); }}
@@ -429,50 +473,8 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             <Text style={styles.menuItemText}>Ma Corbeille</Text>
                         </TouchableOpacity>
 
-                        <View style={[styles.menuItem, { paddingVertical: 8, justifyContent: 'space-between' }]}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Wifi size={20} color="#78350F" style={styles.menuIcon} />
-                                <Text style={styles.menuItemText}>Wi-Fi uniquement</Text>
-                            </View>
-                            <Switch
-                                value={wifiOnly}
-                                onValueChange={async (value) => {
-                                    setWifiOnly(value);
-                                    await setWifiOnlyPreference(value);
-                                }}
-                                trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
-                                thumbColor={wifiOnly ? '#78350F' : '#F5F5F4'}
-                            />
-                        </View>
-
-                        <View style={[styles.menuItem, { paddingVertical: 8, justifyContent: 'space-between' }]}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                {autoSync ? (
-                                    <Cloud size={20} color="#78350F" style={styles.menuIcon} />
-                                ) : (
-                                    <CloudOff size={20} color="#78350F" style={styles.menuIcon} />
-                                )}
-                                <Text style={styles.menuItemText}>Synchro auto</Text>
-                            </View>
-                            <Switch
-                                value={autoSync}
-                                onValueChange={async (value) => {
-                                    if (value) {
-                                        setShowAutoSyncModal(true);
-                                    } else {
-                                        setAutoSync(false);
-                                        await setAutoSyncPreference(false);
-                                    }
-                                }}
-                                trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
-                                thumbColor={autoSync ? '#78350F' : '#F5F5F4'}
-                            />
-                        </View>
-
-                        <View style={[styles.separator, { marginVertical: 16 }]} />
-
                         {/* Section Rappel Quotidien */}
-                        <View style={[styles.menuItem, { paddingVertical: 8, justifyContent: 'space-between' }]}>
+                        <View style={[styles.menuItem, { paddingVertical: 10, justifyContent: 'space-between' }]}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Bell size={20} color="#78350F" style={styles.menuIcon} />
                                 <View>
@@ -526,68 +528,10 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                             </View>
                         )}
 
-                        <TouchableOpacity
-                            style={styles.menuItem}
-                            onPress={async () => {
-                                console.log("Bouton test notification cliqué !");
-                                showAlert('Test lancé', 'La notification devrait apparaître immédiatement...', 'info');
-                                onClose();
-                                try {
-                                    await Notifications.scheduleNotificationAsync({
-                                        content: {
-                                            title: "🔔 Test réussi !",
-                                            body: "Les notifications locales fonctionnent sur cet appareil.",
-                                            sound: true,
-                                        },
-                                        trigger: null, // Déclenchement immédiat
-                                    });
-                                    console.log("Notification programmée avec succès");
-                                } catch (e) {
-                                    console.error("Erreur programmation notification locale :", e);
-                                    showAlert('Erreur', 'Impossible de programmer la notification.', 'error');
-                                }
-                            }}
-                        >
-                            <Bell size={20} color="#78350F" style={styles.menuIcon} />
-                            <Text style={styles.menuItemText}>Tester notification locale</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.menuItem}
-                            onPress={async () => {
-                                console.log("Bouton test push distant cliqué !");
-                                showAlert('Envoi en cours...', 'Contact du serveur Supabase...', 'info');
-                                onClose();
-                                try {
-                                    const { data, error } = await supabase.functions.invoke('send-push', {
-                                        body: { trigger: 'manual' }
-                                    });
-                                    if (error) {
-                                        let errorMsg = error.message;
-                                        if (error.context && typeof error.context.json === 'function') {
-                                            try {
-                                                const errData = await error.context.json();
-                                                errorMsg = errData.error || errorMsg;
-                                            } catch (e) { }
-                                        }
-                                        throw new Error(errorMsg);
-                                    }
-                                    console.log("Réponse serveur :", data);
-                                    if (data?.success) {
-                                        console.log("Le serveur a bien envoyé le push à Expo.");
-                                        showAlert('Succès', 'La notification a été envoyée !', 'success');
-                                    } else {
-                                        showAlert('Erreur Serveur', data?.error || 'Erreur inconnue', 'error');
-                                    }
-                                } catch (e) {
-                                    console.error("Erreur appel fonction send-push :", e);
-                                    showAlert('Erreur', e.message || 'Impossible de contacter le serveur distant.', 'error');
-                                }
-                            }}
-                        >
-                            <Send size={20} color="#78350F" style={styles.menuIcon} />
-                            <Text style={styles.menuItemText}>Tester Push distant</Text>
-                        </TouchableOpacity>
+                        {/* =================================================== */}
+                        {/* 3ème SECTION : GESTION DU COMPTE                    */}
+                        {/* =================================================== */}
+                        <View style={[styles.separator, { marginVertical: 16 }]} />
 
                         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
                             <LogOut size={20} color="#991B1B" style={styles.menuIcon} />
@@ -602,7 +546,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                 ) : (
                     <ScrollView style={styles.menuContainer} showsVerticalScrollIndicator={false}>
                         {/* Info de stockage local */}
-                        <View style={{ paddingVertical: 16, paddingHorizontal: 20 }}>
+                        <View style={{ paddingVertical: 10, paddingHorizontal: 20 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Database size={20} color="#78350F" style={styles.menuIcon} />
                                 <View>
@@ -714,7 +658,7 @@ const styles = StyleSheet.create({
     emailText: { fontSize: 14, color: '#78716C', marginBottom: 12 },
     separator: { height: 1, backgroundColor: '#D4A574', marginHorizontal: 20 },
     menuContainer: { flex: 1, paddingTop: 8 },
-    menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20 },
+    menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 20 },
     menuIcon: { marginRight: 16 },
     menuItemTextDanger: { fontSize: 16, color: '#ef4444' },
     menuItemText: { fontSize: 16, color: '#292524' },
