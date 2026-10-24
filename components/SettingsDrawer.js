@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Switch, ActivityIndicator, ScrollView, TextInput, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
@@ -34,6 +34,17 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
     const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
     const [dailyReminderTime, setDailyReminderTime] = useState('20:00');
     const [showTimePicker, setShowTimePicker] = useState(false);
+    const [showAutoSyncModal, setShowAutoSyncModal] = useState(false);
+
+    const handleConfirmAutoSync = async () => {
+        setAutoSync(true);
+        await setAutoSyncPreference(true);
+        setShowAutoSyncModal(false);
+    };
+
+    const handleCancelAutoSync = () => {
+        setShowAutoSyncModal(false);
+    };
 
     const handleTimeSave = async (newTime) => {
         setDailyReminderTime(newTime);
@@ -436,14 +447,22 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
 
                         <View style={[styles.menuItem, { paddingVertical: 8, justifyContent: 'space-between' }]}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <CloudOff size={20} color="#78350F" style={styles.menuIcon} />
+                                {autoSync ? (
+                                    <Cloud size={20} color="#78350F" style={styles.menuIcon} />
+                                ) : (
+                                    <CloudOff size={20} color="#78350F" style={styles.menuIcon} />
+                                )}
                                 <Text style={styles.menuItemText}>Synchro auto</Text>
                             </View>
                             <Switch
                                 value={autoSync}
                                 onValueChange={async (value) => {
-                                    setAutoSync(value);
-                                    await setAutoSyncPreference(value);
+                                    if (value) {
+                                        setShowAutoSyncModal(true);
+                                    } else {
+                                        setAutoSync(false);
+                                        await setAutoSyncPreference(false);
+                                    }
                                 }}
                                 trackColor={{ false: '#E7E5E4', true: '#D4A574' }}
                                 thumbColor={autoSync ? '#78350F' : '#F5F5F4'}
@@ -639,6 +658,43 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                     <Text style={styles.footerText}>KeepYourSeed v1.2</Text>
                 </TouchableOpacity>
             </Animated.View>
+
+            {/* Modale de confirmation d'activation de la synchronisation automatique */}
+            <Modal
+                visible={showAutoSyncModal}
+                transparent={true}
+                animationType="fade"
+                statusBarTranslucent={true}
+                onRequestClose={handleCancelAutoSync}
+            >
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalIconContainer}>
+                            <CloudUpload size={30} color="#78350F" />
+                        </View>
+                        <Text style={styles.modalTitle}>Synchronisation Cloud</Text>
+                        <Text style={styles.modalDescription}>
+                            En activant cette option, toutes vos pensées vocales seront automatiquement sauvegardées dans votre espace Cloud privé dès leur enregistrement.
+                        </Text>
+                        <View style={styles.modalButtonsRow}>
+                            <TouchableOpacity
+                                style={styles.modalCancelButton}
+                                onPress={handleCancelAutoSync}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.modalCancelButtonText}>Annuler</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalConfirmButton}
+                                onPress={handleConfirmAutoSync}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.modalConfirmButtonText}>Activer</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -750,5 +806,86 @@ const styles = StyleSheet.create({
     settingInfo: {
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(41, 37, 36, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    modalCard: {
+        width: '100%',
+        maxWidth: 320,
+        backgroundColor: '#FAF7F2',
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#D4A574',
+        ...Platform.select({
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 },
+            android: { elevation: 8 },
+            web: { boxShadow: '0 4px 16px rgba(41, 37, 36, 0.2)' },
+        }),
+    },
+    modalIconContainer: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#FEF3C7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#292524',
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    modalDescription: {
+        fontSize: 14,
+        color: '#78716C',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 22,
+    },
+    modalButtonsRow: {
+        flexDirection: 'row',
+        width: '100%',
+        gap: 12,
+    },
+    modalCancelButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#D4A574',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+    },
+    modalCancelButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#78716C',
+    },
+    modalConfirmButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: '#78350F',
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 2,
+    },
+    modalConfirmButtonText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#FFFFFF',
     },
 });

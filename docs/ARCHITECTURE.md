@@ -71,3 +71,5 @@ Pour notifier l'utilisateur d'un nouveau souvenir sans alourdir le DOM React :
 /utils               # Formatage et aides métier
 App.js               # Orchestrateur de navigation & Providers
 ```
+
+build aab : https://expo.dev/artifacts/eas/wUEvldc0jYxVnvmtLg1t1qC-R4RhKlTdOm3d2qFrwKo.aab
