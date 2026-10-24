@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Animated, Platform, Alert, StyleSheet, Sw
 import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
-import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize } from '../services/storage';
+import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize, formatStorageRatio } from '../services/storage';
 import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell, Send, Trees } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { fetchTotalCloudUsage } from '../services/cloud';
@@ -349,7 +349,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                         <Text style={[styles.menuItemText, { fontSize: 15 }]}>Stockage Cloud</Text>
                                         <Text style={{ fontSize: 12, fontWeight: '600', color: (cloudUsage / cloudQuota) > 0.9 ? '#991B1B' : '#A8A29E' }}>
-                                            {formatSize(cloudUsage)} / {formatSize(cloudQuota)}
+                                            {formatStorageRatio(cloudUsage, cloudQuota)}
                                         </Text>
                                     </View>
 

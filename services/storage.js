@@ -191,6 +191,22 @@ export const formatSize = (bytes) => {
 };
 
 /**
+ * Formate un ratio d'utilisation (usage / quota) avec l'unité du quota (Mo ou Go).
+ * Ex: "1.2 / 30 Mo" ou "0.25 / 2 Go"
+ */
+export const formatStorageRatio = (usageBytes = 0, quotaBytes = 0) => {
+    const isGigabytes = quotaBytes >= 1024 * 1024 * 1024;
+    if (isGigabytes) {
+        const uGb = (usageBytes / (1024 * 1024 * 1024)).toFixed(2);
+        const qGb = parseFloat((quotaBytes / (1024 * 1024 * 1024)).toFixed(1));
+        return `${uGb} / ${qGb} Go`;
+    }
+    const uMb = usageBytes ? (usageBytes / (1024 * 1024)).toFixed(1) : '0';
+    const qMb = parseFloat((quotaBytes / (1024 * 1024)).toFixed(1));
+    return `${uMb} / ${qMb} Mo`;
+};
+
+/**
  * LOCAL FIRST : Résout la source audio UNIQUEMENT depuis le stockage local.
  * Ne contacte JAMAIS le cloud pendant la lecture.
  * Les fichiers cloud sont téléchargés en amont par cacheSupabaseAudioLocally (via le pull).
@@ -668,10 +684,10 @@ export const waterTree = async (recording) => {
     try {
         if (!recording) return;
         const targetId = recording.parentId || recording.id;
-        
+
         const recordings = await getRecordings();
         let target = recordings.find(r => r.id === targetId);
-        
+
         if (!target) {
             // Tentative de résolution via dbId
             target = recordings.find(r => r.dbId && r.dbId.toString() === String(targetId));

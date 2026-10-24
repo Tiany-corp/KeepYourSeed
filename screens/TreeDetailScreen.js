@@ -21,7 +21,7 @@ export default function TreeDetailScreen() {
     const audioPlayer = useAudioPlayer();
     const { width, height } = useWindowDimensions();
 
-    const { session, updateStreak } = useContext(AppContext);
+    const { session, updateStreak, setDrawerOpen } = useContext(AppContext);
     const { showAlert } = useAlert();
     const { isRecording, duration, startRecording, stopRecording, formatDuration } = useAudioRecorder();
 
@@ -215,7 +215,7 @@ export default function TreeDetailScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <AppHeader
-                onOpenSettings={() => { }}
+                onOpenSettings={() => setDrawerOpen(true)}
                 title="Mon jardin"
                 showLogo={false}
                 rightContent={
