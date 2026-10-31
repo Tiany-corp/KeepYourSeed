@@ -8,13 +8,13 @@
 
 | Élément | Statut | Notes |
 |---------|--------|-------|
-| `package` Android défini | ✅ | `com.tianyr.KeepYourSeed` |
+| `package` Android défini | ✅ | `com.tianyr.keepyourseeds` |
 | `version` définie | ✅ | `1.0.0` |
 | `icon` défini | ✅ | `./assets/oragnicKYS.png` |
 | `adaptiveIcon` configuré | ✅ | `foregroundImage` + `backgroundColor` |
 | Permissions micro | ✅ | `RECORD_AUDIO` + `MODIFY_AUDIO_SETTINGS` |
 | `eas.json` profil production | ✅ | `autoIncrement: true` |
-| Build APK/AAB production | ❌ À faire | `eas build --platform android --profile production` |
+| Build APK/AAB production | ✅ Fait | AAB v3 importé avec succès sur la Play Console |
 
 ---
 

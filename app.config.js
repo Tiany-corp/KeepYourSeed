@@ -12,7 +12,7 @@ module.exports = ({ config }) => {
     },
     android: {
       ...config.android,
-      package: IS_DEV ? 'com.tianyr.KeepYourSeed.dev' : config.android?.package,
+      package: IS_DEV ? 'com.tianyr.keepyourseeds.dev' : (config.android?.package || 'com.tianyr.keepyourseeds'),
     },
   };
 };

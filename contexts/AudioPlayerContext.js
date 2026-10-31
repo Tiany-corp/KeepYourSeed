@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { createAudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { getAudioSource, waterTree } from '../services/storage';
 
 // --- Contexte global du lecteur audio ---
@@ -52,6 +52,17 @@ export function AudioPlayerProvider({ children }) {
         };
     }, [player]);
 
+    // Configuration de la lecture audio en arrière-plan (Android & iOS)
+    useEffect(() => {
+        setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: true,
+            interruptionMode: 'doNotMix',
+        }).catch(err => {
+            console.warn('Erreur configuration setAudioModeAsync:', err);
+        });
+    }, []);
+
     // Écoute des changements d'état du player natif
     useEffect(() => {
         const sub = player.addListener('playbackStatusUpdate', (status) => {
@@ -80,6 +91,11 @@ export function AudioPlayerProvider({ children }) {
                 setIsPlaying(false);
                 setPosition(durationRef.current);
                 positionRef.current = durationRef.current;
+                try {
+                    if (typeof player.clearLockScreenControls === 'function') {
+                        player.clearLockScreenControls();
+                    }
+                } catch (_) {}
             }
         });
 
@@ -107,6 +123,14 @@ export function AudioPlayerProvider({ children }) {
 
         if (currentTrack?.id === recording.id) {
             player.play();
+            try {
+                if (typeof player.setActiveForLockScreen === 'function') {
+                    player.setActiveForLockScreen(true, {
+                        title: recording.title || 'Note vocale',
+                        artist: 'KeepYourSeed',
+                    });
+                }
+            } catch (_) {}
             setLoadingTrackId(null);
             return;
         }
@@ -123,6 +147,14 @@ export function AudioPlayerProvider({ children }) {
             // ZAPPING INSTANTANÉ
             player.replace(source);
             player.play();
+            try {
+                if (typeof player.setActiveForLockScreen === 'function') {
+                    player.setActiveForLockScreen(true, {
+                        title: recording.title || 'Note vocale',
+                        artist: 'KeepYourSeed',
+                    });
+                }
+            } catch (_) {}
         } catch (e) {
             intentionalPlay.current = false;
             setIsPlaying(false);
@@ -161,6 +193,9 @@ export function AudioPlayerProvider({ children }) {
         setCurrentTrack(null);
         setModalVisible(false);
         try {
+            if (typeof player.clearLockScreenControls === 'function') {
+                player.clearLockScreenControls();
+            }
             player.pause();
         } catch (error) {
             console.log('stop() player error (ignored):', error);

@@ -39,7 +39,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      "package": "com.tianyr.KeepYourSeed"
+      "package": "com.tianyr.keepyourseeds"
     },
     "web": {
       "favicon": "./assets/oragnicKYS.png",
@@ -80,6 +80,7 @@
       ],
       "expo-web-browser",
       "expo-updates",
+      "expo-asset",
       "@react-native-community/datetimepicker"
     ],
     "extra": {

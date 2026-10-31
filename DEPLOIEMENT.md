@@ -5,6 +5,20 @@ Ce fichier garde la trace des déploiements OTA effectués via Expo Application 
 > [!NOTE]
 > L'application actuellement installée sur le téléphone de test est configurée pour écouter la branche **`preview`**. Toutes les mises à jour de test doivent donc être déployées sur cette branche.
 
+## 31 Octobre 2026
+
+### 📦 Build Production Google Play Store (AAB)
+- **Profil :** `production` (commande: `eas build --platform android --profile production`)
+- **Canal OTA associé :** `production`
+- **Application ID (Package) :** `com.tianyr.keepyourseeds`
+- **Version :** `1.0.0` (Version code: `3`)
+- **Signature :** Signature avec la clé d'importation Play Store officielle (`SHA1: B9:36:C2:87:9A:60:E1:FA:BF:64:99:FF:8D:32:DB:69:B3:D9:F9:DD`)
+- **Lien du dashboard :** [Build 4efe26f8](https://expo.dev/accounts/tianyr/projects/KeepYourSeed/builds/4efe26f8-73bc-4d58-b1ca-a2454ebfab4e)
+- **Fichier AAB :** [Télécharger l'AAB v3](https://expo.dev/artifacts/eas/sAEySTz5jgvWlfq_3xnVNe5-TIzPU77TSMnFO3-NkF0.aab)
+- **Statut Play Console :** Validé et importé avec succès sur la Google Play Console.
+
+
+
 
 ## 24 Octobre 2026
 
