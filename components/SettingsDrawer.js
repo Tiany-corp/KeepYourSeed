@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAlert } from '../contexts/AlertContext';
 import { supabase } from '../services/supabase';
 import { clearRecordings, getWifiOnlyPreference, setWifiOnlyPreference, getAutoSyncPreference, setAutoSyncPreference, getCloudQuota, setCloudQuota, getRecordings, calculateStorageSize, formatSize, formatStorageRatio } from '../services/storage';
-import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, CloudSync, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell, Send, Trees } from 'lucide-react-native';
+import { Settings, X, Trash2, LogOut, LogIn, CloudUpload, ShieldCheck, Database, Info, Wifi, RefreshCcw, Inbox, Cloud, CloudOff, Wrench, Bell, Send, Trees } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { fetchTotalCloudUsage } from '../services/cloud';
 import { syncAll, forcePushAllLocalNotes } from '../services/sync';
@@ -343,7 +343,7 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         {/* Info de stockage CLOUD */}
                         <View style={{ paddingVertical: 10, paddingHorizontal: 20 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                                <Cloud size={20} color="#78350F" fill="#78350F" style={[styles.menuIcon, { marginTop: 2 }]} />
+                                <Cloud size={20} color="#78350F" style={[styles.menuIcon, { marginTop: 2 }]} />
                                 <View style={{ flex: 1 }}>
                                     {/* Ligne 1 : Titre et Chiffres */}
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -383,9 +383,9 @@ export default function SettingsDrawer({ visible, onClose, session, onDataCleare
                         <View style={[styles.menuItem, { paddingVertical: 10, justifyContent: 'space-between' }]}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 {autoSync ? (
-                                    <CloudSync size={20} color="#15803d" style={styles.menuIcon} />
+                                    <Cloud size={20} color="#10B981" style={styles.menuIcon} />
                                 ) : (
-                                    <CloudOff size={20} color="#78350F" style={styles.menuIcon} />
+                                    <CloudOff size={20} color="#78716C" opacity={0.6} style={styles.menuIcon} />
                                 )}
                                 <Text style={styles.menuItemText}>Sauvegarde Auto</Text>
                             </View>
