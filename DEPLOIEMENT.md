@@ -5,9 +5,29 @@ Ce fichier garde la trace des déploiements OTA effectués via Expo Application 
 > [!NOTE]
 > L'application actuellement installée sur le téléphone de test est configurée pour écouter la branche **`preview`**. Toutes les mises à jour de test doivent donc être déployées sur cette branche.
 
+## 1 Novembre 2026
+
+### 🚀 Harmonisation Icônes Cloud & Audio Background
+- **Branche cible :** `preview` (commande: `eas update --branch preview`)
+- **Message :** `Harmonisation icones cloud et audio background`
+- **Lien du dashboard :** [Update be486609](https://expo.dev/accounts/tianyr/projects/KeepYourSeed/updates/be486609-9878-4248-a7e4-4c7bef8083ae)
+- **Modifications principales :**
+  - **Audio en arrière-plan :** Intégration de `setAudioModeAsync({ shouldPlayInBackground: true })` et commandes lockscreen/notification (`setActiveForLockScreen`).
+  - **Harmonisation des icônes Cloud (`SettingsDrawer.js`) :**
+    - Sauvegarde auto active : icône `Cloud` en vert émeraude (`#10B981`), identique à l'historique.
+    - Sauvegarde auto inactive : icône `CloudOff` en gris (`#78716C`) avec opacité adoucie.
+    - Stockage cloud : icône `Cloud` marron en mode contour (sans remplissage).
+
 ## 31 Octobre 2026
 
-### 📦 Build Production Google Play Store (AAB)
+### 📦 Build Production Google Play Store AAB v4
+- **Profil :** `production`
+- **Application ID :** `com.tianyr.keepyourseeds`
+- **Version :** `1.0.0` (Version code: `4`)
+- **Commit :** `3cea58c`
+- **Fichier AAB :** [Télécharger l'AAB v4](https://expo.dev/artifacts/eas/EJXrCKcAmcfvVE1sGl5i8PW134UOEh0ZAJKaCvzyV4I.aab)
+
+### 📦 Build Production Google Play Store (AAB v3)
 - **Profil :** `production` (commande: `eas build --platform android --profile production`)
 - **Canal OTA associé :** `production`
 - **Application ID (Package) :** `com.tianyr.keepyourseeds`

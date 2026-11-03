@@ -61,7 +61,7 @@ export default function RecordButton({
                             style={[styles.actionButton, styles.mainButton]}
                         >
                             <Mic size={20} color="#FFFFFF" strokeWidth={1.5} />
-                            <Text style={styles.mainButtonText}>Capturer une pensée</Text>
+                            <Text style={styles.mainButtonText}>Garder une pensée</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
