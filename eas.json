@@ -25,11 +25,19 @@
       "ios": {
         "simulator": true
       },
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zzuqcuvutynwczrfbzms.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_ZKGbj4wlJL6EHgKpVQuMGg_h-KYKpIh"
+      }
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://zzuqcuvutynwczrfbzms.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_ZKGbj4wlJL6EHgKpVQuMGg_h-KYKpIh"
+      }
     }
   },
   "submit": {

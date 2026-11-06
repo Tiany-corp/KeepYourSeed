@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "KeepYourSeeds",
+    "name": "Keep Your Seeds",
     "slug": "KeepYourSeed",
     "scheme": "keepyourseed",
     "version": "1.0.0",
@@ -31,7 +31,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/oragnicKYS.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FAF7F2"
       },
       "edgeToEdgeEnabled": true,

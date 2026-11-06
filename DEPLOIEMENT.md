@@ -5,6 +5,21 @@ Ce fichier garde la trace des déploiements OTA effectués via Expo Application 
 > [!NOTE]
 > L'application actuellement installée sur le téléphone de test est configurée pour écouter la branche **`preview`**. Toutes les mises à jour de test doivent donc être déployées sur cette branche.
 
+## 5 Novembre 2026
+
+### 📦 Build Production Google Play Store AAB v5 (KeepYourSeeds)
+- **Profil :** `production`
+- **Application ID :** `com.tianyr.keepyourseeds`
+- **Nom de l'application :** `KeepYourSeeds`
+- **Version :** `1.0.0` (Version code: `5`)
+- **Lien du dashboard :** [Build e95c7222](https://expo.dev/accounts/tianyr/projects/KeepYourSeed/builds/e95c7222-c064-4043-ad14-b2726a680628)
+- **Fichier AAB :** [Télécharger l'AAB v5](https://expo.dev/artifacts/eas/mtnhao52ZCkM5iSU_x6LVr3qiBtiP_Naip1Y13V0Rzc.aab)
+- **Inclus dans ce build :**
+  - Renommage officiel de l'application en **KeepYourSeeds**.
+  - Nouveau libellé du bouton : **« Garder une pensée »**.
+  - Lecture audio en arrière-plan avec commandes lockscreen/notification.
+  - Harmonisation complète des icônes Cloud dans le tiroir de paramètres.
+
 ## 1 Novembre 2026
 
 ### 🚀 Harmonisation Icônes Cloud & Audio Background
