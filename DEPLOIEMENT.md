@@ -5,6 +5,20 @@ Ce fichier garde la trace des déploiements OTA effectués via Expo Application 
 > [!NOTE]
 > L'application actuellement installée sur le téléphone de test est configurée pour écouter la branche **`preview`**. Toutes les mises à jour de test doivent donc être déployées sur cette branche.
 
+## 6 Novembre 2026
+
+### 📦 Build Production Google Play Store AAB v6 (Fix Écran Blanc & Adaptive Icon)
+- **Profil :** `production`
+- **Application ID :** `com.tianyr.keepyourseeds`
+- **Nom de l'application :** `Keep Your Seeds` (avec espaces)
+- **Version :** `1.0.0` (Version code: `6`)
+- **Lien du dashboard :** [Build 578ed034](https://expo.dev/accounts/tianyr/projects/KeepYourSeed/builds/578ed034-5237-4d2b-87c8-afd2dfd6da67)
+- **Fichier AAB :** [Télécharger l'AAB v6](https://expo.dev/artifacts/eas/iKECJzPtPO7Z4rtfjn8NQXUhWp674p2aSuqBb4Cx6dc.aab)
+- **Correctifs majeurs dans ce build :**
+  - **Correction du White Screen (Crash au démarrage) :** Injection automatique des variables d'environnement Supabase (`EXPO_PUBLIC_SUPABASE_URL` et `EXPO_PUBLIC_SUPABASE_ANON_KEY`) dans le profil de production EAS et ajout de fallbacks dans `services/supabase.js`.
+  - **Correction du Logo Android (Rognage) :** Nouvelle icône adaptative (`assets/adaptive-icon.png`) avec feuille redimensionnée à 56% pour respecter la zone de sécurité circulaire/squircle Android.
+  - **Nom officiel sous l'icône :** `Keep Your Seeds` avec espaces naturels pour un affichage propre sans césure artificielle.
+
 ## 5 Novembre 2026
 
 ### 📦 Build Production Google Play Store AAB v5 (KeepYourSeeds)

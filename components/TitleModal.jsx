@@ -15,41 +15,12 @@ import { Trash2, Plus, X, Apple, Leaf } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import CustomDatePicker from './CustomDatePicker';
 import TimeWheelPickerModal from './TimeWheelPickerModal';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { get, set } from 'idb-keyval';
-import { AVAILABLE_TAGS, loadCustomTagsCache } from '../utils/tags';
-
-const CUSTOM_TAGS_KEY = '@custom_tags_v1';
+import { AVAILABLE_TAGS, loadCustomTags, persistCustomTags, loadCustomTagsCache } from '../utils/tags';
 
 const CUSTOM_TAG_EMOJIS = [
     '🔥', '⭐', '💪', '❤️', '🎵', '📖', '✨', '🌍',
     '🏆', '💎', '🕊️', '🌙', '⚡', '🎨', '📌', '🔑',
 ];
-
-
-// --- Persistence des tags custom ---
-const loadCustomTags = async () => {
-    try {
-        if (Platform.OS === 'web') {
-            const data = await get(CUSTOM_TAGS_KEY);
-            return data ? JSON.parse(data) : [];
-        } else {
-            const data = await AsyncStorage.getItem(CUSTOM_TAGS_KEY);
-            return data ? JSON.parse(data) : [];
-        }
-    } catch { return []; }
-};
-
-const persistCustomTags = async (tags) => {
-    try {
-        const str = JSON.stringify(tags);
-        if (Platform.OS === 'web') {
-            await set(CUSTOM_TAGS_KEY, str);
-        } else {
-            await AsyncStorage.setItem(CUSTOM_TAGS_KEY, str);
-        }
-    } catch (e) { console.warn('Failed to save custom tags', e); }
-};
 
 const RootIcon = ({ size = 24, color = "currentColor", strokeWidth = 2 }) => (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">

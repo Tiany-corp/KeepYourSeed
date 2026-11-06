@@ -42,6 +42,10 @@ Ces fonctionnalités constituent le cœur de l'application.
 - [ ] **Croissance de la Plante** : Évolution visuelle d'un arbre basée sur la régularité des pensées.
 - [ ] **Insight IA** : Résumé hebdomadaire des thématiques abordées (via analyse de tags/transcription).
 - [ ] **Mode Méditation** : Fonds sonores ambiants pendant l'écoute des souvenirs.
+- [ ] **Monétisation & Achats intégrés (Freemium via RevenueCat)** :
+  - Intégration de **RevenueCat** (`react-native-purchases`) pour la gestion unifiée des abonnements et achats in-app (Google Play Billing / App Store).
+  - Abonnements Pro optionnels : extension du stockage Cloud, synchronisation haute fréquence, exports audio et personnalisations visuelles.
+  - Formule "Achat à vie" (Lifetime Pro).
 
 ---
 

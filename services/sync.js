@@ -84,6 +84,14 @@ export const syncAll = async (userId, isManual = false) => {
         const canDownloadAudio = isManual || isWifi || !wifiOnly;
         pulledCount = await pullCloudRecordings(userId, canDownloadAudio);
 
+        // 3. SYNCHRONISATION DES ÉTIQUETTES PERSONNALISÉES (tags & emojis)
+        try {
+            const { syncCustomTagsWithCloud } = require('../utils/tags');
+            await syncCustomTagsWithCloud();
+        } catch (tagErr) {
+            console.warn('Tag sync error in syncAll:', tagErr);
+        }
+
         _isSyncing = false;
         _lastSyncTime = Date.now();
         return {

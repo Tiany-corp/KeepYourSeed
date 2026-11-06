@@ -1,6 +1,7 @@
-import { get } from 'idb-keyval';
+import { get, set } from 'idb-keyval';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { supabase } from '../services/supabase';
 
 const CUSTOM_TAGS_KEY = '@custom_tags_v1';
 let _customTagsCache = [];
@@ -17,21 +18,103 @@ export const AVAILABLE_TAGS = [
 ];
 
 /**
+ * Charge les tags personnalisés depuis le stockage local (AsyncStorage / IndexedDB).
+ */
+export const loadCustomTags = async () => {
+    try {
+        if (Platform.OS === 'web') {
+            const data = await get(CUSTOM_TAGS_KEY);
+            return data ? JSON.parse(data) : [];
+        } else {
+            const data = await AsyncStorage.getItem(CUSTOM_TAGS_KEY);
+            return data ? JSON.parse(data) : [];
+        }
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * Sauvegarde les tags personnalisés en local et les envoie sur Supabase si l'utilisateur est connecté.
+ */
+export const persistCustomTags = async (tags, syncWithCloud = true) => {
+    try {
+        const str = JSON.stringify(tags);
+        if (Platform.OS === 'web') {
+            await set(CUSTOM_TAGS_KEY, str);
+        } else {
+            await AsyncStorage.setItem(CUSTOM_TAGS_KEY, str);
+        }
+        _customTagsCache = tags;
+
+        if (syncWithCloud) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                supabase.auth.updateUser({
+                    data: { custom_tags: tags }
+                }).catch(err => console.warn('Erreur sync cloud tags:', err));
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to save custom tags', e);
+    }
+};
+
+export const syncCustomTagsWithCloud = async () => {
+    try {
+        let user = null;
+        try {
+            const { data } = await supabase.auth.getUser();
+            user = data?.user;
+        } catch {
+            // Mode hors-ligne ou erreur réseau
+        }
+        if (!user) {
+            const { data: { session } } = await supabase.auth.getSession();
+            user = session?.user;
+        }
+        if (!user) return _customTagsCache;
+
+        const cloudTags = Array.isArray(user.user_metadata?.custom_tags) ? user.user_metadata.custom_tags : [];
+        const localTags = await loadCustomTags();
+
+        // Fusion sans doublons par ID
+        const map = new Map();
+        localTags.forEach(t => { if (t && t.id) map.set(t.id, t); });
+        cloudTags.forEach(t => { if (t && t.id) map.set(t.id, t); });
+        const merged = Array.from(map.values());
+
+        // Mise à jour locale si des nouveautés viennent du cloud
+        if (JSON.stringify(merged) !== JSON.stringify(localTags)) {
+            await persistCustomTags(merged, false);
+        }
+
+        // Mise à jour cloud si le local avait des tags pas encore envoyés
+        if (JSON.stringify(merged) !== JSON.stringify(cloudTags)) {
+            await supabase.auth.updateUser({
+                data: { custom_tags: merged }
+            });
+        }
+
+        _customTagsCache = merged;
+        return merged;
+    } catch (e) {
+        console.warn('Erreur syncCustomTagsWithCloud:', e);
+        return _customTagsCache;
+    }
+};
+
+/**
  * Charge les tags personnalisés depuis le stockage pour le cache synchrone.
  */
 export const loadCustomTagsCache = async () => {
     try {
-        let data;
-        if (Platform.OS === 'web') {
-            data = await get(CUSTOM_TAGS_KEY);
-        } else {
-            data = await AsyncStorage.getItem(CUSTOM_TAGS_KEY);
-        }
-        if (data) {
-            _customTagsCache = JSON.parse(data);
-        }
+        const tags = await loadCustomTags();
+        _customTagsCache = tags;
+        return tags;
     } catch (e) {
         console.warn('Failed to load custom tags cache', e);
+        return [];
     }
 };
 

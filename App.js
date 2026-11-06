@@ -17,6 +17,7 @@ import AudioPlayer from './components/AudioPlayer';
 import { AppContext } from './contexts/AppContext';
 import { syncAll } from './services/sync';
 import { deduplicateLocalStore } from './services/storage';
+import { loadCustomTagsCache, syncCustomTagsWithCloud } from './utils/tags';
 
 const Stack = createNativeStackNavigator();
 
@@ -63,9 +64,15 @@ function AppContent() {
   useEffect(() => {
     let authSubscription;
 
+    // Initialisation du cache des étiquettes personnalisées
+    loadCustomTagsCache();
+
     // Récupération de la session en tâche de fond (silencieuse)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user) {
+        syncCustomTagsWithCloud();
+      }
     });
 
     // Nettoyage des doublons locaux au démarrage
@@ -73,6 +80,9 @@ function AppContent() {
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user) {
+        syncCustomTagsWithCloud();
+      }
     });
 
     authSubscription = data?.subscription;
