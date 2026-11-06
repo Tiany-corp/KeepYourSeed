@@ -42,6 +42,48 @@ L'application privilégie toujours les données locales pour une réactivité in
 
 ---
 
+## 🏷️ Système d'Étiquettes et Émojis (Dictionnaire Découplé)
+
+L'architecture des étiquettes repose sur un principe de **découplage strict** entre la référence stockée sur la pensée et le dictionnaire visuel de l'utilisateur :
+
+### 1. Stockage sur les Pensées (`recordings.tags`)
+- Dans la table PostgreSQL `public.recordings`, la colonne `tags` est un simple tableau textuel (`text[]`).
+- Les notes ne stockent **que des identifiants/clés de référence**, jamais les émojis ni les styles :
+  ```json
+  // Exemple de ligne en BDD dans recordings
+  {
+    "id": "uuid-123",
+    "title": "Ma pensée",
+    "tags": ["enseignement", "custom_force", "custom_musique"]
+  }
+  ```
+- **Dérivation du libellé :** L'application dérive le label affiché par une règle simple (suppression du préfixe `custom_`, remplacement des underscores par des espaces, première lettre en majuscule : `"custom_force"` ➔ `"Force"`).
+
+### 2. Le Dictionnaire Utilisateur (`auth.users.raw_user_meta_data`)
+- Les émojis personnalisés et leurs libellés sont centralisés dans le profil du compte utilisateur Supabase, dans la colonne JSON `raw_user_meta_data` :
+  ```json
+  {
+    "custom_tags": [
+      { "id": "custom_force", "label": "Force", "emoji": "💪" },
+      { "id": "custom_musique", "label": "Musique", "emoji": "🎵" }
+    ]
+  }
+  ```
+- **Cache local & Offline :** Au démarrage de l'app, ce dictionnaire est chargé en mémoire cache (`_customTagsCache`) et persisté en local (`@custom_tags_v1` via AsyncStorage / IndexedDB).
+
+### 3. Résolution Visuelle (`getTagInfo`)
+Quand l'interface affiche une étiquette :
+1. Elle vérifie si c'est un tag système (`AVAILABLE_TAGS` : 🌱 *Enseignement*, 💛 *Gratitude*...).
+2. Sinon, elle cherche dans le dictionnaire `custom_tags` de l'utilisateur pour trouver l'émoji correspondant.
+3. Si le tag n'est pas encore présent dans le dictionnaire (ex: ancienne note créée sur un autre appareil avant synchronisation), elle utilise un filet de secours : émoji générique `🏷️` + nom dérivé de l'identifiant.
+
+### 4. Avantages de ce Design
+- **Mise à jour en cascade instantanée** : Changer l'émoji ou renommer une étiquette dans l'espace d'administration modifie une seule entrée dans le dictionnaire utilisateur. Les centaines de pensées liées affichent immédiatement le nouvel émoji sans nécessiter d'UPDATE SQL sur chaque note.
+- **Légèreté de la base de données** : Aucun coût de stockage redondant d'émojis sur les milliers de lignes de `recordings`.
+- **Portabilité multi-appareils** : La connexion sur un nouvel appareil ou sur le Web télécharge immédiatement le dictionnaire et restitue tous les émojis.
+
+---
+
 ## ✨ Système d'Animations Visuelles
 
 ### Glow & Aura (DailyMemoryCard)

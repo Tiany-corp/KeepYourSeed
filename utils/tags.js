@@ -17,6 +17,12 @@ export const AVAILABLE_TAGS = [
     { id: 'temoignage', label: 'Témoignage', emoji: '💬' },
 ];
 
+export const CUSTOM_TAG_EMOJIS = [
+    '🔥', '⭐', '💪', '❤️', '🎵', '📖', '✨', '🌍',
+    '🏆', '💎', '🕊️', '🌙', '⚡', '🎨', '📌', '🔑',
+    '🎯', '🌿', '💡', '🌱', '☀️', '☕', '🚀', '💬'
+];
+
 /**
  * Charge les tags personnalisés depuis le stockage local (AsyncStorage / IndexedDB).
  */
@@ -124,29 +130,32 @@ export const loadCustomTagsCache = async () => {
 export function getTagInfo(tagId) {
     if (!tagId) return null;
     
-    const lowerId = tagId.toLowerCase();
+    const lowerId = String(tagId).toLowerCase();
+    const cleanId = lowerId.replace(/^custom_/, '');
 
     // 1. Chercher dans les tags système
-    const found = AVAILABLE_TAGS.find(t => t.id.toLowerCase() === lowerId || t.label.toLowerCase() === lowerId);
+    const found = AVAILABLE_TAGS.find(t => 
+        t.id.toLowerCase() === lowerId || 
+        t.label.toLowerCase() === lowerId ||
+        t.id.toLowerCase() === cleanId
+    );
     if (found) return found;
     
-    // 2. Chercher dans le cache des tags personnalisés
-    const customFound = _customTagsCache.find(t => t.id === tagId);
+    // 2. Chercher dans le cache des tags personnalisés (par ID, label ou ID sans préfixe custom_)
+    const customFound = _customTagsCache.find(t => {
+        if (!t) return false;
+        const tId = (t.id || '').toLowerCase();
+        const tLabel = (t.label || '').toLowerCase();
+        const tClean = tId.replace(/^custom_/, '');
+        return tId === lowerId || tLabel === lowerId || tClean === cleanId || tClean === lowerId;
+    });
     if (customFound) return customFound;
 
-    // 3. Fallback pour les tags personnalisés non encore mis en cache
-    if (tagId.startsWith('custom_')) {
-        const label = tagId.replace('custom_', '').replace(/_/g, ' ');
-        return { 
-            id: tagId, 
-            label: label.charAt(0).toUpperCase() + label.slice(1), 
-            emoji: '🏷️' 
-        };
-    }
-    
+    // 3. Fallback pour les tags non encore mis en cache
+    const label = cleanId.replace(/_/g, ' ');
     return {
         id: tagId,
-        label: tagId.charAt(0).toUpperCase() + tagId.slice(1),
+        label: label.charAt(0).toUpperCase() + label.slice(1),
         emoji: '🏷️'
     };
 }

@@ -72,7 +72,7 @@ export default function HistoryScreen() {
     useEffect(() => {
         const initialize = async () => {
             // Initialisations légères
-            loadCustomTagsCache();
+            await loadCustomTagsCache();
             getDailyMemoryPrefTag(session?.user?.id || null).then(setCurrentPrefTag);
 
             // 1. Chargement local des vocaux (~10ms)
@@ -535,6 +535,10 @@ export default function HistoryScreen() {
                     selectedTag={selectedFilterTag}
                     onSelectTag={setSelectedFilterTag}
                     onSearchPress={() => setSearchModalVisible(true)}
+                    onTagsUpdated={async () => {
+                        await loadCustomTagsCache();
+                        loadRecordings();
+                    }}
                 />
             </View>
         );
